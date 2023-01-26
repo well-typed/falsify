@@ -1,1 +1,3 @@
-module Test.Falsify () where
+module Test.Falsify (
+  ) where
+

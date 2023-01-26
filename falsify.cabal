@@ -16,20 +16,50 @@ extra-doc-files:    CHANGELOG.md
 common lang
   ghc-options:
       -Wall
-  build-depends:
-      base >= 4.14
+      -Wredundant-constraints
   default-language:
       Haskell2010
+  default-extensions:
+      DeriveFoldable
+      DeriveFunctor
+      DerivingStrategies
+      DisambiguateRecordFields
+      FlexibleInstances
+      GADTs
+      GeneralizedNewtypeDeriving
+      LambdaCase
+      MultiParamTypeClasses
+      NamedFieldPuns
+      PatternSynonyms
+      ScopedTypeVariables
+      StandaloneDeriving
+      TypeFamilies
+      ViewPatterns
+  build-depends:
+      base >= 4.12
 
 library
   import:
       lang
   exposed-modules:
       Test.Falsify
+      Test.Falsify.Entropy
+      Test.Falsify.Entropy.Tree
+      Test.Falsify.Generator
+      Test.Falsify.Generator.Compound
+      Test.Falsify.Generator.Primitive
+      Test.Falsify.Generator.Simple
+      Test.Falsify.Nudge
+      Test.Falsify.Range
+      Test.Falsify.Util
+      Test.Falsify.Util.Tree
   hs-source-dirs:
       src
+  build-depends:
+    , data-default
+    , transformers
 
-test-suite falsify-test
+test-suite test-falsify
   import:
       lang
   type:
@@ -38,5 +68,10 @@ test-suite falsify-test
       test
   main-is:
       Main.hs
+  other-modules:
+      TestSuite.Sanity.Generator
   build-depends:
-      falsify
+    , falsify
+    , splitmix
+    , tasty
+    , tasty-hunit

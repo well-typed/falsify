@@ -1,4 +1,10 @@
-module Main (main) where
+module Main where
+
+import Test.Tasty
+
+import qualified TestSuite.Sanity.Generator
 
 main :: IO ()
-main = putStrLn "Test suite not yet implemented."
+main = defaultMain $ testGroup "falsify" [
+      TestSuite.Sanity.Generator.tests
+    ]
