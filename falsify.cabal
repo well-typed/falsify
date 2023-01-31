@@ -1,35 +1,83 @@
 cabal-version:      3.0
 name:               falsify
 version:            0.1.0
--- synopsis:
--- description:
+synopsis:           Property-based testing with internal integrated shrinking
+description:        This library provides property based testing with support
+                    for internal integrated shrinking: integrated in the sense
+                    of Hedgehog, meaning that there is no need to write a
+                    separate shrinker and generator; and internal in the sense
+                    of Hypothesis, meaning that this works well even across
+                    monadic bind.
 license:            BSD-3-Clause
 license-file:       LICENSE
 author:             Edsko de Vries
 maintainer:         edsko@well-typed.com
--- copyright:
+copyright:          Well-Typed LLP
 category:           Testing
 build-type:         Simple
 extra-doc-files:    CHANGELOG.md
 -- extra-source-files:
+tested-with:        GHC==8.6.5
+                  , GHC==8.8.4
+                  , GHC==8.10.7
+                  , GHC==9.0.2
+                  , GHC==9.2.5
+                  , GHC==9.4.4
+
+source-repository head
+  type:     git
+  location: https://github.com/well-typed/falsify
 
 common lang
   ghc-options:
       -Wall
+      -Wredundant-constraints
   build-depends:
-      base >= 4.14
+      base >= 4.12 && < 4.18
   default-language:
       Haskell2010
+  default-extensions:
+      DeriveFunctor
+      DerivingStrategies
+      FlexibleContexts
+      FlexibleInstances
+      GADTs
+      GeneralizedNewtypeDeriving
+      LambdaCase
+      MultiParamTypeClasses
+      NamedFieldPuns
+      ScopedTypeVariables
+      StandaloneDeriving
+      UndecidableInstances
 
 library
   import:
       lang
   exposed-modules:
       Test.Falsify
+      Test.Falsify.Generator
+      Test.Falsify.Generator.Auxiliary
+      Test.Falsify.Generator.Debugging
+      Test.Falsify.Nudge
+      Test.Falsify.Range
+      Test.Falsify.SampleTree
+  other-modules:
+      Test.Falsify.Internal.Generator
+      Test.Falsify.Internal.Generator.Definition
+      Test.Falsify.Internal.Generator.Shrinking
+      Test.Falsify.Internal.Generator.Truncated
+      Test.Falsify.Internal.Search
+      Test.Falsify.Reexported.Generator.Compound
+      Test.Falsify.Reexported.Generator.Simple
   hs-source-dirs:
       src
+  build-depends:
+    , containers
+    , data-default
+    , mtl
+    , splitmix
 
-test-suite falsify-test
+test-suite test-falsify
   import:
       lang
   type:
@@ -38,5 +86,16 @@ test-suite falsify-test
       test
   main-is:
       Main.hs
+  other-modules:
+      TestSuite.Sanity.Auxiliary
+      TestSuite.Sanity.Compound
+      TestSuite.Sanity.Prim
+      TestSuite.Sanity.Range
+      TestSuite.Sanity.Simple
+      TestSuite.Util.Predicates
   build-depends:
-      falsify
+    , containers
+    , data-default
+    , falsify
+    , tasty
+    , tasty-hunit
