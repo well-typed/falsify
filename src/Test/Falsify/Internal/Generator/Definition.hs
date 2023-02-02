@@ -94,6 +94,11 @@ instance Monad Gen where
 
 -- | Disable shrinking in the given generator
 --
+-- This should be considered a hint only: in particular, values may /always/ be
+-- shrunk to their minimum value, and if the structure of a generator changes
+-- and random samples are interpreted in a different context, we might "shrink"
+-- from any value to another other value (including even larger values).
+--
 -- This function is only occassionally necessary; most users will probably not
 -- need to use it.
 withoutShrinking :: Gen a -> Gen a
