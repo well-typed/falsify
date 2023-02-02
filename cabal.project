@@ -1,0 +1,4 @@
+packages: .
+
+package falsify
+  tests: true

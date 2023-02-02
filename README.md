@@ -1,7 +1,5 @@
 # falsify
 
-Haskell library for randomized property-based testing using internal shrinking.
-
 ## References
 
 * **Hypothesis: A new approach to property-based testing.**
