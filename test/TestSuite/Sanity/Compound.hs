@@ -1,6 +1,7 @@
 module TestSuite.Sanity.Compound (tests) where
 
 import Data.List.NonEmpty (NonEmpty((:|)), nub)
+import Data.Word
 import Test.Tasty
 import Test.Tasty.HUnit
 
@@ -42,9 +43,9 @@ test_list = do
     assertEqual "shrink" shrinkHistory $
       nub $ Gen.shrink (not . prop) gen (SampleTree.fromSeed 1)
   where
-    gen :: Gen [Word]
+    gen :: Gen [Word8]
     gen = filter even <$>
             Gen.list (10, 20) (Gen.integral $ Range.num (0, 10) 5)
 
-    prop :: [Word] -> Bool
+    prop :: [Word8] -> Bool
     prop = pairwiseAll (<=)
