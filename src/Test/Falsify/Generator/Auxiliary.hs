@@ -27,6 +27,7 @@ import Data.Word
 
 import Test.Falsify.Internal.Generator
 import Test.Falsify.Internal.Search
+import Data.Bits
 
 {-------------------------------------------------------------------------------
   Auxiliary type: signed values
@@ -58,13 +59,20 @@ forgetPrecision (WordN _ x) = x
 
 -- | Make @n@-bit word (@n <= 64@)
 --
--- If the 'Word64' exceeds the specified range, it will be capped at the max.
+-- Bits outside the requested precision will be zeroed.
 --
--- > capAt 4 10 == WordN 4 10
--- > capAt 4 16 == WordN 4 15
-capAt :: Precision -> Word64 -> WordN
-capAt desiredPrecision x =
-    WordN actualPrecision (min x $ maxValue actualPrecision)
+-- We use this to generate random @n@-bit words from random 64-bit words.
+-- It is important that we /truncate/ rather than /cap/ the value: capping the
+-- value (limiting it to a certain maximum) would result in a strong bias
+-- towards that maximum value.
+--
+-- Of course, /shrinking/ of a Word64 bit does not translate automatically to
+-- shrinking of the lower @n@ bits of that word (a decrease in the larger
+-- 'Word64' may very well be an /increase/ in the lower @n@ bits), so this must
+-- be taken into account.
+truncateAt :: Precision -> Word64 -> WordN
+truncateAt desiredPrecision x =
+    WordN actualPrecision (x .&. mask actualPrecision)
   where
     maximumPrecision, actualPrecision :: Precision
     maximumPrecision = Precision 64
@@ -74,8 +82,8 @@ capAt desiredPrecision x =
     --
     -- If @n == 64@ then @2 ^ n@ will overflow, but it will overflow to @0@, and
     -- @(-1) :: Word64 == maxBound@; so no need to treat this case separately.
-    maxValue :: Precision -> Word64
-    maxValue (Precision n) = 2 ^ n - 1
+    mask :: Precision -> Word64
+    mask (Precision n) = 2 ^ n - 1
 
 {-------------------------------------------------------------------------------
   Auxiliary type: fractions
@@ -96,8 +104,7 @@ mkFraction (WordN (Precision p) x) = Fraction $ (fromIntegral x) / (2 ^ p - 1)
 -- | Generate @n@-bit word of specified precision, shrinking towards 0
 unsignedWordN :: Precision -> Gen WordN
 unsignedWordN p =
-    capAt p <$>
-      primWith (binarySearch . forgetPrecision . capAt p)
+    truncateAt p <$> primWith (binarySearch . forgetPrecision . truncateAt p)
 
 -- | Generated signed @n-bit@ word, shrinking towards 0
 --
@@ -109,8 +116,9 @@ signedWordN :: Precision -> Gen (Signed WordN)
 signedWordN = \p ->
     -- We will use the LSB to determine the sign of the value, so we must ask
     -- for one more bit of precision.
-    aux . capAt (succ p) <$>
-      primWith (binarySearchNoParityBias . forgetPrecision . capAt (succ p))
+    let p' = succ p
+    in aux . truncateAt p' <$>
+         primWith (binarySearchNoParityBias . forgetPrecision . truncateAt p')
   where
     -- As @x@ tends towards 0, the LSB of @x@ (i.e., whether @x@ is even or not)
     -- will fluctuate randomly. Thus, we can use this to determine whether we
