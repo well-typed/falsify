@@ -56,7 +56,7 @@ test_pair_word_word = do
     gen = (,) <$> Gen.prim <*> Gen.prim
 
     tree :: Word64 -> Word64 -> SampleTree
-    tree x y = expandTruncated $ B (B (S x) E) (B (S y) E)
+    tree x y = expandTruncated $ B (S x) (B (S y) E)
 
     -- for all pairs (x, y), x < y
     prop1 :: (Word64, Word64) -> Bool
@@ -78,11 +78,10 @@ test_list_allEqual = do
     -- Tree that produces gen of three elements in the specified order
     tree :: Word64 -> Word64 -> Word64 -> SampleTree
     tree x y z = expandTruncated $
-        B (S 3)
-          (B (B (S x) E) (B
-          (B (B (S y) E) (B
-          (B (B (S z) E) (B E
-          E)) E)) E))
+        B (S 3) (B (S x) (B
+                (B (S y) (B
+                (B (S z) (B E
+                E)) E)) E))
 
     gen :: Gen [Word64]
     gen = do
@@ -107,10 +106,10 @@ test_list_sorted = do
     -- Tree that produces list of three elements in the specified order
     tree :: Word64 -> Word64 -> Word64 -> SampleTree
     tree x y z = expandTruncated $
-        B (B (B (B (B (S 1) E) (B (S x) E)) E) (
-        B (B (B (B (B (S 1) E) (B (S y) E)) E) (
-        B (B (B (B (B (S 1) E) (B (S z) E)) E) (B E
-        E)) E)) E)) E
+        B (B (S 1) (B (S x) E)) (B (
+        B (B (S 1) (B (S y) E)) (B (
+        B (B (S 1) (B (S z) E)) (B E
+        E)) E)) E)
 
     gen :: Int -> Gen [Word64]
     gen n =
@@ -130,7 +129,7 @@ test_maybe_towardsNothing = do
     -- When we start with the minimal tree, we get 'Nothing'
     let minimalTree = expandTruncated E
         (nothingTree, nothingResult) = (
-            B (B (S 0) E) (B (S 0) E)
+            B (S 0) (S 0)
           , (Nothing, 0)
           )
     assertEqual "run Nothing" (nothingTree, nothingResult) $
@@ -142,7 +141,7 @@ test_maybe_towardsNothing = do
           expandTruncated' Set.findMin  . toTruncated' $
             replaceValues [1] nothingTree
         (justTree, justResult) = (
-            B (B (S 1) E) (B (B (S 0) E) (B (S 0) E))
+            B (S 1) (B (S 0) (B (S 0) E))
           , (Just 0, 0)
           )
     assertEqual "run Just" (justTree, justResult) $
@@ -151,13 +150,11 @@ test_maybe_towardsNothing = do
     -- When we merge these two trees, we realize that the generators look
     -- at different parts of the sample tree (other than that first value)
     let mergedTree x y z =
-          B' (B' (S' (Set.fromList [0,1])) E')
-             (B' (F' (Set.fromList [x])
-                     (S' (Set.fromList [y]))
-                     E'
-                  )
-                  (B' (S' (Set.fromList [z])) E')
-             )
+          B' (S' (Set.fromList [0,1]))
+             (F' (Set.fromList [x])
+                 (S' (Set.fromList [y])) (B'
+                 (S' (Set.fromList [z])) E'
+                 ))
     assertEqual "merged" (mergedTree 0 0 0) $
          toTruncated' nothingTree <> toTruncated' justTree
 
@@ -184,13 +181,9 @@ test_maybe_towardsJust = do
     -- Unlike hypothesis, we are always dealing with infinite sample tree; if a
     -- "simpler" test case needs more samples, then they are available.
     -- (Note how we are shrinking from Nothing to Just in this example).
-    let shrinkHistory = (Nothing,27) :| [
-            (Just 26, 5)
-          , (Just  0, 5)
-          , (Just  0, 3) -- binary search "fails" here. QC has the same problem.
-          ]
+    let shrinkHistory = (Nothing,7) :| [(Just 6,2),(Just 0,2),(Just 0,1)]
     assertEqual "const True" shrinkHistory $
-      Gen.shrink (not . prop) gen (SampleTree.mod 50 $ SampleTree.fromSeed 1)
+      Gen.shrink (not . prop) gen (SampleTree.mod 10 $ SampleTree.fromSeed 0)
   where
     gen :: Gen (Maybe Word64, Word64)
     gen = do
@@ -200,7 +193,7 @@ test_maybe_towardsJust = do
           else (\  y -> (Nothing, y)) <$>              Gen.prim
 
     prop :: (Maybe Word64, Word64) -> Bool
-    prop = even . snd
+    prop (_, x) = x == 0
 
 test_either :: Assertion
 test_either = do
@@ -237,7 +230,7 @@ test_either = do
           else Right <$> Gen.prim
 
     tree1 :: Word64 -> SampleTree
-    tree1 x = expandTruncated $ B (B (S 1) E) (B (S x) E)
+    tree1 x = expandTruncated $ B (S 1) (S x)
 
     prop :: Either Word64 Word64 -> Bool
     prop (Right y) = odd y  || y == 0
@@ -251,37 +244,26 @@ test_either = do
         aux _ _ y = Right y
 
     tree2 :: Word64 -> SampleTree
-    tree2 x = expandTruncated $ B (B (B (S 1) E) (B (S x) E)) (B (S x) E)
+    tree2 x = expandTruncated $ B (B (S 1) (B (S x) E)) (B (S x) E)
 
 test_stream :: Assertion
 test_stream = do
-    assertEqual "run" [5,9,8,7,5,2] $
-      uncurry prefix $ Gen.run gen $ SampleTree.mod 10 (SampleTree.fromSeed 0)
+    assertEqual "run" [3,7,5,1,3,2,1] $
+      uncurry prefix $ Gen.run gen $ SampleTree.mod 10 (SampleTree.fromSeed 1)
 
-    let shrinkHistory = [5,9,8,7,5,2] :| [
-            [3,9,8,7,5,2]
-          , [2,9,8,7,5,2]
-          , [1,9,8,7,5,2]
-          , [1,5,8,7,5,2]
-          , [1,3,8,7,5,2]
-          , [1,2,8,7,5,2]
-          , [1,2,4,7,5,2]
-          , [1,2,3,7,5,2]
-          , [1,2,3,4,5,2]
-          , [1,2,3,2,5,2]
-          , [1,2,3,1,5,2]
-          , [1,2,3,1,3,2]
-          , [1,2,3,1,3,1]
-          , [1,2,3,1,2,1]
-          , [1,2,3,1,2,1]
-          , [1,2,3,1,2]
-          , [1,2,3,1,2]
+    let shrinkHistory = [3,7,5,1,3,2,1] :| [
+            [2,7,5,1,3,2,1]
+          , [1,7,5,1,3,2,1]
+          , [1,4,5,1,3,2,1]
+          , [1,2,5,1,3,2,1]
+          , [1,2,3,1,3,2,1]
+          , [1,2,3,1,3,2,1]
           , [1,2,3,1]
           , [1,2,3,1]
           ]
     assertEqual "shrink" shrinkHistory $
       fmap (uncurry prefix) $
-        Gen.shrink (not . prop) gen (SampleTree.mod 10 $ SampleTree.fromSeed 0)
+        Gen.shrink (not . prop) gen (SampleTree.mod 10 $ SampleTree.fromSeed 1)
   where
     gen :: Gen (Stream Word64, Word64)
     gen = (,) <$> genStream <*> Gen.prim
@@ -289,7 +271,6 @@ test_stream = do
     genStream :: Gen (Stream Word64)
     genStream = Stream <$> Gen.prim <*> genStream
 
-    -- all non-zero prefixes of all streams contain at least one 1
     prop :: (Stream Word64, Word64) -> Bool
     prop = aux . uncurry prefix
       where

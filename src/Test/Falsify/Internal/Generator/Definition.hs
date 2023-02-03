@@ -78,7 +78,10 @@ primWith shrinker = Prim shrinker id
 -------------------------------------------------------------------------------}
 
 instance Functor Gen where
-  fmap   = liftM
+  fmap f = \case
+      Pure x          -> Pure (f x)
+      Prim shrinker g -> Prim shrinker (f . g)
+      Bind x k        -> Bind x (fmap f . k)
 
 instance Applicative Gen where
   pure   = Pure

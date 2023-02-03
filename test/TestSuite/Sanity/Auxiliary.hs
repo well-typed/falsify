@@ -40,13 +40,8 @@ test_fraction = do
     gen :: Gen Fraction
     gen = fraction
 
-    -- TODO: (Here and elsewhere): Testing against these very precise trees
-    -- is useful for illuminating how exactly the generator works, but it also
-    -- makes these tests quite fragile. An additional `fmap` somewhere will
-    -- result in a different tree. Perhaps we should generalize 'Gen' so that
-    -- we can implement 'fmap' without changing the generator structure.
     tree :: Word64 -> SampleTree
-    tree x = expandTruncated $ B (B (S x) E) E
+    tree x = expandTruncated $ S x
 
     prop :: Fraction -> Bool
     prop f = pct f < 10
@@ -80,7 +75,7 @@ test_signedWordN = do
     gen = signedWordN 4
 
     tree :: Word64 -> SampleTree
-    tree x = expandTruncated $ B (S x) E
+    tree x = expandTruncated $ S x
 
 test_signedFraction :: Assertion
 test_signedFraction = do
@@ -97,7 +92,7 @@ test_signedFraction = do
     gen = toPercentage <$> signedFraction
 
     tree :: Word64 -> SampleTree
-    tree x = expandTruncated $ B (B (B (S x) E) E) E
+    tree x = expandTruncated $ S x
 
     prop :: Int -> Bool
     prop pct = abs pct < 10

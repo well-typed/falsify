@@ -25,18 +25,22 @@ test_list = do
     --
     -- TODO: This is quite slow, I think primarily due to the precision of the
     -- 'Word64' used for fractions. We should make this configurable.
-    let shrinkHistory = [4,0,0,2,6,2,10,4] :| [
-            [0,0,2,6,2,10,4]
-          , [0,2,6,2,10,4]
-          , [2,6,2,10,4]
-          , [6,2,10,4]
-          , [2,10,4]
-          , [10,4]
-          , [8,4]
+    let shrinkHistory = [2,8,6,10,8,6,4,0,4,0] :| [
+            [8,6,10,8,6,4,0,4,0]
+          , [6,10,8,6,4,0,4,0]
+          , [10,8,6,4,0,4,0]
+          , [8,6,4,0,4,0]
+          , [6,4,0,4,0]
+          , [4,0,4,0]
+          , [0,4,0]
+          , [4,0]
+          , [6,0]
+          , [6,2]
           , [6,4]
           ]
+
     assertEqual "shrink" shrinkHistory $
-      nub $ Gen.shrink (not . prop) gen (SampleTree.fromSeed 0)
+      nub $ Gen.shrink (not . prop) gen (SampleTree.fromSeed 1)
   where
     gen :: Gen [Word]
     gen = filter even <$>
