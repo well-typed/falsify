@@ -23,14 +23,12 @@ test_list = do
     -- Note that [6, 4] is indeed the minimal counter-example to a sorted list,
     -- when the elements are drawn from the range [0, 10] with origin 5, and
     -- filtered for even numbers.
-    let shrinkHistory = [4,6,8,6,6,8,4,2,4] :| [
-            [6,8,6,6,8,4,2,4]
-          , [8,6,6,8,4,2,4]
-          , [6,6,8,4,2,4]
-          , [6,8,4,2,4]
-          , [8,4,2,4]
-          , [4,2,4]
-          , [6,2,4]
+    let shrinkHistory = [4,6,8,6,6,8,4] :| [
+            [6,8,6,6,8,4]
+          , [8,6,6,8,4]
+          , [6,6,8,4]
+          , [6,8,4]
+          , [8,4]
           , [6,4]
           ]
     assertEqual "shrink" shrinkHistory $
