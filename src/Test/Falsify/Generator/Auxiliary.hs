@@ -7,57 +7,29 @@
 --
 -- Intended for unqualified import.
 module Test.Falsify.Generator.Auxiliary (
-    -- * Supporting types
-    -- ** Fractions
-    Fraction(..)
-  , mkFraction
-    -- ** Word63
-  , Word63(..)
+    -- * Auxiliary types
     -- ** Signed values
-  , Signed(..)
-  , sign
-  , magnitude
+    Signed(..)
+    -- ** @n@-bit words
+  , Precision(..)
+  , WordN(..)
+    -- ** Fractions
+  , Fraction(..)
+  , mkFraction
     -- * Generators
-  , signedWord63
+  , unsignedWordN
+  , signedWordN
   , fraction
   , signedFraction
   ) where
 
-import Data.Bits
 import Data.Word
 
 import Test.Falsify.Internal.Generator
 import Test.Falsify.Internal.Search
 
 {-------------------------------------------------------------------------------
-  Supporting type: fractions
--------------------------------------------------------------------------------}
-
--- | Value in the range [0 .. 1]
-newtype Fraction = Fraction Double
-  deriving stock (Show, Eq, Ord)
-
-mkFraction :: (Integral a, FiniteBits a) => a -> Fraction
-mkFraction x = Fraction $ fromIntegral x / (2 ^ finiteBitSize x - 1)
-
-{-------------------------------------------------------------------------------
-  Supporting type: Word63
--------------------------------------------------------------------------------}
-
--- | 63-bit word
-newtype Word63 = Word63 Word64
-  deriving stock (Show)
-  deriving newtype (Eq, Ord, Num, Real, Enum, Integral, Bits)
-
-instance FiniteBits Word63 where
-  finiteBitSize _ = 63
-
-instance Bounded Word63 where
-  minBound = Word63 0
-  maxBound = Word63 (maxBound `div` 2)
-
-{-------------------------------------------------------------------------------
-  Supporting type: signed values
+  Auxiliary type: signed values
 -------------------------------------------------------------------------------}
 
 -- | Signed value
@@ -68,46 +40,100 @@ instance Bounded Word63 where
 data Signed a = Pos a | Neg a
   deriving stock (Functor, Show, Eq, Ord)
 
-sign :: Signed a -> Signed ()
-sign = fmap (const ())
+{-------------------------------------------------------------------------------
+  Auxiliary type: @n@-bit word
+-------------------------------------------------------------------------------}
 
-magnitude :: Signed a -> a
-magnitude (Pos x) = x
-magnitude (Neg x) = x
+-- | Precision (in bits)
+newtype Precision = Precision Word8
+  deriving stock (Show, Eq, Ord)
+  deriving newtype (Num, Enum)
+
+-- | @n@-bit word
+data WordN = WordN Precision Word64
+  deriving (Show, Eq, Ord)
+
+forgetPrecision :: WordN -> Word64
+forgetPrecision (WordN _ x) = x
+
+-- | Make @n@-bit word (@n <= 64@)
+--
+-- If the 'Word64' exceeds the specified range, it will be capped at the max.
+--
+-- > capAt 4 10 == WordN 4 10
+-- > capAt 4 16 == WordN 4 15
+capAt :: Precision -> Word64 -> WordN
+capAt desiredPrecision x =
+    WordN actualPrecision (min x $ maxValue actualPrecision)
+  where
+    maximumPrecision, actualPrecision :: Precision
+    maximumPrecision = Precision 64
+    actualPrecision  = min desiredPrecision maximumPrecision
+
+    -- Maximum possible value
+    --
+    -- If @n == 64@ then @2 ^ n@ will overflow, but it will overflow to @0@, and
+    -- @(-1) :: Word64 == maxBound@; so no need to treat this case separately.
+    maxValue :: Precision -> Word64
+    maxValue (Precision n) = 2 ^ n - 1
+
+{-------------------------------------------------------------------------------
+  Auxiliary type: fractions
+-------------------------------------------------------------------------------}
+
+-- | Value in the range [0 .. 1]
+newtype Fraction = Fraction Double
+  deriving stock (Show, Eq, Ord)
+
+-- | Compute fraction from @n@-bit word
+mkFraction :: WordN -> Fraction
+mkFraction (WordN (Precision p) x) = Fraction $ (fromIntegral x) / (2 ^ p - 1)
 
 {-------------------------------------------------------------------------------
   Generators
 -------------------------------------------------------------------------------}
 
--- | Generate 'Signed Word63', shrinking towards 0
+-- | Generate @n@-bit word of specified precision, shrinking towards 0
+unsignedWordN :: Precision -> Gen WordN
+unsignedWordN p =
+    capAt p <$>
+      primWith (binarySearch . forgetPrecision . capAt p)
+
+-- | Generated signed @n-bit@ word, shrinking towards 0
 --
 -- Shrinking will decrease the /magnitude/ (distance to 0), but may randomly
 -- fluctuate the /sign/: there is no bias towards negative or positive.
-signedWord63 :: Gen (Signed Word63)
-signedWord63 =
-    aux <$> primWith binarySearchWithoutParityBias
+--
+-- Maximum precision available is @n == 63@.
+signedWordN :: Precision -> Gen (Signed WordN)
+signedWordN = \p ->
+    -- We will use the LSB to determine the sign of the value, so we must ask
+    -- for one more bit of precision.
+    aux . capAt (succ p) <$>
+      primWith (binarySearchNoParityBias . forgetPrecision . capAt (succ p))
   where
     -- As @x@ tends towards 0, the LSB of @x@ (i.e., whether @x@ is even or not)
     -- will fluctuate randomly. Thus, we can use this to determine whether we
     -- want a positive or negative number, and then can use the remaining bits
     -- (shifted appropriately) for the magnitude.
     --
-    -- Note that this is quite different from simply reinterpreting the unsigned
-    -- number as a signed number; in this case, it would be the /most/
-    -- significant bit that determines whether the number is negative or
-    -- positive, and would therefore introduce a heavy bias towards positive
-    -- numbers (not to mention that the direction of shrinking would be reversed
-    -- due to two's complement).
-    aux :: Word64 -> Signed Word63
-    aux x = (if even x then Pos else Neg) $ Word63 (x `div` 2)
+    -- This is quite different from simply reinterpreting the unsigned number as
+    -- a signed number; in this case, it would be the /most/ significant bit
+    -- that determines whether the number is negative or positive, and would
+    -- therefore introduce a heavy bias towards positive numbers (and the
+    -- direction of shrinking would be reversed due to two's complement).
+    aux :: WordN -> Signed WordN
+    aux (WordN p x) =
+        (if even x then Pos else Neg) $
+          WordN (pred p) (x `div` 2)
 
 -- | Generate fraction, shrinking towards 0
 fraction :: Gen Fraction
-fraction = mkFraction <$> prim
+fraction = mkFraction <$> unsignedWordN 64
 
 -- | Generate signed fraction, shrinking towards 0
 --
 -- There is no bias towards positive or negative fractions. See 'signedWord63'
 -- for more detailed discussion.
 signedFraction :: Gen (Signed Fraction)
-signedFraction = fmap mkFraction <$> signedWord63
+signedFraction = fmap mkFraction <$> signedWordN 63

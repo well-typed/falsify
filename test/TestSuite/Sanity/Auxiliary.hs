@@ -15,7 +15,7 @@ import qualified Test.Falsify.Generator as Gen
 tests :: TestTree
 tests = testGroup "TestSuite.Sanity.Auxiliary" [
       testCase "fraction"       test_fraction
-    , testCase "signedWord63"   test_signedWord63
+    , testCase "signedWordN"    test_signedWordN
     , testCase "signedFraction" test_signedFraction
     ]
 
@@ -40,8 +40,13 @@ test_fraction = do
     gen :: Gen Fraction
     gen = fraction
 
+    -- TODO: (Here and elsewhere): Testing against these very precise trees
+    -- is useful for illuminating how exactly the generator works, but it also
+    -- makes these tests quite fragile. An additional `fmap` somewhere will
+    -- result in a different tree. Perhaps we should generalize 'Gen' so that
+    -- we can implement 'fmap' without changing the generator structure.
     tree :: Word64 -> SampleTree
-    tree x = expandTruncated $ B (S x) E
+    tree x = expandTruncated $ B (B (S x) E) E
 
     prop :: Fraction -> Bool
     prop f = pct f < 10
@@ -49,28 +54,30 @@ test_fraction = do
     pct :: Fraction -> Word
     pct (Fraction f) = round (f * 100)
 
-test_signedWord63 :: Assertion
-test_signedWord63 = do
-    assertEqual "run minBound" (Pos minBound) $
-      Gen.run gen $ tree minBound
-    assertEqual "run minBound+1" (Neg minBound) $
-      Gen.run gen $ tree (minBound + 1)
-    assertEqual "run minBound+2" (Pos (minBound + 1)) $
-      Gen.run gen $ tree (minBound + 2)
-    assertEqual "run minBound+3" (Neg (minBound + 1)) $
-      Gen.run gen $ tree (minBound + 3)
+test_signedWordN :: Assertion
+test_signedWordN = do
+    assertEqual "run minBound" (Pos $ WordN 4 0) $
+      Gen.run gen $ tree 0
+    assertEqual "run minBound+1" (Neg $ WordN 4 0) $
+      Gen.run gen $ tree 1
+    assertEqual "run minBound+2" (Pos $ WordN 4 1) $
+      Gen.run gen $ tree 2
+    assertEqual "run minBound+3" (Neg $ WordN 4 1) $
+      Gen.run gen $ tree 3
 
-    assertEqual "run maxBound" (Neg maxBound) $
-      Gen.run gen $ tree maxBound
-    assertEqual "run maxBound-1" (Pos maxBound) $
-      Gen.run gen $ tree (maxBound - 1)
-    assertEqual "run maxBound-2" (Neg (maxBound - 1)) $
-      Gen.run gen $ tree (maxBound - 2)
-    assertEqual "run maxBound-3" (Pos (maxBound - 1)) $
-      Gen.run gen $ tree (maxBound - 3)
+    assertEqual "run maxBound" (Neg $ WordN 4 15) $
+      Gen.run gen $ tree 31 -- need 5 bits of precision for signed 4-bit number
+    assertEqual "run maxBound+1" (Neg $ WordN 4 15) $
+      Gen.run gen $ tree 31
+    assertEqual "run maxBound-1" (Pos $ WordN 4 15) $
+      Gen.run gen $ tree 30
+    assertEqual "run maxBound-2" (Neg $ WordN 4 14) $
+      Gen.run gen $ tree 29
+    assertEqual "run maxBound-3" (Pos $ WordN 4 14) $
+      Gen.run gen $ tree 28
   where
-    gen :: Gen (Signed Word63)
-    gen = signedWord63
+    gen :: Gen (Signed WordN)
+    gen = signedWordN 4
 
     tree :: Word64 -> SampleTree
     tree x = expandTruncated $ B (S x) E

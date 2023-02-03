@@ -36,7 +36,7 @@ test_bool = do
 
     tree :: Word64 -> Word64 -> SampleTree
     tree x y = expandTruncated $
-        B (B (B (B (S x) E) E) E) (B (B (B (S y) E) E) E)
+        B (B (B (B (B (S x) E) E) E) E) (B (B (B (B (S y) E) E) E) E)
 
 test_integral :: Assertion
 test_integral = do

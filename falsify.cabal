@@ -48,6 +48,7 @@ common lang
       NamedFieldPuns
       ScopedTypeVariables
       StandaloneDeriving
+      TypeApplications
       UndecidableInstances
 
 library
