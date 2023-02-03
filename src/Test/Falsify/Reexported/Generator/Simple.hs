@@ -4,6 +4,8 @@ module Test.Falsify.Reexported.Generator.Simple (
   , integral
   ) where
 
+import Data.Bits
+
 import Test.Falsify.Generator.Auxiliary
 import Test.Falsify.Internal.Generator
 import Test.Falsify.Nudge
@@ -14,7 +16,7 @@ import Test.Falsify.Range (Range(..), origin)
 -------------------------------------------------------------------------------}
 
 bool :: Range NoOffset Bool -> Gen Bool
-bool Range{lo, hi, inverted} = aux <$> fraction
+bool Range{lo, hi, inverted} = aux <$> fraction 1
   where
     aux :: Fraction -> Bool
     aux (Fraction f) =
@@ -22,8 +24,10 @@ bool Range{lo, hi, inverted} = aux <$> fraction
           then if f < 0.5 then lo else hi
           else if f < 0.5 then hi else lo
 
-integral :: forall o a. (NudgeBy o a, Integral a) => Range o a -> Gen a
-integral r = aux <$> signedFraction
+integral :: forall o a.
+     (NudgeBy o a, Integral a, FiniteBits a)
+  => Range o a -> Gen a
+integral r = aux <$> signedFraction (precisionOf r)
   where
     lo', hi', origin' :: Double
     lo'     = fromIntegral $ lo     r

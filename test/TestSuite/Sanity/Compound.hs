@@ -23,23 +23,16 @@ test_list = do
     -- Note that [6, 4] is indeed the minimal counter-example to a sorted list,
     -- when the elements are drawn from the range [0, 10] with origin 5, and
     -- filtered for even numbers.
-    --
-    -- TODO: This is quite slow, I think primarily due to the precision of the
-    -- 'Word64' used for fractions. We should make this configurable.
-    let shrinkHistory = [2,8,6,10,8,6,4,0,4,0] :| [
-            [8,6,10,8,6,4,0,4,0]
-          , [6,10,8,6,4,0,4,0]
-          , [10,8,6,4,0,4,0]
-          , [8,6,4,0,4,0]
-          , [6,4,0,4,0]
-          , [4,0,4,0]
-          , [0,4,0]
-          , [4,0]
-          , [6,0]
-          , [6,2]
+    let shrinkHistory = [4,6,8,6,6,8,4,2,4] :| [
+            [6,8,6,6,8,4,2,4]
+          , [8,6,6,8,4,2,4]
+          , [6,6,8,4,2,4]
+          , [6,8,4,2,4]
+          , [8,4,2,4]
+          , [4,2,4]
+          , [6,2,4]
           , [6,4]
           ]
-
     assertEqual "shrink" shrinkHistory $
       nub $ Gen.shrink (not . prop) gen (SampleTree.fromSeed 1)
   where

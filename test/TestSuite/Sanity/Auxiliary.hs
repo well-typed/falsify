@@ -1,6 +1,6 @@
 module TestSuite.Sanity.Auxiliary (tests) where
 
-import Data.List.NonEmpty (NonEmpty((:|)), nub)
+import Data.List.NonEmpty (NonEmpty((:|)))
 import Data.Word
 import Test.Tasty
 import Test.Tasty.HUnit
@@ -26,19 +26,12 @@ test_fraction = do
     assertEqual "run maxBound" (Fraction 1) $
       Gen.run gen (tree maxBound)
 
-    let shrinkHistory = 100 :| [
-            50
-          , 25
-          , 12
-          , 11
-          , 10
-          ]
+    let shrinkHistory = 100 :| [52,26,13,10]
     assertEqual "shrink" shrinkHistory $
-      -- we nub the result: we have a bunch of fractions that all round to 10
-      nub $ fmap pct $ Gen.shrink (not . prop) gen (tree maxBound)
+      fmap pct $ Gen.shrink (not . prop) gen (tree maxBound)
   where
     gen :: Gen Fraction
-    gen = fraction
+    gen = fraction 5
 
     tree :: Word64 -> SampleTree
     tree x = expandTruncated $ S x
@@ -84,12 +77,12 @@ test_signedFraction = do
     assertEqual "run maxBound" (-100) $
       Gen.run gen (tree maxBound)
 
-    let shrinkHistory = -100 :| [50,25,12,11,10]
+    let shrinkHistory = -100 :| [52,26,13,10]
     assertEqual "shrink" shrinkHistory $
-      nub $ Gen.shrink (not . prop) gen (tree maxBound)
+      Gen.shrink (not . prop) gen (tree maxBound)
   where
     gen :: Gen Int
-    gen = toPercentage <$> signedFraction
+    gen = toPercentage <$> signedFraction 5
 
     tree :: Word64 -> SampleTree
     tree x = expandTruncated $ S x

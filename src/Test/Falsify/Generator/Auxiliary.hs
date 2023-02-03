@@ -12,6 +12,7 @@ module Test.Falsify.Generator.Auxiliary (
     Signed(..)
     -- ** @n@-bit words
   , Precision(..)
+  , precisionOf
   , WordN(..)
     -- ** Fractions
   , Fraction(..)
@@ -49,6 +50,9 @@ data Signed a = Pos a | Neg a
 newtype Precision = Precision Word8
   deriving stock (Show, Eq, Ord)
   deriving newtype (Num, Enum)
+
+precisionOf :: forall proxy a. FiniteBits a => proxy a -> Precision
+precisionOf _ = Precision (fromIntegral $ finiteBitSize (undefined :: a))
 
 -- | @n@-bit word
 data WordN = WordN Precision Word64
@@ -136,12 +140,12 @@ signedWordN = \p ->
           WordN (pred p) (x `div` 2)
 
 -- | Generate fraction, shrinking towards 0
-fraction :: Gen Fraction
-fraction = mkFraction <$> unsignedWordN 64
+fraction :: Precision -> Gen Fraction
+fraction p = mkFraction <$> unsignedWordN p
 
 -- | Generate signed fraction, shrinking towards 0
 --
--- There is no bias towards positive or negative fractions. See 'signedWord63'
+-- There is no bias towards positive or negative fractions. See 'signedWordN'
 -- for more detailed discussion.
-signedFraction :: Gen (Signed Fraction)
-signedFraction = fmap mkFraction <$> signedWordN 63
+signedFraction :: Precision -> Gen (Signed Fraction)
+signedFraction p = fmap mkFraction <$> signedWordN p
