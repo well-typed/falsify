@@ -1,6 +1,7 @@
 module TestSuite.Sanity.Compound (tests) where
 
 import Data.List.NonEmpty (NonEmpty((:|)), nub)
+import Data.Word
 import Test.Tasty
 import Test.Tasty.HUnit
 
@@ -22,25 +23,20 @@ test_list = do
     -- Note that [6, 4] is indeed the minimal counter-example to a sorted list,
     -- when the elements are drawn from the range [0, 10] with origin 5, and
     -- filtered for even numbers.
-    --
-    -- TODO: This is quite slow, I think primarily due to the precision of the
-    -- 'Word64' used for fractions. We should make this configurable.
-    let shrinkHistory = [4,0,0,2,6,2,10,4] :| [
-            [0,0,2,6,2,10,4]
-          , [0,2,6,2,10,4]
-          , [2,6,2,10,4]
-          , [6,2,10,4]
-          , [2,10,4]
-          , [10,4]
+    let shrinkHistory = [4,6,8,6,6,8,4] :| [
+            [6,8,6,6,8,4]
+          , [8,6,6,8,4]
+          , [6,6,8,4]
+          , [6,8,4]
           , [8,4]
           , [6,4]
           ]
     assertEqual "shrink" shrinkHistory $
-      nub $ Gen.shrink (not . prop) gen (SampleTree.fromSeed 0)
+      nub $ Gen.shrink (not . prop) gen (SampleTree.fromSeed 1)
   where
-    gen :: Gen [Word]
+    gen :: Gen [Word8]
     gen = filter even <$>
             Gen.list (10, 20) (Gen.integral $ Range.num (0, 10) 5)
 
-    prop :: [Word] -> Bool
+    prop :: [Word8] -> Bool
     prop = pairwiseAll (<=)

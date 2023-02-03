@@ -68,13 +68,16 @@ import Test.Falsify.Nudge
 -- from 'lo'; otherwise, the offset is interpreted as a decrease from 'hi'. The
 -- precise meaning of \"increase\" or \"decrease\" is left abstract, and defined
 -- by the 'Nudge' class.
+--
+-- NOTE: This /could/ be given a 'Functor' instance, but we don't, as this
+-- would result in strange 'NudgeBy' constraints.
 data Range o a = Range {
       lo       :: a
     , hi       :: a
     , offset   :: o
     , inverted :: Bool
     }
-  deriving stock (Show, Eq, Functor)
+  deriving stock (Show, Eq)
 
 origin :: NudgeBy o a => Range o a -> a
 origin Range{lo, hi, offset, inverted} =
@@ -97,16 +100,16 @@ originAtLo (lo, hi) = Range{lo, hi, offset = NoOffset, inverted = False}
 --
 -- The origin must lie within the bounds.
 num :: forall a.
-     (Num a, Show a, Ord a, HasCallStack)
-  => (a, a) -> a -> Range a a
+     (Integral a, Show a, HasCallStack)
+  => (a, a) -> a -> Range Word a
 num bounds@(x, y) o
   | x < y     = aux x y
   | otherwise = aux y x
   where
-    aux :: a -> a -> Range a a
+    aux :: a -> a -> Range Word a
     aux lo hi
       | lo <= o && o <= hi
-      = Range{lo, hi, offset = o - lo, inverted = False}
+      = Range{lo, hi, offset = fromIntegral $ o - lo, inverted = False}
 
       | otherwise
       = error originNotInBounds

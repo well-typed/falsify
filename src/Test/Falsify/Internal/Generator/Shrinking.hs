@@ -115,7 +115,7 @@ shrinkStep = go
 
     -- Actual shrinking only happens for the primitive generator
     -- We cannot shrink if the value is already minimal.
-    go (Prim f) (SampleTree s l r) = (\s' -> SampleTree s' l r) <$> f s
+    go (Prim f _) (SampleTree s l r) = (\s' -> SampleTree s' l r) <$> f s
 
     -- Finally, for 'Bind' we shrink either the left or the right tree; as is
     -- usual, this introduces a left bias.

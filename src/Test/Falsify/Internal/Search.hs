@@ -1,7 +1,7 @@
 module Test.Falsify.Internal.Search (
     -- * Binary search
     binarySearch
-  , binarySearchWithoutParityBias
+  , binarySearchNoParityBias
   ) where
 
 import Data.Word
@@ -37,7 +37,7 @@ import Data.Word
 -- succeeds with the first (non-zero) option, the number is basically halved
 -- each at step; since halving an even number results in another even number,
 -- and halving an odd number /also/ results in an even number, this results in a
--- strong bias towards even numbers. See also 'binarySearchWithoutParityBias'.
+-- strong bias towards even numbers. See also 'binarySearchNoParityBias'.
 binarySearch :: Word64 -> [Word64]
 binarySearch = go 0 . deltas
   where
@@ -60,22 +60,22 @@ binarySearch = go 0 . deltas
 --
 -- Examples:
 --
--- > binarySearchWithoutParityBias   0 == []
--- > binarySearchWithoutParityBias   1 == [0]
--- > binarySearchWithoutParityBias   2 == [0,1]
--- > binarySearchWithoutParityBias   3 == [0,1,2]
--- > binarySearchWithoutParityBias   4 == [0,1,2,3]
--- > binarySearchWithoutParityBias   5 == [0,1,2,3,4]
--- > binarySearchWithoutParityBias   6 == [0,1,2,3,4,5]
--- > binarySearchWithoutParityBias   7 == [0,1,4,5,6]
--- > binarySearchWithoutParityBias   8 == [0,1,4,5,6,7]
--- > binarySearchWithoutParityBias   9 == [0,1,4,5,6,7,8]
--- > binarySearchWithoutParityBias  10 == [0,1,4,5,8,9]
--- > binarySearchWithoutParityBias  16 == [0,1,8,9,12,13,14,15]
--- > binarySearchWithoutParityBias 127 == [0,1,64,65,96,97,112,113,120,121,124,125,126]
--- > binarySearchWithoutParityBias 128 == [0,1,64,65,96,97,112,113,120,121,124,125,126,127]
-binarySearchWithoutParityBias :: Word64 -> [Word64]
-binarySearchWithoutParityBias = adjust . binarySearch
+-- > binarySearchNoParityBias   0 == []
+-- > binarySearchNoParityBias   1 == [0]
+-- > binarySearchNoParityBias   2 == [0,1]
+-- > binarySearchNoParityBias   3 == [0,1,2]
+-- > binarySearchNoParityBias   4 == [0,1,2,3]
+-- > binarySearchNoParityBias   5 == [0,1,2,3,4]
+-- > binarySearchNoParityBias   6 == [0,1,2,3,4,5]
+-- > binarySearchNoParityBias   7 == [0,1,4,5,6]
+-- > binarySearchNoParityBias   8 == [0,1,4,5,6,7]
+-- > binarySearchNoParityBias   9 == [0,1,4,5,6,7,8]
+-- > binarySearchNoParityBias  10 == [0,1,4,5,8,9]
+-- > binarySearchNoParityBias  16 == [0,1,8,9,12,13,14,15]
+-- > binarySearchNoParityBias 127 == [0,1,64,65,96,97,112,113,120,121,124,125,126]
+-- > binarySearchNoParityBias 128 == [0,1,64,65,96,97,112,113,120,121,124,125,126,127]
+binarySearchNoParityBias :: Word64 -> [Word64]
+binarySearchNoParityBias = adjust . binarySearch
   where
     -- Starting with some value @y@, 'binarySearch' has given us a list of
     -- possible shrunk values

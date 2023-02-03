@@ -35,8 +35,7 @@ test_bool = do
     gen = (,) <$> Gen.bool def <*> Gen.bool (Range.invert def)
 
     tree :: Word64 -> Word64 -> SampleTree
-    tree x y = expandTruncated $
-        B (B (B (B (S x) E) E) E) (B (B (B (S y) E) E) E)
+    tree x y = expandTruncated $ B (S x) (B (S y) E)
 
 test_integral :: Assertion
 test_integral = do
@@ -72,10 +71,7 @@ test_integral = do
         <*> Gen.integral (Range.num (0, 6) 3)
 
     tree :: Word64 -> SampleTree
-    tree x = expandTruncated $
-        B (B (B (B (B (B (S x) E) E) E) E) (
-              B (B (B (B (S x) E) E) E) E)) (
-              B (B (B (B (S x) E) E) E) E)
+    tree x = expandTruncated $ B (B (S x) (B (S x) E)) (B (S x) E)
 
     prop :: (Word, Word, Word) -> Bool
     prop (x, y, z) = (x == 0) || odd x && odd y && odd z
