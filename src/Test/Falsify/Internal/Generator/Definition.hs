@@ -52,7 +52,7 @@ import qualified Test.Falsify.SampleTree as SampleTree
 -- improves on this in a few ways).
 data Gen a where
   Pure :: a -> Gen a
-  Prim :: (Word64 -> [Word64]) -> Gen Word64
+  Prim :: (Word64 -> [Word64]) -> (Word64 -> a) -> Gen a
   Bind :: Gen a -> (a -> Gen b) -> Gen b
 
 {-------------------------------------------------------------------------------
@@ -71,7 +71,7 @@ prim = primWith binarySearch
 -- This is only required in rare circumstances. Most users will probably never
 -- need to use this generator.
 primWith :: (Word64 -> [Word64]) -> Gen Word64
-primWith = Prim
+primWith shrinker = Prim shrinker id
 
 {-------------------------------------------------------------------------------
   Composition
@@ -106,7 +106,7 @@ withoutShrinking = go
   where
     go :: Gen a -> Gen a
     go (Pure x)   = Pure x
-    go (Prim _)   = Prim (const [])
+    go (Prim _ f) = Prim (const []) f
     go (Bind x f) = Bind (go x) (go . f)
 
 {-------------------------------------------------------------------------------
@@ -122,8 +122,8 @@ runExplain = flip go
     go :: SampleTree -> Gen a -> (Truncated, a)
     go st = \case
         Pure x   -> (E, x)
-        Prim _   -> let s = SampleTree.next st
-                    in (S s, s)
+        Prim _ f -> let s = SampleTree.next st
+                    in (S s, f s)
         Bind x f -> let (l, r)  = SampleTree.split st
                         (l', a) = go l x
                         (r', b) = go r (f a)
