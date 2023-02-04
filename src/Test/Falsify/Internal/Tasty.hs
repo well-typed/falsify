@@ -10,6 +10,9 @@ module Test.Falsify.Internal.Tasty (
   , Verbose(..)
   , ExpectFailure(..)
   , testPropertyWith
+    -- * Render success and failure
+  , ShowSuccess(..)
+  , ShowFailure(..)
   ) where
 
 import Prelude hiding (log)
@@ -38,7 +41,7 @@ import qualified Test.Tasty.Providers as Tasty
   Tasty integration
 -------------------------------------------------------------------------------}
 
-data Test = Test TestOptions (Property String String)
+data Test = Test TestOptions (Property String (Maybe String))
 
 data TestOptions = TestOptions {
       expectFailure      :: ExpectFailure
@@ -88,7 +91,10 @@ instance IsTest Test where
 toTastyResult ::
      Verbose
   -> ExpectFailure
-  -> (ReplaySeed, [Success String], Maybe (Failure String String))
+  -> ( ReplaySeed
+     , [Success (Maybe String)]
+     , Maybe (Failure String (Maybe String))
+     )
   -> Tasty.Result
 toTastyResult verbose expectFailure (initSeed, successes, mFailure) =
     case (verbose, expectFailure, mFailure) of
@@ -154,13 +160,13 @@ toTastyResult verbose expectFailure (initSeed, successes, mFailure) =
       _otherwise ->
         error "TODO"
 
-renderSuccess :: (Int, Success String) -> String
+renderSuccess :: (Int, Success (Maybe String)) -> String
 renderSuccess (ix, Driver.Success{successOutcome, successLog}) =
-    intercalate "\n" [
-        "Test " ++ show ix
-      , "Outcome: " ++ show successOutcome
-      , "Logs:"
-      , renderLog successLog
+    intercalate "\n" . concat $ [
+        ["Test " ++ show ix]
+      , ["Outcome: " ++ show o | Just o <- [successOutcome]]
+      , ["Logs:"]
+      , [renderLog successLog]
       ]
 
 renderLog :: Log -> String
@@ -175,18 +181,44 @@ renderLogEntry = \case
     aux stack x = x ++ " at " ++ prettyCallStack stack
 
 {-------------------------------------------------------------------------------
+  Rendering failure and success
+-------------------------------------------------------------------------------}
+
+class ShowFailure e where
+  showFailure :: e -> String
+
+class ShowSuccess a where
+  showSuccess :: a -> Maybe String
+
+instance ShowFailure String where
+  showFailure = id
+
+instance ShowSuccess () where
+  showSuccess = const Nothing
+
+instance ShowSuccess String where
+  showSuccess = Just
+
+{-------------------------------------------------------------------------------
   User API
 -------------------------------------------------------------------------------}
 
-testProperty :: TestName -> Property String String -> TestTree
+testProperty ::
+     (ShowFailure e, ShowSuccess a)
+  => TestName -> Property e a -> TestTree
 testProperty = testPropertyWith def
 
 testPropertyWith ::
-     TestOptions
+     (ShowFailure e, ShowSuccess a)
+  => TestOptions
   -> TestName
-  -> Property String String
+  -> Property e a
   -> TestTree
-testPropertyWith testOpts name = singleTest name . Test testOpts
+testPropertyWith testOpts name =
+      singleTest name
+    . Test testOpts
+    . mapFailure showFailure
+    . fmap showSuccess
 
 {-------------------------------------------------------------------------------
   Options specific to the tasty test runner

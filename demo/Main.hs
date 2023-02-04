@@ -25,16 +25,14 @@ main = defaultMain $ testGroup "demo" [
     ]
 
 -- | "Every value between 0 and 100 is even"
-prop_even :: Property String String
+prop_even :: Property String ()
 prop_even = do
     x :: Word <- gen $ Gen.integral $ Range.num (0, 100) 0
     assert ("not even: " ++ show x) $ even x
-    return "OK"
 
 -- | "Every value between 0 and 100 is between 0 and 100"
-prop_inRange :: Property String String
+prop_inRange :: Property String ()
 prop_inRange = do
     x :: Word <- gen $ Gen.integral $ Range.num (0, 100) 0
     assert ("not in range: " ++ show x) $ 0 <= x && x <= 100
-    return "OK"
 
