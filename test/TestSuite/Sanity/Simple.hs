@@ -6,8 +6,8 @@ import Data.Word
 import Test.Tasty
 import Test.Tasty.HUnit
 
+import Test.Falsify.Debugging
 import Test.Falsify.Generator (Gen)
-import Test.Falsify.Generator.Debugging
 import Test.Falsify.SampleTree (SampleTree)
 
 import qualified Test.Falsify.Generator  as Gen
@@ -25,10 +25,10 @@ test_bool = do
     assertEqual "run" (False, True) $
       Gen.run gen SampleTree.minimal
 
-    let shrinkHistory = (True,False) :| [
+    let expectedHistory = (True,False) :| [
             (False,True)
           ]
-    assertEqual "shrink" shrinkHistory $
+    assertEqual "shrink" expectedHistory $
       Gen.shrink (const True) gen (tree maxBound maxBound)
   where
     gen :: Gen (Bool, Bool)
@@ -55,13 +55,13 @@ test_integral = do
     -- Note that we are shrinking to a perfect minimal counter-example here: the
     -- 6 and 3 are at their "minimal" value, and if we were to shrink that 1 any
     -- further, it would no longer be a counter-example.
-    let shrinkHistory = (6, 6, 6) :| [
+    let expectedHistory = (6, 6, 6) :| [
             (3, 6, 6)
           , (2, 6, 6)
           , (1, 6, 6)
           , (1, 6, 3)
           ]
-    assertEqual "shrink" shrinkHistory $
+    assertEqual "shrink" expectedHistory $
       nub $ Gen.shrink (not . prop) gen (tree (maxBound - 1))
   where
     gen :: Gen (Word, Word, Word)

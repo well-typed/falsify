@@ -39,6 +39,7 @@ common lang
   default-extensions:
       DeriveFunctor
       DerivingStrategies
+      DisambiguateRecordFields
       FlexibleContexts
       FlexibleInstances
       GADTs
@@ -48,6 +49,7 @@ common lang
       NamedFieldPuns
       ScopedTypeVariables
       StandaloneDeriving
+      TupleSections
       TypeApplications
       UndecidableInstances
 
@@ -56,27 +58,43 @@ library
       lang
   exposed-modules:
       Test.Falsify
+      Test.Falsify.Debugging
+      Test.Falsify.Driver
+      Test.Falsify.Driver.ReplaySeed
       Test.Falsify.Generator
       Test.Falsify.Generator.Auxiliary
-      Test.Falsify.Generator.Debugging
       Test.Falsify.Nudge
+      Test.Falsify.Property
       Test.Falsify.Range
       Test.Falsify.SampleTree
+
+      -- For consistency with the other tasty runners, we places these modules
+      -- in the @Test.Tasty.*@ hiearchy instead of @Test.Falsify.*@.
+      Test.Tasty.Falsify
   other-modules:
       Test.Falsify.Internal.Generator
       Test.Falsify.Internal.Generator.Definition
       Test.Falsify.Internal.Generator.Shrinking
       Test.Falsify.Internal.Generator.Truncated
       Test.Falsify.Internal.Search
+      Test.Falsify.Internal.Tasty
       Test.Falsify.Reexported.Generator.Compound
       Test.Falsify.Reexported.Generator.Simple
   hs-source-dirs:
       src
   build-depends:
+    , base16-bytestring
+    , binary
+    , bytestring
     , containers
     , data-default
     , mtl
+    , optparse-applicative
     , splitmix
+    , tagged
+    , tasty
+  other-extensions:
+    CPP
 
 test-suite test-falsify
   import:
@@ -100,3 +118,15 @@ test-suite test-falsify
     , falsify
     , tasty
     , tasty-hunit
+
+executable demo
+  import:
+      lang
+  hs-source-dirs:
+      demo
+  main-is:
+      Main.hs
+  build-depends:
+    , data-default
+    , falsify
+    , tasty
