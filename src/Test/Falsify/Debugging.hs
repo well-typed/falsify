@@ -1,7 +1,7 @@
--- | Utilities for debugging generators
+-- | Utilities for debugging
 --
 -- Intended for unqualified import.
-module Test.Falsify.Generator.Debugging (
+module Test.Falsify.Debugging (
     -- * Truncated sample tree
     Truncated(..)
   , expandTruncated
@@ -16,6 +16,8 @@ module Test.Falsify.Generator.Debugging (
   , ShrinkExplanation(..)
   , shrinkExplain
   , shrinkStep
+  , limitShrinkSteps
+  , shrinkHistory
   ) where
 
 import Test.Falsify.Internal.Generator.Definition

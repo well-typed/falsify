@@ -5,9 +5,9 @@ import Data.Word
 import Test.Tasty
 import Test.Tasty.HUnit
 
+import Test.Falsify.Debugging
 import Test.Falsify.Generator (Gen)
 import Test.Falsify.Generator.Auxiliary
-import Test.Falsify.Generator.Debugging
 import Test.Falsify.SampleTree (SampleTree)
 
 import qualified Test.Falsify.Generator as Gen
@@ -26,8 +26,8 @@ test_fraction = do
     assertEqual "run maxBound" (Fraction 1) $
       Gen.run gen (tree maxBound)
 
-    let shrinkHistory = 100 :| [52,26,13,10]
-    assertEqual "shrink" shrinkHistory $
+    let expectedHistory = 100 :| [52,26,13,10]
+    assertEqual "shrink" expectedHistory $
       fmap pct $ Gen.shrink (not . prop) gen (tree maxBound)
   where
     gen :: Gen Fraction
@@ -77,8 +77,8 @@ test_signedFraction = do
     assertEqual "run maxBound" (-100) $
       Gen.run gen (tree maxBound)
 
-    let shrinkHistory = -100 :| [52,26,13,10]
-    assertEqual "shrink" shrinkHistory $
+    let expectedHistory = -100 :| [52,26,13,10]
+    assertEqual "shrink" expectedHistory $
       Gen.shrink (not . prop) gen (tree maxBound)
   where
     gen :: Gen Int

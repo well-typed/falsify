@@ -23,7 +23,7 @@ test_list = do
     -- Note that [6, 4] is indeed the minimal counter-example to a sorted list,
     -- when the elements are drawn from the range [0, 10] with origin 5, and
     -- filtered for even numbers.
-    let shrinkHistory = [4,6,8,6,6,8,4] :| [
+    let expectedHistory = [4,6,8,6,6,8,4] :| [
             [6,8,6,6,8,4]
           , [8,6,6,8,4]
           , [6,6,8,4]
@@ -31,7 +31,7 @@ test_list = do
           , [8,4]
           , [6,4]
           ]
-    assertEqual "shrink" shrinkHistory $
+    assertEqual "shrink" expectedHistory $
       nub $ Gen.shrink (not . prop) gen (SampleTree.fromSeed 1)
   where
     gen :: Gen [Word8]

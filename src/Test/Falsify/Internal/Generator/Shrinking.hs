@@ -1,20 +1,82 @@
 module Test.Falsify.Internal.Generator.Shrinking (
     -- * Shrinking
     shrink
-  , shrinkStep
-    -- * Debugging
+    -- * With full history
   , ShrinkExplanation(..)
+  , ShrinkHistory(..)
   , shrinkExplain
+  , limitShrinkSteps
+  , shrinkHistory
+    -- * Debugging
+  , shrinkStep
   ) where
 
+import Data.Either
 import Data.List.NonEmpty (NonEmpty((:|)))
 import GHC.Stack
-
-import qualified Data.List.NonEmpty as NE
 
 import Test.Falsify.Internal.Generator.Definition
 import Test.Falsify.Internal.Generator.Truncated
 import Test.Falsify.SampleTree (SampleTree(..))
+
+{-------------------------------------------------------------------------------
+  Explanation
+-------------------------------------------------------------------------------}
+
+-- | Shrink explanation
+--
+-- @p@ is the type of \"positive\" elements that satisfied the predicate (i.e.,
+-- valid shrinks), and @n@ is the type of \"negative\" which didn't.
+data ShrinkExplanation p n = ShrinkExplanation {
+      -- | The value we started, before shrinking
+      initial :: (Truncated, p)
+
+      -- | The full shrink history
+    , history :: ShrinkHistory p n
+    }
+
+-- | Shrink explanation
+data ShrinkHistory p n =
+    -- | We successfully executed a single shrink step
+    ShrunkTo (Truncated, p) (ShrinkHistory p n)
+
+    -- | We could no shrink any further
+    --
+    -- We also record all rejected next steps. This is occasionally useful when
+    -- trying to figure out why a value didn't shrink any further (what did it
+    -- try to shrink to?)
+  | ShrinkingDone [(Truncated, n)]
+
+    -- | We stopped shrinking early
+    --
+    -- This is used when the number of shrink steps is limited.
+  | ShrinkingStopped
+  deriving (Show)
+
+limitShrinkSteps :: Maybe Word -> ShrinkExplanation p n -> ShrinkExplanation p n
+limitShrinkSteps Nothing      = id
+limitShrinkSteps (Just limit) = \case
+    ShrinkExplanation{initial, history} ->
+      ShrinkExplanation{
+          initial
+        , history = go limit history
+        }
+  where
+    go :: Word -> ShrinkHistory p n -> ShrinkHistory p n
+    go 0 (ShrunkTo _ _)      = ShrinkingStopped
+    go n (ShrunkTo x xs)     = ShrunkTo x (go (pred n) xs)
+    go _ (ShrinkingDone rej) = ShrinkingDone rej
+    go _ ShrinkingStopped    = ShrinkingStopped
+
+-- | Simplify the shrink explanation to keep only the shrink history
+shrinkHistory :: ShrinkExplanation p n -> NonEmpty p
+shrinkHistory (ShrinkExplanation (_, unshrunk) shrunk) =
+    unshrunk :| go shrunk
+  where
+    go :: ShrinkHistory p n -> [p]
+    go (ShrunkTo (_, x) xs) = x : go xs
+    go (ShrinkingDone _)    = []
+    go ShrinkingStopped     = []
 
 {-------------------------------------------------------------------------------
   Shrinking
@@ -36,67 +98,85 @@ shrink :: forall a.
   -> Gen a
   -> SampleTree
   -> NonEmpty a
-shrink p g = fmap snd . history . shrinkExplain p g
-
--- | Explanation of how shrinking proceeded
-data ShrinkExplanation a = ShrinkExplanation {
-      -- | All successful shrink steps
-      --
-      -- For each step, we record the value produced by the generator, as well
-      -- as the part of the sample tree that the generator used.
-      history :: NonEmpty (Truncated, a)
-
-      -- | The candidates that were rejected
-      --
-      -- If this list is empty, shrinking failed because the sample tree could
-      -- not be shrunk further. If not, then all of these represent possible
-      -- next shrink steps that however all failed the supplied predicate (i.e.,
-      -- typically these represent values that are no longer counter-examples to
-      -- whatever property is being tested).
-      --
-      -- Note that the list here is different from the interpretation of the
-      -- list in 'history': in 'history', the list corresponds to a series of
-      -- successful shrink steps
-      --
-      -- > x0 ~> x1 ~> .. ~> xN
-      --
-      -- The list of 'rejected' next steps are all possible next steps from @xN@,
-      -- all of which fail the predicate:
-      --
-      -- > history                   rejected
-      -- > ----------------------------------
-      -- >                         / y0
-      -- >                         | y1
-      -- > x0 ~> x1 ~> .. ~> xN ~> | ..
-      -- >                         | ..
-      -- >                         \ yM
-    , rejected :: [(Truncated, a)]
-    }
-  deriving (Show)
+shrink p g = shrinkHistory . shrinkExplain p' g
+  where
+    p' :: a -> Either a a
+    p' x = if p x then Left x else Right x
 
 -- | Generalization of 'shrink' which explains the process
 --
 -- This is occassionally useful when debugging a generator, for example when it
 -- is shrinking in unexpected ways.
-shrinkExplain :: forall a.
+--
+-- This function has a more precise type than 'shrink', which suffers from
+-- boolean blindness; here we get /evidence/ whether or not something is a valid
+-- shrink step.
+--
+-- This is lazy in the shrink history; see 'limitShrinkSteps' to limit the
+-- number of shrinking steps.
+shrinkExplain :: forall a p n.
      HasCallStack
-  => (a -> Bool) -> Gen a -> SampleTree -> ShrinkExplanation a
+  => (a -> Either p n)
+  -> Gen a -> SampleTree -> ShrinkExplanation p n
 shrinkExplain p g = \st ->
-    let unshrunk = runExplain g st in
-    if not (p $ snd unshrunk)
-      then error "shrink: precondition violated"
-      else go (unshrunk :| []) st
+    let (trunc, a) = runExplain g st in
+    case p a of
+      Left  x -> ShrinkExplanation (trunc, x) $ go st
+      Right _ -> error "shrink: precondition violated"
   where
-    go :: NonEmpty (Truncated, a) -> SampleTree -> ShrinkExplanation a
-    go acc st =
+    go :: SampleTree -> ShrinkHistory p n
+    go st =
         -- Shrinking is a greedy algorithm: we go with the first candidate that
         -- works, and discard the others.
-        case filter (p . snd . snd) candidates of
-          []        -> ShrinkExplanation (NE.reverse acc) (map snd candidates)
-          (st',c):_ -> go (NE.cons c acc) st'
+        --
+        -- NOTE: 'partitionEithers' is lazy enough:
+        --
+        -- > head . fst $ partitionEithers [Left True, undefined] == True
+        case partitionEithers candidates of
+          ([], rejected) ->
+            ShrinkingDone $ map (\c -> (truncated c, outcome c)) rejected
+          (c:_, _) ->
+            ShrunkTo (truncated c, outcome c) $ go (shrunkTree c)
       where
-        candidates :: [(SampleTree, (Truncated, a))]
-        candidates = map (\st' -> (st', runExplain g st')) $ shrinkStep g st
+        candidates :: [Either (Candidate p) (Candidate n)]
+        candidates = map (eitherCandidate . mkCandidate p g) $ shrinkStep g st
+
+{-------------------------------------------------------------------------------
+  Shrinking candidates
+
+  This is an internal auxiliary type only; it is not exported.
+-------------------------------------------------------------------------------}
+
+-- | Candidate during shrink
+data Candidate x = Candidate {
+      -- | The shrunk 'SampleTree'
+      shrunkTree :: SampleTree
+
+      -- | The parts of the shrunk 'SampleTree' the generator looked at
+    , truncated :: Truncated
+
+      -- | The result of the generator
+    , outcome :: x
+    }
+
+mkCandidate :: forall a x. (a -> x) -> Gen a -> SampleTree -> Candidate x
+mkCandidate f g shrunkTree =
+    aux $ runExplain g  shrunkTree
+  where
+    aux :: (Truncated, a) -> Candidate x
+    aux (truncated, a) = Candidate{shrunkTree, truncated, outcome = f a}
+
+eitherCandidate :: Candidate (Either p n) -> Either (Candidate p) (Candidate n)
+eitherCandidate c@Candidate{outcome} =
+    case outcome of
+      Left  x -> Left  c{outcome = x}
+      Right x -> Right c{outcome = x}
+
+{-------------------------------------------------------------------------------
+  Shrink step
+
+  This could be considered to be the core of the @falsify@ approach.
+-------------------------------------------------------------------------------}
 
 -- | Single step in shrinking
 --
