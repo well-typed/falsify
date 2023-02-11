@@ -2,6 +2,7 @@ module Test.Falsify.Internal.Generator.Definition (
     -- * Definition
     Gen(..)
     -- * Primitive generators
+  , Prim(..)
   , prim
   , primWith
     -- * Combinators
@@ -52,13 +53,29 @@ import qualified Test.Falsify.SampleTree as SampleTree
 -- improves on this in a few ways).
 data Gen a where
   Pure :: a -> Gen a
-  FMap :: (a -> b) -> Gen a -> Gen b
-  Prim :: (Word64 -> [Word64]) -> Gen Word64
+  Prim :: Prim a -> Gen a
   Bind :: Gen a -> (a -> Gen b) -> Gen b
 
 {-------------------------------------------------------------------------------
   Primitive generators
 -------------------------------------------------------------------------------}
+
+-- | Primitive generator
+--
+-- This is an internal type, not part of the public API.
+--
+-- It is important that 'Prim' supports a 'Functor' instance. If a primitive
+-- generator would always return something of type 'Word64', then we would need
+-- rely on 'Bind' to implement 'Functor' for 'Gen', which would have unfortunate
+-- consequences. For example, it would mean that a generator such as
+--
+-- > do x <- bool
+-- >    if x then negate <$> prim else prim
+--
+-- would shrink in unexpected ways: @negate <$> prim@ and @prim@ would look at
+-- different parts of the sample tree.
+data Prim a = P (Word64 -> [Word64]) (Word64 -> a)
+  deriving (Functor)
 
 -- | Uniform selection of 'Word64', shrinking towards 0, using binary search
 --
@@ -72,14 +89,16 @@ prim = primWith binarySearch
 -- This is only required in rare circumstances. Most users will probably never
 -- need to use this generator.
 primWith :: (Word64 -> [Word64]) -> Gen Word64
-primWith shrinker = Prim shrinker
+primWith shrinker = Prim (P shrinker id)
 
 {-------------------------------------------------------------------------------
   Composition
 -------------------------------------------------------------------------------}
 
 instance Functor Gen where
-  fmap = FMap
+  fmap g (Pure x)   = Pure (g x)
+  fmap g (Prim p)   = Prim (fmap g p)
+  fmap g (Bind x f) = Bind x (fmap g . f)
 
 instance Applicative Gen where
   pure   = Pure
@@ -106,10 +125,9 @@ withoutShrinking :: Gen a -> Gen a
 withoutShrinking = go
   where
     go :: Gen a -> Gen a
-    go (Pure x)   = Pure x
-    go (FMap f g) = FMap f (go g)
-    go (Prim _)   = Prim (const [])
-    go (Bind x f) = Bind (go x) (go . f)
+    go (Pure x)       = Pure x
+    go (Prim (P _ f)) = Prim (P (const []) f)
+    go (Bind x f)     = Bind (go x) (go . f)
 
 {-------------------------------------------------------------------------------
   Running
@@ -123,10 +141,9 @@ runExplain = flip go
   where
     go :: SampleTree -> Gen a -> (Truncated, a)
     go st = \case
-        Pure x   -> (E, x)
-        FMap f g -> f <$> go st g
-        Prim _   -> let s = SampleTree.next st in (S s, s)
-        Bind x f -> let (l, r)  = SampleTree.split st
-                        (l', a) = go l x
-                        (r', b) = go r (f a)
-                    in (B l' r', b)
+        Pure x       -> (E, x)
+        Prim (P _ f) -> let s = SampleTree.next st in (S s, f s)
+        Bind x f     -> let (l, r)  = SampleTree.split st
+                            (l', a) = go l x
+                            (r', b) = go r (f a)
+                        in (B l' r', b)

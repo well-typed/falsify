@@ -193,12 +193,9 @@ shrinkStep = go
     -- The generator is independent of the tree: /no point/ shrinking
     go (Pure _) _ = []
 
-    -- 'fmap' does not affect the tree at all
-    go (FMap _ g) st = go g st
-
     -- Actual shrinking only happens for the primitive generator
     -- We cannot shrink if the value is already minimal.
-    go (Prim f) (SampleTree s l r) = (\s' -> SampleTree s' l r) <$> f s
+    go (Prim (P f _)) (SampleTree s l r) = (\s' -> SampleTree s' l r) <$> f s
 
     -- Finally, for 'Bind' we shrink either the left or the right tree; as is
     -- usual, this introduces a left bias.
