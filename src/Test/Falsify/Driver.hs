@@ -112,7 +112,7 @@ falsify opts prop = do
             let explanation :: ShrinkExplanation (e, Log) (a, Log)
                 explanation =
                     limitShrinkSteps (maxShrinks opts) $
-                      shrinkExplain isValid (runProperty prop) st
+                      shrinkExplain shortcutMinimal isValid (runProperty prop) st
 
                 failure :: Failure e a
                 failure = Failure {
@@ -123,6 +123,6 @@ falsify opts prop = do
             return (acc, Just failure)
 
     -- It's a valid shrink step if the test still fails
-    isValid :: (Either e a, Log) -> Either (e, Log) (a, Log)
-    isValid (Left  e, log) = Left (e, log)
-    isValid (Right a, log) = Right (a, log)
+    isValid :: (Either e a, Log) -> IsValidShrink (e, Log) (a, Log)
+    isValid (Left  e, log) = ValidShrink   (e, log)
+    isValid (Right a, log) = InvalidShrink (a, log)

@@ -14,10 +14,13 @@ module Test.Falsify.Debugging (
   , runExplain
     -- * Shrinking
   , ShrinkExplanation(..)
+  , IsValidShrink(..)
   , shrinkExplain
   , shrinkStep
   , limitShrinkSteps
   , shrinkHistory
+  , Shortcut
+  , shortcutMinimal
   ) where
 
 import Test.Falsify.Internal.Generator.Definition

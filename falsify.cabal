@@ -111,6 +111,7 @@ test-suite test-falsify
       TestSuite.Sanity.Prim
       TestSuite.Sanity.Range
       TestSuite.Sanity.Simple
+      TestSuite.Sanity.Tree
       TestSuite.Util.Predicates
   build-depends:
     , containers

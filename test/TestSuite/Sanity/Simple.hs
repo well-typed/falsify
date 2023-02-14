@@ -1,6 +1,5 @@
 module TestSuite.Sanity.Simple (tests) where
 
-import Data.Default
 import Data.List.NonEmpty (NonEmpty((:|)), nub)
 import Data.Word
 import Test.Tasty
@@ -32,7 +31,7 @@ test_bool = do
       Gen.shrink (const True) gen (tree maxBound maxBound)
   where
     gen :: Gen (Bool, Bool)
-    gen = (,) <$> Gen.bool def <*> Gen.bool (Range.invert def)
+    gen = (,) <$> Gen.bool False <*> Gen.bool True
 
     tree :: Word64 -> Word64 -> SampleTree
     tree x y = expandTruncated $ B (S x) (B (S y) E)

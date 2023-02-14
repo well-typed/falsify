@@ -10,19 +10,22 @@ import Test.Falsify.Generator.Auxiliary
 import Test.Falsify.Internal.Generator
 import Test.Falsify.Nudge
 import Test.Falsify.Range (Range(..), origin)
+import Data.Word
 
 {-------------------------------------------------------------------------------
   Generators
 -------------------------------------------------------------------------------}
 
-bool :: Range NoOffset Bool -> Gen Bool
-bool Range{lo, hi, inverted} = aux <$> fraction 1
+-- | Generate random bool, shrink towards the given value
+bool :: Bool -> Gen Bool
+bool target = aux <$> prim
   where
-    aux :: Fraction -> Bool
-    aux (Fraction f) =
-        if not inverted
-          then if f < 0.5 then lo else hi
-          else if f < 0.5 then hi else lo
+    aux :: Word64 -> Bool
+    aux x | msbSet x  = not target
+          | otherwise = target
+
+    msbSet :: forall a. FiniteBits a => a -> Bool
+    msbSet x = testBit x (finiteBitSize (undefined :: a) - 1)
 
 integral :: forall o a.
      (NudgeBy o a, Integral a, FiniteBits a)

@@ -2,20 +2,20 @@
 --
 -- Intended for qualified import.
 --
--- > import Test.Falsify.Range (Range(..), origin)
+-- > import Test.Falsify.Range (Range(..))
 -- > import qualified Test.Falsify.Range as Range
 module Test.Falsify.Range (
     -- * Definition
     Range(..)
   , origin
     -- * Constructing ranges
-  , originAtLo
+  , full
+  , between
   , num
     -- * Modifying ranges
   , invert
   ) where
 
-import Data.Default
 import GHC.Stack
 
 import Test.Falsify.Nudge
@@ -89,12 +89,13 @@ origin Range{lo, hi, offset, inverted} =
   Constructing ranges
 -------------------------------------------------------------------------------}
 
-instance Bounded a => Default (Range NoOffset a) where
-  def = Range{lo = minBound, hi = maxBound, offset = NoOffset, inverted = False}
+-- | Anywhere in the range of @a@
+full :: Bounded a => Range NoOffset a
+full = between (minBound, maxBound)
 
--- | Range between specified bounds with 'origin' at 'lo'
-originAtLo :: (a, a) -> Range NoOffset a
-originAtLo (lo, hi) = Range{lo, hi, offset = NoOffset, inverted = False}
+-- | Construct range with given lo and hi bound, shrinking towards lo
+between :: (a, a) -> Range NoOffset a
+between (lo, hi) = Range{lo, hi, offset = NoOffset, inverted = False}
 
 -- | Construct numeric range between specified bounds and with the given origin
 --
