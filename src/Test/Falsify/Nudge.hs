@@ -11,7 +11,7 @@ module Test.Falsify.Nudge (
 -------------------------------------------------------------------------------}
 
 data NoOffset = NoOffset
-  deriving stock (Show)
+  deriving stock (Show, Eq)
 
 {-------------------------------------------------------------------------------
   Definition

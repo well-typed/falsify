@@ -4,13 +4,12 @@ module Test.Falsify.Reexported.Generator.Simple (
   , integral
   ) where
 
+import Data.Word
 import Data.Bits
 
 import Test.Falsify.Generator.Auxiliary
 import Test.Falsify.Internal.Generator
-import Test.Falsify.Nudge
 import Test.Falsify.Range (Range(..), origin)
-import Data.Word
 
 {-------------------------------------------------------------------------------
   Generators
@@ -27,9 +26,7 @@ bool target = aux <$> prim
     msbSet :: forall a. FiniteBits a => a -> Bool
     msbSet x = testBit x (finiteBitSize (undefined :: a) - 1)
 
-integral :: forall o a.
-     (NudgeBy o a, Integral a, FiniteBits a)
-  => Range o a -> Gen a
+integral :: forall a. (Integral a, FiniteBits a) => Range a -> Gen a
 integral r = aux <$> signedFraction (precisionOf r)
   where
     lo', hi', origin' :: Double
