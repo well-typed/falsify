@@ -12,7 +12,7 @@ module Test.Falsify.Generator.Auxiliary (
     Signed(..)
     -- ** @n@-bit words
   , Precision(..)
-  , precisionOf
+  , precisionRequiredToRepresent
   , WordN(..)
     -- ** Fractions
   , Fraction(..)
@@ -54,8 +54,9 @@ newtype Precision = Precision Word8
   deriving stock (Show, Eq, Ord)
   deriving newtype (Num, Enum)
 
-precisionOf :: forall proxy a. FiniteBits a => proxy a -> Precision
-precisionOf _ = Precision (fromIntegral $ finiteBitSize (undefined :: a))
+precisionRequiredToRepresent :: forall a. FiniteBits a => a -> Precision
+precisionRequiredToRepresent x = Precision $ fromIntegral $
+    finiteBitSize (undefined :: a) - countLeadingZeros x
 
 -- | @n@-bit word
 data WordN = WordN Precision Word64

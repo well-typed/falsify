@@ -13,6 +13,7 @@ module Test.Falsify.Generator (
   , integral
     -- ** Compound
   , list
+  , tree
     -- ** Specialized shrinking
   , firstThen
     -- ** Primitive

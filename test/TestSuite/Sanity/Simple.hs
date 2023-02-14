@@ -1,6 +1,6 @@
 module TestSuite.Sanity.Simple (tests) where
 
-import Data.List.NonEmpty (NonEmpty((:|)), nub)
+import Data.List.NonEmpty (NonEmpty((:|)))
 import Data.Word
 import Test.Tasty
 import Test.Tasty.HUnit
@@ -55,14 +55,9 @@ test_integral = do
     -- Note that we are shrinking to a perfect minimal counter-example here: the
     -- 6 and 3 are at their "minimal" value, and if we were to shrink that 1 any
     -- further, it would no longer be a counter-example.
-    let expectedHistory = (6, 6, 6) :| [
-            (3, 6, 6)
-          , (2, 6, 6)
-          , (1, 6, 6)
-          , (1, 6, 3)
-          ]
+    let expectedHistory = (6,6,6) :| [(3,6,6),(1,6,6),(1,6,6),(1,6,3)]
     assertEqual "shrink" expectedHistory $
-      nub $ Gen.shrink (not . prop) gen (tree (maxBound - 1))
+      Gen.shrink (not . prop) gen (tree (maxBound - 1))
   where
     gen :: Gen (Word, Word, Word)
     gen = (,,)

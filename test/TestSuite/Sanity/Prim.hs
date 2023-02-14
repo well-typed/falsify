@@ -9,14 +9,13 @@ import Test.Tasty.HUnit
 
 import qualified Data.Set as Set
 
+import Data.Falsify.List (pairwiseAll, pairwiseAny)
 import Test.Falsify.Debugging
 import Test.Falsify.Generator (Gen)
 import Test.Falsify.SampleTree (SampleTree, Sample (..))
 
 import qualified Test.Falsify.Generator  as Gen
 import qualified Test.Falsify.SampleTree as SampleTree
-
-import TestSuite.Util.Predicates
 
 tests :: TestTree
 tests = testGroup "TestSuite.Sanity.Prim" [
@@ -113,9 +112,7 @@ test_list_sorted = do
         E)) E)) E)
 
     gen :: Int -> Gen [Word64]
-    gen n =
-        catMaybes <$>
-          replicateM (fromIntegral n) (aux <$> Gen.prim <*> Gen.prim)
+    gen n = catMaybes <$> replicateM n (aux <$> Gen.prim <*> Gen.prim)
       where
         aux :: Word64 -> Word64 -> Maybe Word64
         aux 0 = const Nothing

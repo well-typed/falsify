@@ -104,10 +104,8 @@ between (lo, hi) = Range{lo, hi, offset = NoOffset, inverted = False}
 -- | Construct numeric range between specified bounds and with the given origin
 --
 -- The origin must lie within the bounds.
-num :: forall a.
-     (Integral a, Show a, HasCallStack)
-  => (a, a) -> a -> Range a
-num bounds@(x, y) o
+num :: forall a. (Integral a, HasCallStack) => (a, a) -> a -> Range a
+num (x, y) o
   | x < y     = aux x y
   | otherwise = aux y x
   where
@@ -122,12 +120,7 @@ num bounds@(x, y) o
       = error originNotInBounds
 
     originNotInBounds :: String
-    originNotInBounds = concat [
-         "num: origin "
-        , show o
-        , " not within bounds "
-        , show bounds
-        ]
+    originNotInBounds = "origin not within bounds"
 
 {-------------------------------------------------------------------------------
   Modifying ranges
