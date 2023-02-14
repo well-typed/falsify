@@ -4,9 +4,12 @@ module Test.Falsify.Internal.Generator.Shrinking (
     -- * With full history
   , ShrinkExplanation(..)
   , ShrinkHistory(..)
+  , IsValidShrink(..)
   , shrinkExplain
   , limitShrinkSteps
   , shrinkHistory
+  , Shortcut
+  , shortcutMinimal
     -- * Debugging
   , shrinkStep
   ) where
@@ -98,10 +101,19 @@ shrink :: forall a.
   -> Gen a
   -> SampleTree
   -> NonEmpty a
-shrink p g = shrinkHistory . shrinkExplain p' g
+shrink p g = shrinkHistory . shrinkExplain shortcutMinimal p' g
   where
-    p' :: a -> Either a a
-    p' x = if p x then Left x else Right x
+    p' :: a -> IsValidShrink a ()
+    p' x = if p x then ValidShrink x else InvalidShrink ()
+
+{-------------------------------------------------------------------------------
+  Generalized shrinking interface
+-------------------------------------------------------------------------------}
+
+-- | Does a given shrunk value represent a valid shrink step?
+data IsValidShrink p n =
+    ValidShrink p
+  | InvalidShrink n
 
 -- | Generalization of 'shrink' which explains the process
 --
@@ -116,13 +128,14 @@ shrink p g = shrinkHistory . shrinkExplain p' g
 -- number of shrinking steps.
 shrinkExplain :: forall a p n.
      HasCallStack
-  => (a -> Either p n)
+  => Shortcut
+  -> (a -> IsValidShrink p n)
   -> Gen a -> SampleTree -> ShrinkExplanation p n
-shrinkExplain p g = \st ->
+shrinkExplain shortcut p g = \st ->
     let (trunc, a) = runExplain g st in
     case p a of
-      Left  x -> ShrinkExplanation (trunc, x) $ go st
-      Right _ -> error "shrink: precondition violated"
+      ValidShrink x   -> ShrinkExplanation (trunc, x) $ go st
+      InvalidShrink _ -> error "shrink: precondition violated"
   where
     go :: SampleTree -> ShrinkHistory p n
     go st =
@@ -139,7 +152,9 @@ shrinkExplain p g = \st ->
             ShrunkTo (truncated c, outcome c) $ go (shrunkTree c)
       where
         candidates :: [Either (Candidate p) (Candidate n)]
-        candidates = map (eitherCandidate . mkCandidate p g) $ shrinkStep g st
+        candidates =
+            map (eitherCandidate . mkCandidate p g) $
+              shrinkStep shortcut g st
 
 {-------------------------------------------------------------------------------
   Shrinking candidates
@@ -164,13 +179,19 @@ mkCandidate f g shrunkTree =
     aux $ runExplain g  shrunkTree
   where
     aux :: (Truncated, a) -> Candidate x
-    aux (truncated, a) = Candidate{shrunkTree, truncated, outcome = f a}
+    aux (truncated, a) = Candidate{
+          shrunkTree
+        , truncated
+        , outcome = f a
+        }
 
-eitherCandidate :: Candidate (Either p n) -> Either (Candidate p) (Candidate n)
+eitherCandidate ::
+     Candidate (IsValidShrink p n)
+  -> Either (Candidate p) (Candidate n)
 eitherCandidate c@Candidate{outcome} =
     case outcome of
-      Left  x -> Left  c{outcome = x}
-      Right x -> Right c{outcome = x}
+      ValidShrink   x -> Left  c{outcome = x}
+      InvalidShrink x -> Right c{outcome = x}
 
 {-------------------------------------------------------------------------------
   Shrink step
@@ -182,8 +203,8 @@ eitherCandidate c@Candidate{outcome} =
 --
 -- This is an auxiliary function used in shrinking; users will typically never
 -- have to call this function.
-shrinkStep :: Gen a -> SampleTree -> [SampleTree]
-shrinkStep = go
+shrinkStep :: Shortcut -> Gen a -> SampleTree -> [SampleTree]
+shrinkStep shortcut = go
   where
     go :: Gen a -> SampleTree -> [SampleTree]
 
@@ -204,9 +225,32 @@ shrinkStep = go
         , (\r' -> SampleTree s l  r') <$> go (f $ run x l) r
         ]
 
-    -- In the 'Bind' case, if we can shrink at all, we also try to shrink to
-    -- 'Minimal' directly. This is important for dealing with generators of
-    -- infinite data structures, which might otherwise shrink indefinitely.
-    shortcut :: [SampleTree] -> [SampleTree]
-    shortcut [] = []
-    shortcut ts = Minimal : ts
+{-------------------------------------------------------------------------------
+  Shortcuts
+-------------------------------------------------------------------------------}
+
+-- | Shortcut shrinking
+--
+-- A shortcut is a way to shrink "faster" than the normal generator-driven
+-- shrinker would shrink. It is given the shrunk sample trees that regular
+-- shrinking would compute, and it can modify this list as it sees fit. The
+-- identity function is a valid shortcut, but only in the absence of infinite
+-- generators (see 'shortcutMinimal').
+type Shortcut = [SampleTree] -> [SampleTree]
+
+-- | Introduce the 'Minimal' sample tree /if/ we can minimize at all
+--
+-- It is important to introduce 'Minimal' when dealing with infinite generators:
+-- since these look at an infinite portion of the sample tree. It is important
+-- that we cut off this portion by introducing 'Minimal' at some point, to
+-- ensure that shrinking terminates. The precise point of /where/ we introduce
+-- 'Minimal' will depend on the property being tested: on the condition that
+-- that property only depends on a finite part of the generated value, there
+-- /must/ be a part of the sample tree that is not relevant and hence can
+-- successfully be replaced by 'Minimal' without affecting what is being tested.
+--
+-- We only introduce 'Minimal' if we can shrink at all; this is an optimization
+-- that avoids introducing unnecessary shrink steps.
+shortcutMinimal :: Shortcut
+shortcutMinimal [] = []
+shortcutMinimal ts = Minimal : ts

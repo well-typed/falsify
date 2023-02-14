@@ -77,7 +77,7 @@ test_signedFraction = do
     assertEqual "run maxBound" (-100) $
       Gen.run gen (tree maxBound)
 
-    let expectedHistory = -100 :| [52,26,13,10]
+    let expectedHistory = -100 :| [52,-26,13,-10,10]
     assertEqual "shrink" expectedHistory $
       Gen.shrink (not . prop) gen (tree maxBound)
   where

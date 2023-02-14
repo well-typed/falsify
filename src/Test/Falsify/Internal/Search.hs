@@ -4,6 +4,8 @@ module Test.Falsify.Internal.Search (
   , binarySearchNoParityBias
   ) where
 
+import Data.Bits
+import Data.List (nub)
 import Data.Word
 
 {-------------------------------------------------------------------------------
@@ -55,88 +57,34 @@ binarySearch = go 0 . deltas
 -- we need to take into account.
 --
 -- In this function we pair each possible shrunk value with the corresponding
--- value of opposite parity; this means that we avoid any bias towards even or
--- odd numbers.
+-- value of opposite parity, ordered in such a way that we try to shrink to
+-- opposite parity first.
 --
 -- Examples:
 --
 -- > binarySearchNoParityBias   0 == []
 -- > binarySearchNoParityBias   1 == [0]
--- > binarySearchNoParityBias   2 == [0,1]
+-- > binarySearchNoParityBias   2 == [1,0]
 -- > binarySearchNoParityBias   3 == [0,1,2]
--- > binarySearchNoParityBias   4 == [0,1,2,3]
+-- > binarySearchNoParityBias   4 == [1,0,3,2]
 -- > binarySearchNoParityBias   5 == [0,1,2,3,4]
--- > binarySearchNoParityBias   6 == [0,1,2,3,4,5]
+-- > binarySearchNoParityBias   6 == [1,0,3,2,5,4]
 -- > binarySearchNoParityBias   7 == [0,1,4,5,6]
--- > binarySearchNoParityBias   8 == [0,1,4,5,6,7]
+-- > binarySearchNoParityBias   8 == [1,0,5,4,7,6]
 -- > binarySearchNoParityBias   9 == [0,1,4,5,6,7,8]
--- > binarySearchNoParityBias  10 == [0,1,4,5,8,9]
--- > binarySearchNoParityBias  16 == [0,1,8,9,12,13,14,15]
+-- > binarySearchNoParityBias  10 == [1,0,5,4,9,8]
+-- > binarySearchNoParityBias  16 == [1,0,9,8,13,12,15,14]
 -- > binarySearchNoParityBias 127 == [0,1,64,65,96,97,112,113,120,121,124,125,126]
--- > binarySearchNoParityBias 128 == [0,1,64,65,96,97,112,113,120,121,124,125,126,127]
+-- > binarySearchNoParityBias 128 == [1,0,65,64,97,96,113,112,121,120,125,124,127,126]
 binarySearchNoParityBias :: Word64 -> [Word64]
-binarySearchNoParityBias = adjust . binarySearch
+binarySearchNoParityBias y =
+    filter (< y) . nub . concatMap pairWithOpposite $
+      binarySearch y
   where
-    -- Starting with some value @y@, 'binarySearch' has given us a list of
-    -- possible shrunk values
-    --
-    -- > x0, x1 .. xN
-    --
-    -- We will pair each @x@ with a value @x'@ by flipping the LSB of @x@;
-    -- @x@ and @x'@ will then be considered to be the same value by the
-    -- 'signedWord63' generator, the primarily user of this shrinker.
-    --
-    -- We have to be careful not to exceed the boundaries and not to introduce
-    -- any duplicates.
-    --
-    -- (a) At the lower end of the range, if @x0@ exists (i.e., if we can shrink
-    --     at all), we must have @x0 == 0@; flipping the LSB would result in
-    --     @1@, which we can introduce unless
-    --
-    --     (i)  @x0@ is the /only/ value, in which case it is also the upper
-    --          limit. Since the final value must be exactly one less than the
-    --          value @y@ we started with, @y@ must have been 1, which means
-    --          we just executed a bitflip, and there is no need to introduce
-    --          any additional values.
-    --     (ii) @x1 == 1@ (we should avoid introducing duplicates)
-    --
-    -- (b) At the upper end of the range:
-    --
-    --     (i)  If @xN@ is even, then flipping the LSB would result in @xN + 1@,
-    --          outside of the range. However, since @xN@ must be precisely one
-    --          less than the value @N@ we are trying to shrink, we effectively
-    --          just /did/ a bit-flip, just like in (a.i), above.
-    --     (ii) If @xN@ is odd, flipping the LSB would result in @xN - 1@,
-    --          which we can introduce unless that is identical to the previous
-    --          value.
-    --
-    -- (c) Otherwise
-    --
-    --     (i)  If @xi@ is even, we must introduce @xi + 1@ unless that is
-    --          equal to the next value.
-    --     (ii) If @xi@ is odd, we must introduce @xi - 1@ unless that is
-    --          equal to the previous value.
-    adjust :: [Word64] -> [Word64]
-    adjust []       = []
-    adjust [0]      = [0]                   -- (a.i)
-    adjust (0:1:xs) = 0 :     go 0 (1:xs)   -- (a.ii)
-    adjust (0:x:xs) = 0 : 1 : go 1 (x:xs)
-    adjust _        = error "if we can shrink at all, first value must be 0"
-
-    go :: Word64 -> [Word64] -> [Word64]
-    go _    []    = []
-    go prev [xN]
-      | even xN   = [xN]                    -- (b.i)
-      | otherwise = if prev == pred xN      -- (b.ii)
-                      then [xN]
-                      else [pred xN, xN]
-    go prev (x:next:xs)
-      | even x    = if next == succ x       -- (c.i)
-                      then x : go x (next:xs)
-                      else x : succ x : go (succ x) (next:xs)
-      | otherwise = if prev == pred x       -- (c.ii)
-                      then x : go x (next:xs)
-                      else pred x : x : go x (next:xs)
+    pairWithOpposite :: Word64 -> [Word64]
+    pairWithOpposite x
+      | even x == even y = [x `xor` 1, x]
+      | otherwise        = [x, x `xor` 1]
 
 -- | Auxiliary to 'binarySearch'
 --
