@@ -13,15 +13,15 @@ tests = testGroup "TestSuite.Sanity.Range" [
 
 test_num :: Assertion
 test_num = do
-    assertEqual "Range-060" expected060 $ Range.num (0, 6) 0
-    assertEqual "Range-066" expected066 $ Range.num (0, 6) 6
-    assertEqual "Range-063" expected063 $ Range.num (0, 6) 3
+    assertBool "Range-060" $ Range.same expected060 $ Range.num (0, 6) 0
+    assertBool "Range-066" $ Range.same expected066 $ Range.num (0, 6) 6
+    assertBool "Range-063" $ Range.same expected063 $ Range.num (0, 6) 3
 
     assertEqual "origin-060" 0 $ Range.origin expected060
     assertEqual "origin-066" 6 $ Range.origin expected066
     assertEqual "origin-063" 3 $ Range.origin expected063
   where
-    expected060, expected066, expected063 :: Range Word Word
-    expected060 = Range {lo = 0, hi = 6, offset = 0, inverted = False}
-    expected066 = Range {lo = 0, hi = 6, offset = 6, inverted = False}
-    expected063 = Range {lo = 0, hi = 6, offset = 3, inverted = False}
+    expected060, expected066, expected063 :: Range Word
+    expected060 = Range {lo = 0, hi = 6, offset = 0 :: Word, inverted = False}
+    expected066 = Range {lo = 0, hi = 6, offset = 6 :: Word, inverted = False}
+    expected063 = Range {lo = 0, hi = 6, offset = 3 :: Word, inverted = False}

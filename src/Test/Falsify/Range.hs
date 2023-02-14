@@ -14,6 +14,8 @@ module Test.Falsify.Range (
   , num
     -- * Modifying ranges
   , invert
+    -- * Queries
+  , same
   ) where
 
 import GHC.Stack
@@ -33,8 +35,7 @@ import Test.Falsify.Nudge
 -- > [*          ]
 -- > lo         hi
 --
--- This is the range constructed by 'def'. We want to be able to 'invert' such a
--- range to instead get
+-- We want to be able to 'invert' such a range to instead get
 --
 -- >  --------->
 -- > [          *]
@@ -47,15 +48,17 @@ import Test.Falsify.Nudge
 -- In the general case, however, the origin is not at either end of the range,
 -- but somewhere in the middle:
 --
--- >  ---> <------------
--- > [    *             ]
--- > lo                hi
+-- >  offset
+-- >  -----> <------------
+-- > [      *             ]
+-- > lo                  hi
 --
 -- In this case, the inverted range is
 --
--- >  ------------> <---
--- > [             *    ]
--- > lo                hi
+-- >                offset
+-- >  ------------> <-----
+-- > [             *      ]
+-- > lo                  hi
 --
 -- If all of these values were numbers, we could compute this new origin as
 --
@@ -71,15 +74,16 @@ import Test.Falsify.Nudge
 --
 -- NOTE: This /could/ be given a 'Functor' instance, but we don't, as this
 -- would result in strange 'NudgeBy' constraints.
-data Range o a = Range {
+data Range a = forall o. (NudgeBy o a, Show o) => Range {
       lo       :: a
     , hi       :: a
     , offset   :: o
     , inverted :: Bool
     }
-  deriving stock (Show, Eq)
 
-origin :: NudgeBy o a => Range o a -> a
+deriving stock instance Show a => Show (Range a)
+
+origin :: Range a -> a
 origin Range{lo, hi, offset, inverted} =
     if not inverted
       then nudgeUp   offset lo
@@ -90,11 +94,11 @@ origin Range{lo, hi, offset, inverted} =
 -------------------------------------------------------------------------------}
 
 -- | Anywhere in the range of @a@
-full :: Bounded a => Range NoOffset a
+full :: Bounded a => Range a
 full = between (minBound, maxBound)
 
 -- | Construct range with given lo and hi bound, shrinking towards lo
-between :: (a, a) -> Range NoOffset a
+between :: (a, a) -> Range a
 between (lo, hi) = Range{lo, hi, offset = NoOffset, inverted = False}
 
 -- | Construct numeric range between specified bounds and with the given origin
@@ -102,15 +106,17 @@ between (lo, hi) = Range{lo, hi, offset = NoOffset, inverted = False}
 -- The origin must lie within the bounds.
 num :: forall a.
      (Integral a, Show a, HasCallStack)
-  => (a, a) -> a -> Range Word a
+  => (a, a) -> a -> Range a
 num bounds@(x, y) o
   | x < y     = aux x y
   | otherwise = aux y x
   where
-    aux :: a -> a -> Range Word a
+    aux :: a -> a -> Range a
     aux lo hi
       | lo <= o && o <= hi
-      = Range{lo, hi, offset = fromIntegral $ o - lo, inverted = False}
+      = let offset :: Word
+            offset = fromIntegral (o - lo)
+        in Range{lo, hi, offset, inverted = False}
 
       | otherwise
       = error originNotInBounds
@@ -130,5 +136,20 @@ num bounds@(x, y) o
 -- | Invert range
 --
 -- See 'Range' for detailed discussion.
-invert :: Range o a -> Range o a
+invert :: Range a -> Range a
 invert r = r{ inverted = not (inverted r) }
+
+{-------------------------------------------------------------------------------
+  Queries
+-------------------------------------------------------------------------------}
+
+-- | Do two 'Range's denote the same range?
+--
+-- This does not mean that they are syntactically the same; the same range
+-- can be represented in more than one way.
+same :: Eq a => Range a -> Range a -> Bool
+same r r' = and [
+      lo     r == lo     r'
+    , hi     r == hi     r'
+    , origin r == origin r'
+    ]

@@ -16,7 +16,6 @@ import Control.Monad.State
 import qualified Data.Foldable as Foldable
 
 import Test.Falsify.Internal.Generator
-import Test.Falsify.Nudge
 import Test.Falsify.Range (Range)
 import Test.Falsify.Reexported.Generator.Simple
 
@@ -84,7 +83,7 @@ keepAtLeast n xs
 -------------------------------------------------------------------------------}
 
 -- | Generate list of specified length
-list :: forall o a. NudgeBy o Word => Range o Word -> Gen a -> Gen [a]
+list :: Range Word -> Gen a -> Gen [a]
 list len g = do
     -- We do /NOT/ mark this call to 'integral' as 'withoutShrinking': it could
     -- shrink towards larger values, in which case we really need to generate
@@ -105,4 +104,5 @@ list len g = do
     n <- integral len
     mapMaybe shouldKeep . keepAtLeast (Range.origin len) <$>
       replicateM (fromIntegral n) (mark g)
+
 
