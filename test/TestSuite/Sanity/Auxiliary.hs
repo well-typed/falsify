@@ -8,15 +8,18 @@ import Test.Tasty.HUnit
 import Test.Falsify.Debugging
 import Test.Falsify.Generator (Gen)
 import Test.Falsify.Generator.Auxiliary
-import Test.Falsify.SampleTree (SampleTree)
+import Test.Falsify.SampleTree (SampleTree, Sample (..))
 
-import qualified Test.Falsify.Generator as Gen
+import qualified Test.Falsify.Generator  as Gen
+import qualified Test.Falsify.SampleTree as SampleTree
+import Control.Monad
 
 tests :: TestTree
 tests = testGroup "TestSuite.Sanity.Auxiliary" [
       testCase "fraction"       test_fraction
     , testCase "signedWordN"    test_signedWordN
     , testCase "signedFraction" test_signedFraction
+    , testCase "firstThen"      test_firstThen
     ]
 
 test_fraction :: Assertion
@@ -34,7 +37,7 @@ test_fraction = do
     gen = fraction 5
 
     tree :: Word64 -> SampleTree
-    tree x = expandTruncated $ S x
+    tree x = expandTruncated $ S (NotShrunk x)
 
     prop :: Fraction -> Bool
     prop f = pct f < 10
@@ -68,7 +71,7 @@ test_signedWordN = do
     gen = signedWordN 4
 
     tree :: Word64 -> SampleTree
-    tree x = expandTruncated $ S x
+    tree x = expandTruncated $ S (NotShrunk x)
 
 test_signedFraction :: Assertion
 test_signedFraction = do
@@ -85,7 +88,7 @@ test_signedFraction = do
     gen = toPercentage <$> signedFraction 5
 
     tree :: Word64 -> SampleTree
-    tree x = expandTruncated $ S x
+    tree x = expandTruncated $ S (NotShrunk x)
 
     prop :: Int -> Bool
     prop pct = abs pct < 10
@@ -93,3 +96,14 @@ test_signedFraction = do
     toPercentage :: Signed Fraction -> Int
     toPercentage (Pos (Fraction f)) = round (f * 100)
     toPercentage (Neg (Fraction f)) = negate $ round (f * 100)
+
+test_firstThen :: Assertion
+test_firstThen = do
+    -- The behaviour of firstThen is independent of the seed.
+    forM_ [0 .. 100] $ \seed ->
+      assertEqual (show seed) (True :| [False]) $
+        Gen.shrink (const True) gen (SampleTree.fromSeed seed)
+  where
+    gen :: Gen Bool
+    gen = firstThen True False
+

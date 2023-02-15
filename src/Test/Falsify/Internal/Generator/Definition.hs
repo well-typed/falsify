@@ -17,7 +17,7 @@ import Data.Word
 
 import Test.Falsify.Internal.Generator.Truncated
 import Test.Falsify.Internal.Search
-import Test.Falsify.SampleTree (SampleTree)
+import Test.Falsify.SampleTree (SampleTree, Sample, sampleValue)
 
 import qualified Test.Falsify.SampleTree as SampleTree
 
@@ -74,7 +74,7 @@ data Gen a where
 --
 -- would shrink in unexpected ways: @negate <$> prim@ and @prim@ would look at
 -- different parts of the sample tree.
-data Prim a = P (Word64 -> [Word64]) (Word64 -> a)
+data Prim a = P (Sample -> [Word64]) (Sample -> a)
   deriving (Functor)
 
 -- | Uniform selection of 'Word64', shrinking towards 0, using binary search
@@ -82,13 +82,13 @@ data Prim a = P (Word64 -> [Word64]) (Word64 -> a)
 -- This is a primitive generator; most users will probably not want to use this
 -- generator directly.
 prim :: Gen Word64
-prim = primWith binarySearch
+prim = sampleValue <$> primWith (binarySearch . sampleValue)
 
 -- | Generalization of 'prim' that allows to override the shrink behaviour
 --
 -- This is only required in rare circumstances. Most users will probably never
 -- need to use this generator.
-primWith :: (Word64 -> [Word64]) -> Gen Word64
+primWith :: (Sample -> [Word64]) -> Gen Sample
 primWith shrinker = Prim (P shrinker id)
 
 {-------------------------------------------------------------------------------

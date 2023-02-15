@@ -13,6 +13,8 @@ module Test.Falsify.Generator (
   , integral
     -- ** Compound
   , list
+    -- ** Specialized shrinking
+  , firstThen
     -- ** Primitive
   , prim
   , primWith
@@ -23,6 +25,7 @@ module Test.Falsify.Generator (
   , shrink
   ) where
 
+import Test.Falsify.Generator.Auxiliary
 import Test.Falsify.Internal.Generator
 import Test.Falsify.Reexported.Generator.Compound
 import Test.Falsify.Reexported.Generator.Simple
