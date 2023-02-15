@@ -10,13 +10,12 @@ module Test.Falsify.Internal.Generator.Truncated (
   ) where
 
 import Control.Monad.State
-import Data.Word
 import Data.Set (Set)
 import GHC.Stack
 
 import qualified Data.Set as Set
 
-import Test.Falsify.SampleTree (SampleTree(..))
+import Test.Falsify.SampleTree (SampleTree(..), Sample(..))
 
 {-------------------------------------------------------------------------------
   Truncated sample tree
@@ -31,7 +30,7 @@ data Truncated =
     E
 
     -- | The generator took a sample from the tree
-  | S Word64
+  | S Sample
 
     -- | The generator split (branched) the sample tree
   | B Truncated Truncated
@@ -56,10 +55,10 @@ expandTruncated = go
     unused = error "expandTruncated: unused"
 
 -- | In-order traversal, replacing values in the tree until the list runs out
-replaceValues :: [Word64] -> Truncated -> Truncated
+replaceValues :: [Sample] -> Truncated -> Truncated
 replaceValues = \vs t -> evalState (go t) vs
   where
-    go :: Truncated -> State [Word64] Truncated
+    go :: Truncated -> State [Sample] Truncated
     go E       = return E
     go (S s)   = state $ \case
                    []    -> (S s, [])
@@ -79,9 +78,9 @@ replaceValues = \vs t -> evalState (go t) vs
 -- depending on previously generated values.
 data Truncated' =
     E'
-  | S' (Set Word64)
+  | S' (Set Sample)
   | B' Truncated' Truncated'
-  | F' (Set Word64) Truncated' Truncated'
+  | F' (Set Sample) Truncated' Truncated'
   deriving stock (Show, Eq)
 
 instance Semigroup Truncated' where
@@ -105,11 +104,17 @@ toTruncated' = go
     go (S s)   = S' (Set.singleton s)
     go (B l r) = B' (go l) (go r)
 
-expandTruncated' :: (Set Word64 -> Word64) -> Truncated' -> SampleTree
+expandTruncated' :: (Set Sample -> Sample) -> Truncated' -> SampleTree
 expandTruncated' pick = go
   where
     go :: Truncated' -> SampleTree
-    go (B' l r)   = SampleTree 0 (go l) (go r)
-    go (S' s)     = SampleTree (pick s) Minimal Minimal
+    go (B' l r)   = SampleTree (pick' Set.empty) (go l) (go r)
+    go (S' s)     = SampleTree (pick' s) Minimal Minimal
     go E'         = Minimal
-    go (F' s l r) = SampleTree (pick s) (go l) (go r)
+    go (F' s l r) = SampleTree (pick' s) (go l) (go r)
+
+    pick' :: Set Sample -> Sample
+    pick' samples = case Set.toList samples of
+                      [s] -> s
+                      _   -> pick samples
+

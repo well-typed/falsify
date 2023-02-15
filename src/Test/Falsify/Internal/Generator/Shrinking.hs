@@ -20,7 +20,7 @@ import GHC.Stack
 
 import Test.Falsify.Internal.Generator.Definition
 import Test.Falsify.Internal.Generator.Truncated
-import Test.Falsify.SampleTree (SampleTree(..))
+import Test.Falsify.SampleTree (SampleTree(..), Sample(..))
 
 {-------------------------------------------------------------------------------
   Explanation
@@ -216,7 +216,8 @@ shrinkStep shortcut = go
 
     -- Actual shrinking only happens for the primitive generator
     -- We cannot shrink if the value is already minimal.
-    go (Prim (P f _)) (SampleTree s l r) = (\s' -> SampleTree s' l r) <$> f s
+    go (Prim (P f _)) (SampleTree s l r) =
+        (\s' -> SampleTree (Shrunk s') l r) <$> f s
 
     -- Finally, for 'Bind' we shrink either the left or the right tree; as is
     -- usual, this introduces a left bias.

@@ -12,10 +12,12 @@ import Test.Falsify.Internal.Generator
 import Test.Falsify.Range (Range(..), origin)
 
 {-------------------------------------------------------------------------------
-  Generators
+  Simple generators
 -------------------------------------------------------------------------------}
 
 -- | Generate random bool, shrink towards the given value
+--
+-- Chooses with equal probability between 'True' and 'False'.
 bool :: Bool -> Gen Bool
 bool target = aux <$> prim
   where
@@ -26,6 +28,7 @@ bool target = aux <$> prim
     msbSet :: forall a. FiniteBits a => a -> Bool
     msbSet x = testBit x (finiteBitSize (undefined :: a) - 1)
 
+-- | Uniform selection of random value in the specified range
 integral :: forall a. (Integral a, FiniteBits a) => Range a -> Gen a
 integral r = aux <$> signedFraction (precisionOf r)
   where

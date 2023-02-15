@@ -7,7 +7,7 @@ import Test.Tasty.HUnit
 
 import Test.Falsify.Debugging
 import Test.Falsify.Generator (Gen)
-import Test.Falsify.SampleTree (SampleTree)
+import Test.Falsify.SampleTree (SampleTree, Sample (..))
 
 import qualified Test.Falsify.Generator  as Gen
 import qualified Test.Falsify.Range      as Range
@@ -34,7 +34,8 @@ test_bool = do
     gen = (,) <$> Gen.bool False <*> Gen.bool True
 
     tree :: Word64 -> Word64 -> SampleTree
-    tree x y = expandTruncated $ B (S x) (B (S y) E)
+    tree x y = expandTruncated $
+        B (S (NotShrunk x)) (B (S (NotShrunk y)) E)
 
 test_integral :: Assertion
 test_integral = do
@@ -70,7 +71,8 @@ test_integral = do
         <*> Gen.integral (Range.num (0, 6) 3)
 
     tree :: Word64 -> SampleTree
-    tree x = expandTruncated $ B (B (S x) (B (S x) E)) (B (S x) E)
+    tree x = expandTruncated $
+        B (B (S (NotShrunk x)) (B (S (NotShrunk x)) E)) (B (S (NotShrunk x)) E)
 
     prop :: (Word, Word, Word) -> Bool
     prop (x, y, z) = (x == 0) || odd x && odd y && odd z

@@ -11,7 +11,7 @@ import qualified Data.Set as Set
 
 import Test.Falsify.Debugging
 import Test.Falsify.Generator (Gen)
-import Test.Falsify.SampleTree (SampleTree)
+import Test.Falsify.SampleTree (SampleTree, Sample (..))
 
 import qualified Test.Falsify.Generator  as Gen
 import qualified Test.Falsify.SampleTree as SampleTree
@@ -56,7 +56,7 @@ test_pair_word_word = do
     gen = (,) <$> Gen.prim <*> Gen.prim
 
     tree :: Word64 -> Word64 -> SampleTree
-    tree x y = expandTruncated $ B (S x) (B (S y) E)
+    tree x y = expandTruncated $ B (S (NotShrunk x)) (B (S (NotShrunk y)) E)
 
     -- for all pairs (x, y), x < y
     prop1 :: (Word64, Word64) -> Bool
@@ -78,10 +78,11 @@ test_list_allEqual = do
     -- Tree that produces gen of three elements in the specified order
     tree :: Word64 -> Word64 -> Word64 -> SampleTree
     tree x y z = expandTruncated $
-        B (S 3) (B (S x) (B
-                (B (S y) (B
-                (B (S z) (B E
-                E)) E)) E))
+        B (S (NotShrunk 3))
+          (B (S (NotShrunk x)) (B
+          (B (S (NotShrunk y)) (B
+          (B (S (NotShrunk z)) (B E
+            E)) E)) E))
 
     gen :: Gen [Word64]
     gen = do
@@ -106,9 +107,9 @@ test_list_sorted = do
     -- Tree that produces list of three elements in the specified order
     tree :: Word64 -> Word64 -> Word64 -> SampleTree
     tree x y z = expandTruncated $
-        B (B (S 1) (B (S x) E)) (B (
-        B (B (S 1) (B (S y) E)) (B (
-        B (B (S 1) (B (S z) E)) (B E
+        B (B (S (NotShrunk 1)) (B (S (NotShrunk x)) E)) (B (
+        B (B (S (NotShrunk 1)) (B (S (NotShrunk y)) E)) (B (
+        B (B (S (NotShrunk 1)) (B (S (NotShrunk z)) E)) (B E
         E)) E)) E)
 
     gen :: Int -> Gen [Word64]
@@ -129,7 +130,7 @@ test_maybe_towardsNothing = do
     -- When we start with the minimal tree, we get 'Nothing'
     let minimalTree = expandTruncated E
         (nothingTree, nothingResult) = (
-            B (S 0) (S 0)
+            B (S (Shrunk 0)) (S (Shrunk 0))
           , (Nothing, 0)
           )
     assertEqual "run Nothing" (nothingTree, nothingResult) $
@@ -138,10 +139,12 @@ test_maybe_towardsNothing = do
     -- To find out the shape of the tree required by the generator to produce
     -- 'Just', we need to replace the first @0@ by a @1@:
     let modifiedTree =
-          expandTruncated' Set.findMin  . toTruncated' $
-            replaceValues [1] nothingTree
+          let pick :: [Sample] -> Sample
+              pick ss = error $ "pick: unexpected " ++ show ss
+          in expandTruncated' (pick . Set.toList)  . toTruncated' $
+               replaceValues [NotShrunk 1] nothingTree
         (justTree, justResult) = (
-            B (S 1) (B (S 0) (B (S 0) E))
+            B (S (NotShrunk 1)) (B (S (Shrunk 0)) (B (S (Shrunk 0)) E))
           , (Just 0, 0)
           )
     assertEqual "run Just" (justTree, justResult) $
@@ -149,16 +152,21 @@ test_maybe_towardsNothing = do
 
     -- When we merge these two trees, we realize that the generators look
     -- at different parts of the sample tree (other than that first value)
-    let mergedTree x y z =
-          B' (S' (Set.fromList [0,1]))
-             (F' (Set.fromList [x])
-                 (S' (Set.fromList [y])) (B'
-                 (S' (Set.fromList [z])) E'
+    let mergedTree :: Word64 -> Word64 -> Word64 -> Truncated'
+        mergedTree x y z =
+          B' (S' (Set.fromList [Shrunk 0, NotShrunk 1]))
+             (F' (Set.fromList [Shrunk x])
+                 (S' (Set.fromList [Shrunk y])) (B'
+                 (S' (Set.fromList [Shrunk z])) E'
                  ))
     assertEqual "merged" (mergedTree 0 0 0) $
          toTruncated' nothingTree <> toTruncated' justTree
 
-    let tree = expandTruncated' Set.findMax $ mergedTree 5 1 3
+    let tree =
+          let pick :: [Sample] -> Sample
+              pick [NotShrunk 1, Shrunk 0] = NotShrunk 1
+              pick ss = error $ "pick: unexpected " ++ show ss
+          in expandTruncated' (pick . Set.toList) $ mergedTree 5 1 3
         expectedHistoryNotProp = (Just 1, 3) :| [
             (Nothing, 5)
           , (Nothing, 3)
@@ -230,7 +238,7 @@ test_either = do
           else Right <$> Gen.prim
 
     tree1 :: Word64 -> SampleTree
-    tree1 x = expandTruncated $ B (S 1) (S x)
+    tree1 x = expandTruncated $ B (S (NotShrunk 1)) (S (NotShrunk x))
 
     prop :: Either Word64 Word64 -> Bool
     prop (Right y) = odd y  || y == 0
@@ -244,7 +252,8 @@ test_either = do
         aux _ _ y = Right y
 
     tree2 :: Word64 -> SampleTree
-    tree2 x = expandTruncated $ B (B (S 1) (B (S x) E)) (B (S x) E)
+    tree2 x = expandTruncated $
+        B (B (S (NotShrunk 1)) (B (S (NotShrunk x)) E)) (B (S (NotShrunk x)) E)
 
 test_stream :: Assertion
 test_stream = do

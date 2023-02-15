@@ -22,13 +22,16 @@ module Test.Falsify.Generator.Auxiliary (
   , signedWordN
   , fraction
   , signedFraction
+    -- * Specialized shrinking behaviour
+  , firstThen
   ) where
 
+import Data.Bits
 import Data.Word
 
 import Test.Falsify.Internal.Generator
 import Test.Falsify.Internal.Search
-import Data.Bits
+import Test.Falsify.SampleTree (Sample(..), sampleValue)
 
 {-------------------------------------------------------------------------------
   Auxiliary type: signed values
@@ -105,12 +108,16 @@ mkFraction (WordN (Precision p) x) = Fraction $ (fromIntegral x) / (2 ^ p - 1)
   Generators
 -------------------------------------------------------------------------------}
 
--- | Generate @n@-bit word of specified precision, shrinking towards 0
+-- | Uniform selection of @n@-bit word of given precision, shrinking towards 0
 unsignedWordN :: Precision -> Gen WordN
 unsignedWordN p =
-    truncateAt p <$> primWith (binarySearch . forgetPrecision . truncateAt p)
+    fmap (truncateAt p . sampleValue) . primWith $
+        binarySearch
+      . forgetPrecision
+      . truncateAt p
+      . sampleValue
 
--- | Generated signed @n-bit@ word, shrinking towards 0
+-- | Uniform selection of signed @n-bit@ word, shrinking towards 0
 --
 -- Shrinking will decrease the /magnitude/ (distance to 0), but may randomly
 -- fluctuate the /sign/: there is no bias towards negative or positive.
@@ -121,8 +128,11 @@ signedWordN = \p ->
     -- We will use the LSB to determine the sign of the value, so we must ask
     -- for one more bit of precision.
     let p' = succ p
-    in aux . truncateAt p' <$>
-         primWith (binarySearchNoParityBias . forgetPrecision . truncateAt p')
+    in fmap (aux . truncateAt p' . sampleValue) . primWith $
+            binarySearchNoParityBias
+          . forgetPrecision
+          . truncateAt p'
+          . sampleValue
   where
     -- As @x@ tends towards 0, the LSB of @x@ (i.e., whether @x@ is even or not)
     -- will fluctuate randomly. Thus, we can use this to determine whether we
@@ -139,13 +149,31 @@ signedWordN = \p ->
         (if even x then Pos else Neg) $
           WordN (pred p) (x `div` 2)
 
--- | Generate fraction, shrinking towards 0
+-- | Uniform selection of fraction, shrinking towards 0
 fraction :: Precision -> Gen Fraction
 fraction p = mkFraction <$> unsignedWordN p
 
--- | Generate signed fraction, shrinking towards 0
+-- | Uniform selection of signed fraction, shrinking towards 0
 --
 -- There is no bias towards positive or negative fractions. See 'signedWordN'
 -- for more detailed discussion.
 signedFraction :: Precision -> Gen (Signed Fraction)
 signedFraction p = fmap mkFraction <$> signedWordN p
+
+{-------------------------------------------------------------------------------
+  Specialized shrinking behaviour
+-------------------------------------------------------------------------------}
+
+-- | Generator that always produces @x@ as initial value, and shrinks to @y@
+firstThen :: forall a. a -> a -> Gen a
+firstThen x y =
+    aux <$> primWith shrinker
+  where
+    aux :: Sample -> a
+    aux (NotShrunk _) = x
+    aux (Shrunk    _) = y
+
+    shrinker :: Sample -> [Word64]
+    shrinker (NotShrunk _) = [0] -- we could pick any value here really
+    shrinker (Shrunk    _) = []
+
