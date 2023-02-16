@@ -11,13 +11,13 @@ module Test.Tasty.Falsify (
   , Verbose(..)
   , ExpectFailure(..)
   , testPropertyWith
-    -- * Render success and failure
-  , ShowSuccess(..)
-  , ShowFailure(..)
-
-    -- TODO: Docs
-    -- TODO: Re-exports
+    -- * Re-exports
+    -- ** Properties
+  , Property -- opaque
+  , gen
+  , assert
   ) where
 
 import Test.Falsify.Internal.Tasty
+import Test.Falsify.Property
 

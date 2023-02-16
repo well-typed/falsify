@@ -2,6 +2,7 @@
 module Test.Falsify.Reexported.Generator.Simple (
     bool
   , integral
+  , enum
   ) where
 
 import Data.Word
@@ -10,6 +11,24 @@ import Data.Bits
 import Test.Falsify.Generator.Auxiliary
 import Test.Falsify.Internal.Generator
 import Test.Falsify.Range (Range(..), origin)
+import qualified Test.Falsify.Range as Range
+
+{-------------------------------------------------------------------------------
+  Internal auxiliary
+-------------------------------------------------------------------------------}
+
+integer :: Precision -> Range Integer -> Gen Integer
+integer p r =
+    aux <$> signedFraction p
+  where
+    lo', hi', origin' :: Double
+    lo'     = fromInteger $ lo     r
+    hi'     = fromInteger $ hi     r
+    origin' = fromInteger $ origin r
+
+    aux :: Signed Fraction -> Integer
+    aux (Neg (Fraction f)) = round $ origin' - f * (origin' - lo')
+    aux (Pos (Fraction f)) = round $ origin' + f * (hi' - origin')
 
 {-------------------------------------------------------------------------------
   Simple generators
@@ -30,15 +49,13 @@ bool target = aux <$> prim
 
 -- | Uniform selection of random value in the specified range
 integral :: forall a. (Integral a, FiniteBits a) => Range a -> Gen a
-integral r =
-    aux <$> signedFraction (precisionRequiredToRepresent $ hi r)
-  where
-    lo', hi', origin' :: Double
-    lo'     = fromIntegral $ lo     r
-    hi'     = fromIntegral $ hi     r
-    origin' = fromIntegral $ origin r
+integral r = fromIntegral <$>
+    integer (precisionRequiredToRepresent $ hi r) (Range.fromIntegral r)
 
-    aux :: Signed Fraction -> a
-    aux (Neg (Fraction f)) = round $ origin' - f * (origin' - lo')
-    aux (Pos (Fraction f)) = round $ origin' + f * (hi' - origin')
-
+-- | Uniform selection of random value in the specified range
+--
+-- For most types 'integral' is preferred; the 'Enum' class goes through 'Int',
+-- and is therefore also limited by the range of 'Int'.
+enum :: forall a. Enum a => Range a -> Gen a
+enum r = toEnum . fromIntegral <$>
+    integer (precisionRequiredToRepresent $ fromEnum $ hi r) (Range.fromEnum r)

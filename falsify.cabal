@@ -50,6 +50,7 @@ common lang
       MultiParamTypeClasses
       NamedFieldPuns
       PatternSynonyms
+      RankNTypes
       ScopedTypeVariables
       StandaloneDeriving
       TypeApplications
@@ -133,6 +134,9 @@ executable demo
       demo
   main-is:
       Main.hs
+  other-modules:
+      Demo.Simple
+      Demo.HowToSpecifyIt
   build-depends:
     , data-default
     , falsify

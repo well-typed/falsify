@@ -8,6 +8,10 @@ module Test.Falsify.Range (
     -- * Definition
     Range(..)
   , origin
+    -- * Combinators
+  , map
+  , fromIntegral
+  , fromEnum
     -- * Constructing ranges
   , full
   , between
@@ -17,6 +21,9 @@ module Test.Falsify.Range (
     -- * Queries
   , same
   ) where
+
+import Prelude hiding (map, fromIntegral, fromEnum)
+import qualified Prelude
 
 import GHC.Stack
 
@@ -71,9 +78,6 @@ import Test.Falsify.Nudge
 -- from 'lo'; otherwise, the offset is interpreted as a decrease from 'hi'. The
 -- precise meaning of \"increase\" or \"decrease\" is left abstract, and defined
 -- by the 'Nudge' class.
---
--- NOTE: This /could/ be given a 'Functor' instance, but we don't, as this
--- would result in strange 'NudgeBy' constraints.
 data Range a = forall o. (NudgeBy o a, Show o) => Range {
       lo       :: a
     , hi       :: a
@@ -90,6 +94,37 @@ origin Range{lo, hi, offset, inverted} =
       else nudgeDown offset hi
 
 {-------------------------------------------------------------------------------
+  Combinators
+-------------------------------------------------------------------------------}
+
+map ::
+     (NudgeBy o' b, Show o')
+  => (a -> b)
+  -> (forall o. NudgeBy o a => o -> o')
+  -> Range a -> Range b
+map f g Range{lo, hi, offset, inverted} = Range{
+      lo = f lo
+    , hi = f hi
+    , offset = g offset
+    , inverted
+    }
+
+fromIntegral :: forall a b. (Integral a, Num b, Show b) => Range a -> Range b
+fromIntegral = map conv $ \o -> Offset (conv $ nudgeUp o (0 :: a))
+  where
+    conv :: a -> b
+    conv = Prelude.fromIntegral
+
+fromEnum :: forall a b. (Enum a, Num b, Show b) => Range a -> Range b
+fromEnum = map conv $ \o -> Offset (conv $ nudgeUp o (toEnum 0 :: a))
+  where
+    conv :: a -> b
+    conv =
+          fromInteger
+        . (Prelude.fromIntegral :: Int -> Integer)
+        . Prelude.fromEnum
+
+{-------------------------------------------------------------------------------
   Constructing ranges
 -------------------------------------------------------------------------------}
 
@@ -104,23 +139,28 @@ between (lo, hi) = Range{lo, hi, offset = NoOffset, inverted = False}
 -- | Construct numeric range between specified bounds and with the given origin
 --
 -- The origin must lie within the bounds.
-num :: forall a. (Integral a, HasCallStack) => (a, a) -> a -> Range a
-num (x, y) o
+num :: forall a. (Integral a, HasCallStack, Show a) => (a, a) -> a -> Range a
+num bounds@(x, y) o
   | x < y     = aux x y
   | otherwise = aux y x
   where
     aux :: a -> a -> Range a
     aux lo hi
       | lo <= o && o <= hi
-      = let offset :: Word
-            offset = fromIntegral (o - lo)
+      = let offset :: Offset a
+            offset = Offset $ o - lo
         in Range{lo, hi, offset, inverted = False}
 
       | otherwise
       = error originNotInBounds
 
     originNotInBounds :: String
-    originNotInBounds = "origin not within bounds"
+    originNotInBounds = concat [
+         "num: origin "
+        , show o
+        , " not within bounds "
+        , show bounds
+        ]
 
 {-------------------------------------------------------------------------------
   Modifying ranges

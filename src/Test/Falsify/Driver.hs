@@ -26,6 +26,7 @@ import Test.Falsify.SampleTree (SampleTree)
 
 import qualified Test.Falsify.Generator  as Gen
 import qualified Test.Falsify.SampleTree as SampleTree
+import Data.Bifunctor
 
 {-------------------------------------------------------------------------------
   Options
@@ -54,25 +55,21 @@ instance Default Options where
   Driver
 -------------------------------------------------------------------------------}
 
-data Success a = Success {
-      successSeed    :: ReplaySeed
-    , successOutcome :: a
-    , successLog     :: Log
+data Success = Success {
+      successSeed :: ReplaySeed
+    , successLog  :: Log
     }
 
-data Failure e a = Failure {
-      failureSeed    :: ReplaySeed
-    , failureOutcome :: ShrinkExplanation (e, Log) (a, Log)
+data Failure = Failure {
+      failureSeed :: ReplaySeed
+    , failureLog  :: ShrinkExplanation (String, Log) Log
     }
 
 -- | Run a test: attempt to falsify the given property
 --
 -- We return the initial replay seed (each test also records its own seed),
 -- the successful tests, and the failed test, if any.
-falsify :: forall e a.
-     Options
-  -> Property e a
-  -> IO (ReplaySeed, [Success a], Maybe (Failure e a))
+falsify :: Options -> Property () -> IO (ReplaySeed, [Success], Maybe Failure)
 falsify opts prop = do
     prng <- case replay opts of
               Just (ReplaySplitmix seed gamma) ->
@@ -83,41 +80,46 @@ falsify opts prop = do
     return (splitmixReplaySeed prng, successes, mFailure)
   where
     go ::
-         SMGen
-      -> [Success a]  -- Accumulated successful tests
-      -> Word         -- Number of tests still to execute
-      -> IO ([Success a], Maybe (Failure e a))
+         SMGen     -- State of the PRNG after the previously executed test
+      -> [Success] -- Accumulated successful tests
+      -> Word      -- Number of tests still to execute
+      -> IO ([Success], Maybe Failure)
     go _    acc 0 = return (acc, Nothing)
     go prng acc n = do
-        let here, next :: SMGen
-            (here, next) = splitSMGen prng
+        let now, later :: SMGen
+            (now, later) = splitSMGen prng
 
             st :: SampleTree
-            st = SampleTree.fromPRNG here
+            st = SampleTree.fromPRNG now
 
-        let outcome :: Either e a
+        let outcome :: Either String ()
             log     :: Log
             (outcome, log) = Gen.run (runProperty prop) st
 
         case outcome of
-          Right x -> do
-            let success :: Success a
-                success = Success {
-                    successSeed    = splitmixReplaySeed here
-                  , successOutcome = x
-                  , successLog     = log
-                  }
-            go next (success : acc) (pred n)
-          Left _ -> do
-            let explanation :: ShrinkExplanation (e, Log) (a, Log)
-                explanation =
-                    limitShrinkSteps (maxShrinks opts) $
-                      shrinkExplain shortcutMinimal isValid (runProperty prop) st
 
-                failure :: Failure e a
+          -- Test passed
+          Right () -> do
+            let success :: Success
+                success = Success {
+                    successSeed = splitmixReplaySeed now
+                  , successLog  = log
+                  }
+            go later (success : acc) (pred n)
+
+          -- Test failed
+          --
+          -- We ignore the failure message here, because this is the failure
+          -- message before shrinking, which we are typically not interested in.
+          Left _-> do
+            let explanation :: ShrinkExplanation (String, Log) Log
+                explanation = limitShrinkSteps (maxShrinks opts) . second snd $
+                    shrinkExplain shortcutMinimal isValid (runProperty prop) st
+
+                failure :: Failure
                 failure = Failure {
-                      failureSeed    = splitmixReplaySeed here
-                    , failureOutcome = explanation
+                      failureSeed = splitmixReplaySeed now
+                    , failureLog  = explanation
                     }
 
             return (acc, Just failure)
