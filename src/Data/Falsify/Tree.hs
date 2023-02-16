@@ -20,10 +20,11 @@ import Prelude hiding (drop, truncate)
 import Control.Monad.State
 import GHC.Show
 
+import qualified Data.Tree as Rose
+
 import Data.Falsify.Marked (Marked(..))
 
 import qualified Data.Falsify.Marked as Marked
-import qualified Data.Tree as Containers
 
 {-------------------------------------------------------------------------------
   Definition
@@ -218,8 +219,8 @@ keepAtLeast = \n t ->
 -------------------------------------------------------------------------------}
 
 draw :: Tree String -> String
-draw = Containers.drawTree . conv
+draw = Rose.drawTree . conv
   where
-    conv :: Tree String -> Containers.Tree String
-    conv Leaf           = Containers.Node "*" []
-    conv (Branch x l r) = Containers.Node x [conv l, conv r]
+    conv :: Tree String -> Rose.Tree String
+    conv Leaf           = Rose.Node "*" []
+    conv (Branch x l r) = Rose.Node x [conv l, conv r]

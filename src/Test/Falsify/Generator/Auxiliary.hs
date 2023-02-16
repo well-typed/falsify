@@ -22,12 +22,16 @@ module Test.Falsify.Generator.Auxiliary (
   , signedWordN
   , fraction
   , signedFraction
-    -- * Specialized shrinking behaviour
+    -- * User-specified shrinking
+  , shrinkTo
   , firstThen
+  , shrinkWith
   ) where
 
 import Data.Bits
 import Data.Word
+
+import qualified Data.Tree as Rose
 
 import Test.Falsify.Internal.Generator
 import Test.Falsify.Internal.Search
@@ -165,16 +169,49 @@ signedFraction p = fmap mkFraction <$> signedWordN p
   Specialized shrinking behaviour
 -------------------------------------------------------------------------------}
 
--- | Generator that always produces @x@ as initial value, and shrinks to @y@
-firstThen :: forall a. a -> a -> Gen a
-firstThen x y =
+-- | Start with @x@, then shrink to any of the @xs@
+--
+-- Once shrunk, cannot shrink any further.
+shrinkTo :: forall a. a -> [a] -> Gen a
+shrinkTo x xs =
     aux <$> primWith shrinker
   where
     aux :: Sample -> a
     aux (NotShrunk _) = x
-    aux (Shrunk    _) = y
+    aux (Shrunk    i) = xs !! fromIntegral i
 
     shrinker :: Sample -> [Word64]
-    shrinker (NotShrunk _) = [0] -- we could pick any value here really
-    shrinker (Shrunk    _) = []
+    shrinker (Shrunk _)    = []
+    shrinker (NotShrunk _)
+               | null xs   = []
+               | otherwise = [0 .. fromIntegral (length xs) - 1]
 
+-- | Generator that always produces @x@ as initial value, and shrinks to @y@
+firstThen :: forall a. a -> a -> Gen a
+firstThen x y = x `shrinkTo` [y]
+
+-- | Shrink with provided shrinker
+--
+-- This provides a way to do QuickCheck-style manual shrinking.
+--
+-- This is O(n^2) in the number of shrink steps: as this shrinks, the generator
+-- is growing a path of indices which locates a particular value in the shrink
+-- tree (resulting from unfolding the provided shrinking function). At each
+-- step during the shrinking process the shrink tree is re-evaluated and the
+-- next value in the tree is located; since this path throws linearly, the
+-- overall cost is O(n^2).
+--
+-- The O(n^2) cost is only incurred on /locating/ the next element to be tested;
+-- the property is not reevaluated at already-shrunk values.
+shrinkWith :: forall a. (a -> [a]) -> Gen a -> Gen a
+shrinkWith f gen = do
+    x <- withoutShrinking gen
+    go $ Rose.unfoldTree (\x' -> (x', f x')) x
+  where
+    go :: Rose.Tree a -> Gen a
+    go (Rose.Node x []) = return x
+    go (Rose.Node x xs) = do
+        next <- Nothing `shrinkTo` map Just xs
+        case next of
+          Nothing -> return x
+          Just x' -> go x'
