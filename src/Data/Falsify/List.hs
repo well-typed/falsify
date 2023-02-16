@@ -1,10 +1,11 @@
-module TestSuite.Util.Predicates (
+module Data.Falsify.List (
+    -- * Predicates
     pairwiseAll
   , pairwiseAny
   ) where
 
 {-------------------------------------------------------------------------------
-  Lists
+  Predicates
 -------------------------------------------------------------------------------}
 
 pairwiseAll :: forall a. (a -> a -> Bool) -> [a] -> Bool

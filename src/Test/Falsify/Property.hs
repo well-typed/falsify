@@ -65,11 +65,13 @@ data LogEntry =
 
     -- | Some additional information
   | Info CallStack String
+  deriving (Show)
 
 -- | Log of the events happened during a test run
 --
 -- The events are recorded in reverse chronological order
 newtype Log = Log [LogEntry]
+  deriving (Show)
 
 {-------------------------------------------------------------------------------
   Construction

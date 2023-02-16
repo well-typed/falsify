@@ -30,7 +30,8 @@ bool target = aux <$> prim
 
 -- | Uniform selection of random value in the specified range
 integral :: forall a. (Integral a, FiniteBits a) => Range a -> Gen a
-integral r = aux <$> signedFraction (precisionOf r)
+integral r =
+    aux <$> signedFraction (precisionRequiredToRepresent $ hi r)
   where
     lo', hi', origin' :: Double
     lo'     = fromIntegral $ lo     r
@@ -40,3 +41,4 @@ integral r = aux <$> signedFraction (precisionOf r)
     aux :: Signed Fraction -> a
     aux (Neg (Fraction f)) = round $ origin' - f * (origin' - lo')
     aux (Pos (Fraction f)) = round $ origin' + f * (hi' - origin')
+
