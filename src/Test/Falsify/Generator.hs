@@ -14,8 +14,10 @@ module Test.Falsify.Generator (
     -- ** Compound
   , list
   , tree
-    -- ** Specialized shrinking
+    -- ** User-specified shrinking
+  , shrinkTo
   , firstThen
+  , shrinkWith
     -- ** Primitive
   , prim
   , primWith
