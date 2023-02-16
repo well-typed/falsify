@@ -10,9 +10,6 @@ module Test.Falsify.Internal.Tasty (
   , Verbose(..)
   , ExpectFailure(..)
   , testPropertyWith
-    -- * Render success and failure
-  , ShowSuccess(..)
-  , ShowFailure(..)
   ) where
 
 import Prelude hiding (log)
@@ -41,7 +38,7 @@ import qualified Test.Tasty.Providers as Tasty
   Tasty integration
 -------------------------------------------------------------------------------}
 
-data Test = Test TestOptions (Property String (Maybe String))
+data Test = Test TestOptions (Property ())
 
 data TestOptions = TestOptions {
       expectFailure      :: ExpectFailure
@@ -91,10 +88,7 @@ instance IsTest Test where
 toTastyResult ::
      Verbose
   -> ExpectFailure
-  -> ( ReplaySeed
-     , [Success (Maybe String)]
-     , Maybe (Failure String (Maybe String))
-     )
+  -> (ReplaySeed, [Success], Maybe Failure)
   -> Tasty.Result
 toTastyResult verbose expectFailure (initSeed, successes, mFailure) =
     case (verbose, expectFailure, mFailure) of
@@ -117,7 +111,7 @@ toTastyResult verbose expectFailure (initSeed, successes, mFailure) =
 
       -- We weren't expecting a failure, but did get one: test fails
       (NotVerbose, DontExpectFailure, Just e) ->
-        let history = shrinkHistory (Driver.failureOutcome e) in
+        let history = shrinkHistory (Driver.failureLog e) in
         testFailed $ intercalate "\n" [
             concat [
                 "Failed after "
@@ -150,21 +144,24 @@ toTastyResult verbose expectFailure (initSeed, successes, mFailure) =
           ]
 
       -- We were expecting failure, and got it: test succeeds
-      (NotVerbose, ExpectFailure, Just _) ->
+      (NotVerbose, ExpectFailure, Just e) ->
+        let history = shrinkHistory (Driver.failureLog e) in
         testPassed $ concat [
-             "Found expected failure after "
-           , show (length successes)
-           , " successful tests"
-           ]
+              "Found expected failure after "
+            , show (length successes)
+            , " successful tests and "
+            , show (length history - 1)
+            , " shrinks: "
+            , fst $ NE.last history
+            ]
 
       _otherwise ->
         error "TODO"
 
-renderSuccess :: (Int, Success (Maybe String)) -> String
-renderSuccess (ix, Driver.Success{successOutcome, successLog}) =
+renderSuccess :: (Int, Success) -> String
+renderSuccess (ix, Driver.Success{successLog}) =
     intercalate "\n" . concat $ [
         ["Test " ++ show ix]
-      , ["Outcome: " ++ show o | Just o <- [successOutcome]]
       , ["Logs:"]
       , [renderLog successLog]
       ]
@@ -181,44 +178,16 @@ renderLogEntry = \case
     aux stack x = x ++ " at " ++ prettyCallStack stack
 
 {-------------------------------------------------------------------------------
-  Rendering failure and success
--------------------------------------------------------------------------------}
-
-class ShowFailure e where
-  showFailure :: e -> String
-
-class ShowSuccess a where
-  showSuccess :: a -> Maybe String
-
-instance ShowFailure String where
-  showFailure = id
-
-instance ShowSuccess () where
-  showSuccess = const Nothing
-
-instance ShowSuccess String where
-  showSuccess = Just
-
-{-------------------------------------------------------------------------------
   User API
 -------------------------------------------------------------------------------}
 
-testProperty ::
-     (ShowFailure e, ShowSuccess a)
-  => TestName -> Property e a -> TestTree
+testProperty :: TestName -> Property () -> TestTree
 testProperty = testPropertyWith def
 
-testPropertyWith ::
-     (ShowFailure e, ShowSuccess a)
-  => TestOptions
-  -> TestName
-  -> Property e a
-  -> TestTree
+testPropertyWith :: TestOptions -> TestName -> Property () -> TestTree
 testPropertyWith testOpts name =
       singleTest name
     . Test testOpts
-    . mapFailure showFailure
-    . fmap showSuccess
 
 {-------------------------------------------------------------------------------
   Options specific to the tasty test runner
@@ -238,10 +207,11 @@ data Verbose = Verbose | NotVerbose
 data ExpectFailure = ExpectFailure | DontExpectFailure
 
 instance IsOption Verbose where
-  defaultValue = NotVerbose
-  parseValue   = fmap (\b -> if b then Verbose else NotVerbose) . safeReadBool
-  optionName   = Tagged $ "falsify-verbose"
-  optionHelp   = Tagged $ "Show the generated test cases"
+  defaultValue   = NotVerbose
+  parseValue     = fmap (\b -> if b then Verbose else NotVerbose) . safeReadBool
+  optionName     = Tagged $ "falsify-verbose"
+  optionHelp     = Tagged $ "Show the generated test cases"
+  optionCLParser = mkFlagCLParser mempty Verbose
 
 {-------------------------------------------------------------------------------
   Options

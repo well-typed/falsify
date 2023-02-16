@@ -3,8 +3,10 @@ module TestSuite.Sanity.Range (tests) where
 import Test.Tasty
 import Test.Tasty.HUnit
 
-import qualified Test.Falsify.Range as Range
+import Test.Falsify.Nudge
 import Test.Falsify.Range
+
+import qualified Test.Falsify.Range as Range
 
 tests :: TestTree
 tests = testGroup "TestSuite.Sanity.Range" [
@@ -22,6 +24,6 @@ test_num = do
     assertEqual "origin-063" 3 $ Range.origin expected063
   where
     expected060, expected066, expected063 :: Range Word
-    expected060 = Range {lo = 0, hi = 6, offset = 0 :: Word, inverted = False}
-    expected066 = Range {lo = 0, hi = 6, offset = 6 :: Word, inverted = False}
-    expected063 = Range {lo = 0, hi = 6, offset = 3 :: Word, inverted = False}
+    expected060 = Range {lo = 0, hi = 6, offset = Offset (0 :: Word), inverted = False}
+    expected066 = Range {lo = 0, hi = 6, offset = Offset (6 :: Word), inverted = False}
+    expected063 = Range {lo = 0, hi = 6, offset = Offset (3 :: Word), inverted = False}

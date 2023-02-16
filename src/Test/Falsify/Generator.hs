@@ -11,6 +11,7 @@ module Test.Falsify.Generator (
     -- * Simple (non-compound)
   , bool
   , integral
+  , enum
     -- ** Compound
   , list
   , tree

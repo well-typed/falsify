@@ -14,6 +14,7 @@ module Test.Falsify.Internal.Generator.Shrinking (
   , shrinkStep
   ) where
 
+import Data.Bifunctor
 import Data.Either
 import Data.List.NonEmpty (NonEmpty((:|)))
 import GHC.Stack
@@ -80,6 +81,25 @@ shrinkHistory (ShrinkExplanation (_, unshrunk) shrunk) =
     go (ShrunkTo (_, x) xs) = x : go xs
     go (ShrinkingDone _)    = []
     go ShrinkingStopped     = []
+
+{-------------------------------------------------------------------------------
+  Mapping
+-------------------------------------------------------------------------------}
+
+instance Bifunctor ShrinkExplanation where
+  bimap f g ShrinkExplanation{initial, history} = ShrinkExplanation{
+        initial = fmap f initial
+      , history = bimap f g history
+      }
+
+instance Bifunctor ShrinkHistory where
+  bimap f g = \case
+      ShrunkTo truncated history ->
+        ShrunkTo (fmap f truncated) (bimap f g history)
+      ShrinkingDone rejected ->
+        ShrinkingDone (map (fmap g) rejected)
+      ShrinkingStopped ->
+        ShrinkingStopped
 
 {-------------------------------------------------------------------------------
   Shrinking
