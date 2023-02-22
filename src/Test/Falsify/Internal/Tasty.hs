@@ -28,7 +28,7 @@ import qualified Data.List.NonEmpty as NE
 import Test.Falsify.Debugging
 import Test.Falsify.Driver (Success, Failure, falsify)
 import Test.Falsify.Driver.ReplaySeed
-import Test.Falsify.Property
+import Test.Falsify.Internal.Property
 
 import qualified Options.Applicative  as Opts
 import qualified Test.Falsify.Driver  as Driver
@@ -94,24 +94,28 @@ toTastyResult verbose expectFailure (initSeed, successes, mFailure) =
     case (verbose, expectFailure, mFailure) of
       -- We weren't expecting a failure, and didn't get one: test succeeds
       (NotVerbose, DontExpectFailure, Nothing) ->
-        testPassed $ concat [
-            "Passed "
-          , show (length successes)
-          , " tests"
-          ]
+        testPassed $
+          if length successes == 1
+            then "Passed 1 test"
+            else concat ["Passed "
+                   , show (length successes)
+                   , " tests"
+                   ]
       (Verbose, DontExpectFailure, Nothing) ->
         testPassed $ intercalate "\n" [
-            concat ["Passed "
-              , show (length successes)
-              , " tests"
-              ]
+            if length successes == 1
+              then "Passed 1 test"
+              else concat ["Passed "
+                     , show (length successes)
+                     , " tests"
+                     ]
           , "Full logs:"
           , intercalate "\n" $ map renderSuccess (zip [1..] successes)
           ]
 
       -- We weren't expecting a failure, but did get one: test fails
       (NotVerbose, DontExpectFailure, Just e) ->
-        let history = shrinkHistory (Driver.failureLog e) in
+        let history = shrinkHistory (Driver.failureRun e) in
         testFailed $ intercalate "\n" [
             concat [
                 "Failed after "
@@ -126,7 +130,7 @@ toTastyResult verbose expectFailure (initSeed, successes, mFailure) =
               , show (Driver.failureSeed e)
               ]
           , "Full log:"
-          , renderLog $ snd (NE.last history)
+          , renderLog $ runLog $ snd (NE.last history)
           ]
 
       -- We were expecting failure, but didn't get one: test fails
@@ -145,7 +149,7 @@ toTastyResult verbose expectFailure (initSeed, successes, mFailure) =
 
       -- We were expecting failure, and got it: test succeeds
       (NotVerbose, ExpectFailure, Just e) ->
-        let history = shrinkHistory (Driver.failureLog e) in
+        let history = shrinkHistory (Driver.failureRun e) in
         testPassed $ concat [
               "Found expected failure after "
             , show (length successes)
@@ -159,11 +163,11 @@ toTastyResult verbose expectFailure (initSeed, successes, mFailure) =
         error "TODO"
 
 renderSuccess :: (Int, Success) -> String
-renderSuccess (ix, Driver.Success{successLog}) =
+renderSuccess (ix, Driver.Success{successRun}) =
     intercalate "\n" . concat $ [
         ["Test " ++ show ix]
       , ["Logs:"]
-      , [renderLog successLog]
+      , [renderLog $ runLog successRun]
       ]
 
 renderLog :: Log -> String

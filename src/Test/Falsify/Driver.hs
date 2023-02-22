@@ -16,17 +16,17 @@ module Test.Falsify.Driver (
 
 import Prelude hiding (log)
 
+import Data.Bifunctor
 import Data.Default
 import System.Random.SplitMix
 
 import Test.Falsify.Debugging
 import Test.Falsify.Driver.ReplaySeed
-import Test.Falsify.Property
+import Test.Falsify.Internal.Property
 import Test.Falsify.SampleTree (SampleTree)
 
 import qualified Test.Falsify.Generator  as Gen
 import qualified Test.Falsify.SampleTree as SampleTree
-import Data.Bifunctor
 
 {-------------------------------------------------------------------------------
   Options
@@ -57,12 +57,12 @@ instance Default Options where
 
 data Success = Success {
       successSeed :: ReplaySeed
-    , successLog  :: Log
+    , successRun  :: TestRun
     }
 
 data Failure = Failure {
       failureSeed :: ReplaySeed
-    , failureLog  :: ShrinkExplanation (String, Log) Log
+    , failureRun  :: ShrinkExplanation (String, TestRun) TestRun
     }
 
 -- | Run a test: attempt to falsify the given property
@@ -93,8 +93,8 @@ falsify opts prop = do
             st = SampleTree.fromPRNG now
 
         let outcome :: Either String ()
-            log     :: Log
-            (outcome, log) = Gen.run (runProperty prop) st
+            run     :: TestRun
+            (outcome, run) = Gen.run (runProperty prop) st
 
         case outcome of
 
@@ -103,28 +103,33 @@ falsify opts prop = do
             let success :: Success
                 success = Success {
                     successSeed = splitmixReplaySeed now
-                  , successLog  = log
+                  , successRun  = run
                   }
-            go later (success : acc) (pred n)
+            if runDeterministic run then
+              case acc of
+                []         -> return ([success], Nothing)
+                _otherwise -> error "falsify.go: impossible"
+            else
+              go later (success : acc) (pred n)
 
           -- Test failed
           --
           -- We ignore the failure message here, because this is the failure
           -- message before shrinking, which we are typically not interested in.
           Left _-> do
-            let explanation :: ShrinkExplanation (String, Log) Log
+            let explanation :: ShrinkExplanation (String, TestRun) TestRun
                 explanation = limitShrinkSteps (maxShrinks opts) . second snd $
                     shrinkExplain shortcutMinimal isValid (runProperty prop) st
 
                 failure :: Failure
                 failure = Failure {
                       failureSeed = splitmixReplaySeed now
-                    , failureLog  = explanation
+                    , failureRun  = explanation
                     }
 
             return (acc, Just failure)
 
     -- It's a valid shrink step if the test still fails
-    isValid :: (Either e a, Log) -> IsValidShrink (e, Log) (a, Log)
-    isValid (Left  e, log) = ValidShrink   (e, log)
-    isValid (Right a, log) = InvalidShrink (a, log)
+    isValid :: (Either e a, TestRun) -> IsValidShrink (e, TestRun) (a, TestRun)
+    isValid (Left  e, run) = ValidShrink   (e, run)
+    isValid (Right a, run) = InvalidShrink (a, run)

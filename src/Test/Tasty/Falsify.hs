@@ -12,12 +12,16 @@ module Test.Tasty.Falsify (
   , ExpectFailure(..)
   , testPropertyWith
     -- * Re-exports
+    -- ** Generators
+  , Gen
     -- ** Properties
   , Property -- opaque
   , gen
   , assert
+  , info
   ) where
 
+
+import Test.Falsify.Generator (Gen)
 import Test.Falsify.Internal.Tasty
 import Test.Falsify.Property
-
