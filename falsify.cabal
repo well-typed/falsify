@@ -40,6 +40,7 @@ common lang
   default-extensions:
       DeriveFoldable
       DeriveFunctor
+      DeriveGeneric
       DeriveTraversable
       DerivingStrategies
       DisambiguateRecordFields
@@ -83,6 +84,7 @@ library
       Test.Falsify.Internal.Generator.Definition
       Test.Falsify.Internal.Generator.Shrinking
       Test.Falsify.Internal.Generator.Truncated
+      Test.Falsify.Internal.Property
       Test.Falsify.Internal.Search
       Test.Falsify.Internal.Tasty
       Test.Falsify.Reexported.Generator.Compound
@@ -140,4 +142,6 @@ executable demo
   build-depends:
     , data-default
     , falsify
+    , mtl
     , tasty
+    , vector
