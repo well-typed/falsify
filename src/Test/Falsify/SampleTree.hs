@@ -19,6 +19,7 @@ module Test.Falsify.SampleTree (
   , minimal
   , constant
     -- * Combinators
+  , shrinkNextWith
   , map
   , mod
   ) where
@@ -132,6 +133,11 @@ constant s = go
 {-------------------------------------------------------------------------------
   Combinators
 -------------------------------------------------------------------------------}
+
+shrinkNextWith :: (Sample -> [Word64]) -> SampleTree -> [SampleTree]
+shrinkNextWith f = \case
+    Minimal          -> []
+    SampleTree s l r -> (\s' -> SampleTree (Shrunk s') l r) <$> f s
 
 -- | Map function over all random samples in the tree
 --

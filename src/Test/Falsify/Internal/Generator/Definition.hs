@@ -5,6 +5,7 @@ module Test.Falsify.Internal.Generator.Definition (
   , Prim(..)
   , prim
   , primWith
+  , captureLocalTree
     -- * Combinators
   , withoutShrinking
     -- * Running
@@ -79,7 +80,7 @@ data Gen a where
 --
 -- would shrink in unexpected ways: @negate <$> prim@ and @prim@ would look at
 -- different parts of the sample tree.
-data Prim a = P (Sample -> [Word64]) (Sample -> a)
+data Prim a = P (SampleTree -> [SampleTree]) (SampleTree -> a)
   deriving (Functor)
 
 -- | Uniform selection of 'Word64', shrinking towards 0, using binary search
@@ -94,7 +95,11 @@ prim = sampleValue <$> primWith (binarySearch . sampleValue)
 -- This is only required in rare circumstances. Most users will probably never
 -- need to use this generator.
 primWith :: (Sample -> [Word64]) -> Gen Sample
-primWith shrinker = Prim (P shrinker id)
+primWith f = Prim $ P (SampleTree.shrinkNextWith f) SampleTree.next
+
+-- | Capture the local sample tree
+captureLocalTree :: (SampleTree -> [SampleTree]) -> Gen SampleTree
+captureLocalTree f = Prim $ P f id
 
 {-------------------------------------------------------------------------------
   Composition
@@ -149,7 +154,7 @@ run = flip go
     go :: SampleTree -> Gen a -> a
     go st = \case
         Pure x       -> x
-        Prim (P _ f) -> f (SampleTree.next st)
+        Prim (P _ f) -> f st
         Bind x f     -> go (SampleTree.left st) x &
                         go (SampleTree.right st) . f
         Select e f   -> go (SampleTree.left st) e &
@@ -168,7 +173,7 @@ explainGen = go
   where
     go :: Gen a -> Gen (Truncated, a)
     go (Pure x)       = Pure (E, x)
-    go (Prim (P f g)) = Prim $ P f (\s -> (S s, g s))
+    go (Prim (P f g)) = Prim $ P f (\s -> (S (SampleTree.next s), g s))
     go (Bind x f)     = Bind (go x) $ \(~(l, a)) -> first (B l) <$> go (f a)
     go (Select e f)   = Select (auxE <$> go e) (auxF <$> go f)
       where

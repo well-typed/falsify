@@ -8,8 +8,7 @@
 module Test.Falsify.Internal.Generator.ShrinkStep (
     Step -- opaque
   , step
-    -- * Working with the 'SampleTree'
-  , next
+    -- * Shrinking subtrees
   , left
   , right
     -- * Shrink the 'SampleTree'
@@ -20,10 +19,9 @@ module Test.Falsify.Internal.Generator.ShrinkStep (
 
 import Data.Bifunctor
 import Data.Functor
-import Data.Word
 
 import Test.Falsify.Internal.Generator.Definition
-import Test.Falsify.SampleTree (SampleTree(..), Sample(..))
+import Test.Falsify.SampleTree (SampleTree(..))
 
 import qualified Test.Falsify.SampleTree as SampleTree
 
@@ -39,14 +37,8 @@ newtype Step a = Step { step :: SampleTree -> [(a, SampleTree)] }
   deriving (Functor, Semigroup, Monoid)
 
 {-------------------------------------------------------------------------------
-  Stepping parts of the sample tree
+  Shrinking subtrees
 -------------------------------------------------------------------------------}
-
--- | Shrink the next sample
-next :: (Sample -> [Word64]) -> Step Sample
-next f = Step $ \case
-    Minimal          -> []
-    SampleTree s l r -> f s <&> \s' -> (Shrunk s', SampleTree (Shrunk s') l r)
 
 -- | Apply a step at the left subtree
 left :: Step a -> Step a
@@ -115,7 +107,7 @@ sampleTree shortcut = go
 
     -- Actual shrinking only happens for the primitive generator
     -- We cannot shrink if the value is already minimal.
-    go' (Prim (P f g)) = g <$> next f
+    go' (Prim (P f g)) = Step $ \st -> map (\st' -> (g st', st')) $ f st
 
     -- For 'Bind' we shrink either the left or the right tree.
     -- As is usual, this introduces a left bias.

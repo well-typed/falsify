@@ -23,6 +23,7 @@ module Test.Falsify.Generator (
     -- ** Primitive
   , prim
   , primWith
+  , captureLocalTree
     -- * Combinators
   , withoutShrinking
     -- * Execution

@@ -9,6 +9,7 @@ module Test.Falsify.Internal.Generator (
     -- * Primitive generators
   , prim
   , primWith
+  , captureLocalTree
     -- * Combinators
   , withoutShrinking
     -- * Running
