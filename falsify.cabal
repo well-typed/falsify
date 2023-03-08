@@ -50,6 +50,7 @@ common lang
       LambdaCase
       MultiParamTypeClasses
       NamedFieldPuns
+      NumericUnderscores
       PatternSynonyms
       RankNTypes
       ScopedTypeVariables
@@ -99,6 +100,7 @@ library
     , data-default
     , mtl
     , optparse-applicative
+    , selective
     , splitmix
     , tagged
     , tasty
@@ -119,13 +121,14 @@ test-suite test-falsify
       TestSuite.Sanity.Compound
       TestSuite.Sanity.Prim
       TestSuite.Sanity.Range
+      TestSuite.Sanity.Selective
       TestSuite.Sanity.Simple
-      TestSuite.Sanity.Tree
   build-depends:
     , containers
     , data-default
     , falsify
     , QuickCheck
+    , selective
     , tasty
     , tasty-hunit
 

@@ -13,6 +13,7 @@ module Test.Falsify.Generator (
   , integral
   , enum
     -- ** Compound
+  , either
   , list
   , tree
     -- ** User-specified shrinking
@@ -27,7 +28,10 @@ module Test.Falsify.Generator (
     -- * Execution
   , run
   , shrink
+  , shrinkWithShortcut
   ) where
+
+import Prelude hiding (either)
 
 import Test.Falsify.Generator.Auxiliary
 import Test.Falsify.Internal.Generator

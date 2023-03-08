@@ -1,11 +1,15 @@
 -- | Compound generators
 module Test.Falsify.Reexported.Generator.Compound (
     -- * Compound generators
-    list
+    either
+  , list
   , tree
   ) where
 
+import Prelude hiding (either)
+
 import Control.Monad
+import Control.Selective
 import Data.Maybe (mapMaybe)
 
 import Data.Falsify.Marked (Marked(..))
@@ -31,16 +35,50 @@ mark g = firstThen Keep Drop <*> g
 
 {-------------------------------------------------------------------------------
   Compound generators
-
-
-  An approach where we generate more elements than we need and then selecting
-  some of them (possibly increasing how many we select as we "shrink") does NOT
-  work: in such an approach, any value we generate but don't look at can
-  trivially shrink to zero ('Minimal'); this means that if we then /do/ want to
-  look at it later (because some other value would have been shrunk), we might
-  only find zeroes: we want to start shrinking that only /after/ we start
-  looking at it, otherwise shrinking means nothing.
 -------------------------------------------------------------------------------}
+
+-- | Generate a value with one of two generators
+--
+-- Shrinks towards the first ('Left') generator.
+--
+-- In the remainder of this docstring we give some background to this function,
+-- which may be useful for general understanding of the @falsify@ library.
+--
+-- The implementation of @either l r@ takes advantage of the that 'Gen' is a
+-- selective functor to ensure that the two generators can shrink independently:
+-- if the initial value of the generator is @Right y@ for some @y@, later shrunk
+-- to @Right y'@, then if the generator can shrink to @Left x@ at some point,
+-- shrinking effectively "starts over": the value of @y@ is independent of @x'@.
+--
+-- That is different from doing this:
+--
+-- > do b <- bool
+-- >    if b then l else r
+--
+-- In this case, @l@ and @r@ will be generated from the /same/ sample tree,
+-- and so cannot shrink independently.
+--
+-- It is /also/ different from
+--
+-- > do x <- l
+-- >    y <- r
+-- >    b <- bool
+-- >    return $ if b then x else y
+--
+-- In this case, @l@ and @r@ are run against /different/ sample trees, like in
+-- @either l r@, /but/ in this case if the current value produced by the
+-- generator is @Right y@ for some @y@, then @x@ will always be shrunk to the
+-- minimal value that @l@ can produce: this /must/ be possible because we're not
+-- currently using @x@!
+--
+-- To rephrase that last point: generating values that are not actually used
+-- will lead to poor shrinking, since those values can always be shrunk to their
+-- minimal value, independently from whatever property is being tested: the
+-- shrinker does not know that the value is not being used. The correct way to
+-- conditionally use a value is to use the selective interface, as 'either'
+-- does.
+either :: Gen a -> Gen b -> Gen (Either a b)
+either = eitherS (bool True)
 
 -- | Generate list of specified length
 list :: Range Word -> Gen a -> Gen [a]
@@ -89,3 +127,11 @@ tree size gen = do
         inLeft <- integral $ Range.num (0, n - 1) ((n - 1) `div` 2)
         let inRight = (n - 1) - inLeft
         Branch x <$> go inLeft <*> go inRight
+
+{-------------------------------------------------------------------------------
+  Auxiliary: 'Selective'
+-------------------------------------------------------------------------------}
+
+-- | A typed version of 'ifS'
+eitherS :: Selective f => f Bool -> f a -> f b -> f (Either a b)
+eitherS b t f = ifS b (Left <$> t) (Right <$> f)
