@@ -1,15 +1,17 @@
 module Test.Falsify.Internal.Generator.Shrinking (
     -- * Shrinking
     shrink
+  , shrinkWithShortcut
+  , Shortcut
+  , shortcutMinimal
     -- * With full history
   , ShrinkExplanation(..)
   , ShrinkHistory(..)
+  , Candidate(..)
   , IsValidShrink(..)
   , shrinkExplain
   , limitShrinkSteps
   , shrinkHistory
-  , Shortcut
-  , shortcutMinimal
     -- * Debugging
   , shrinkStep
   ) where
@@ -33,7 +35,7 @@ import Test.Falsify.SampleTree (SampleTree(..), Sample(..))
 -- valid shrinks), and @n@ is the type of \"negative\" which didn't.
 data ShrinkExplanation p n = ShrinkExplanation {
       -- | The value we started, before shrinking
-      initial :: (Truncated, p)
+      initial :: Candidate p
 
       -- | The full shrink history
     , history :: ShrinkHistory p n
@@ -42,20 +44,19 @@ data ShrinkExplanation p n = ShrinkExplanation {
 -- | Shrink explanation
 data ShrinkHistory p n =
     -- | We successfully executed a single shrink step
-    ShrunkTo (Truncated, p) (ShrinkHistory p n)
+    ShrunkTo (Candidate p) (ShrinkHistory p n)
 
     -- | We could no shrink any further
     --
     -- We also record all rejected next steps. This is occasionally useful when
     -- trying to figure out why a value didn't shrink any further (what did it
     -- try to shrink to?)
-  | ShrinkingDone [(Truncated, n)]
+  | ShrinkingDone [Candidate n]
 
     -- | We stopped shrinking early
     --
     -- This is used when the number of shrink steps is limited.
   | ShrinkingStopped
-  deriving (Show)
 
 limitShrinkSteps :: Maybe Word -> ShrinkExplanation p n -> ShrinkExplanation p n
 limitShrinkSteps Nothing      = id
@@ -74,13 +75,13 @@ limitShrinkSteps (Just limit) = \case
 
 -- | Simplify the shrink explanation to keep only the shrink history
 shrinkHistory :: ShrinkExplanation p n -> NonEmpty p
-shrinkHistory (ShrinkExplanation (_, unshrunk) shrunk) =
-    unshrunk :| go shrunk
+shrinkHistory (ShrinkExplanation unshrunk shrunk) =
+    outcome unshrunk :| go shrunk
   where
     go :: ShrinkHistory p n -> [p]
-    go (ShrunkTo (_, x) xs) = x : go xs
-    go (ShrinkingDone _)    = []
-    go ShrinkingStopped     = []
+    go (ShrunkTo x xs)   = outcome x : go xs
+    go (ShrinkingDone _) = []
+    go ShrinkingStopped  = []
 
 {-------------------------------------------------------------------------------
   Mapping
@@ -121,7 +122,18 @@ shrink :: forall a.
   -> Gen a
   -> SampleTree
   -> NonEmpty a
-shrink p g = shrinkHistory . shrinkExplain shortcutMinimal p' g
+shrink = shrinkWithShortcut shortcutMinimal
+
+-- | Generalization of 'shrink'
+shrinkWithShortcut :: forall a.
+     HasCallStack
+  => Shortcut
+  -> (a -> Bool) -- ^ Predicate to check if something is a valid shrink
+  -> Gen a
+  -> SampleTree
+  -> NonEmpty a
+shrinkWithShortcut shortcut p g =
+    shrinkHistory . shrinkExplain shortcut p' g
   where
     p' :: a -> IsValidShrink a ()
     p' x = if p x then ValidShrink x else InvalidShrink ()
@@ -152,10 +164,9 @@ shrinkExplain :: forall a p n.
   -> (a -> IsValidShrink p n)
   -> Gen a -> SampleTree -> ShrinkExplanation p n
 shrinkExplain shortcut p g = \st ->
-    let (trunc, a) = runExplain g st in
-    case p a of
-      ValidShrink x   -> ShrinkExplanation (trunc, x) $ go st
-      InvalidShrink _ -> error "shrink: precondition violated"
+    case evalSampleTree p g st of
+      Left  c -> ShrinkExplanation c $ go st
+      Right _ -> error "shrink: precondition violated"
   where
     go :: SampleTree -> ShrinkHistory p n
     go st =
@@ -166,20 +177,14 @@ shrinkExplain shortcut p g = \st ->
         --
         -- > head . fst $ partitionEithers [Left True, undefined] == True
         case partitionEithers candidates of
-          ([], rejected) ->
-            ShrinkingDone $ map (\c -> (truncated c, outcome c)) rejected
-          (c:_, _) ->
-            ShrunkTo (truncated c, outcome c) $ go (shrunkTree c)
+          ([], rejected) -> ShrinkingDone rejected
+          (c:_, _)       -> ShrunkTo c $ go (shrunkTree c)
       where
         candidates :: [Either (Candidate p) (Candidate n)]
-        candidates =
-            map (eitherCandidate . mkCandidate p g) $
-              shrinkStep shortcut g st
+        candidates = map (evalSampleTree p g) $ shrinkStep shortcut g st
 
 {-------------------------------------------------------------------------------
   Shrinking candidates
-
-  This is an internal auxiliary type only; it is not exported.
 -------------------------------------------------------------------------------}
 
 -- | Candidate during shrink
@@ -193,25 +198,23 @@ data Candidate x = Candidate {
       -- | The result of the generator
     , outcome :: x
     }
+  deriving (Functor)
 
-mkCandidate :: forall a x. (a -> x) -> Gen a -> SampleTree -> Candidate x
-mkCandidate f g shrunkTree =
-    aux $ runExplain g  shrunkTree
-  where
-    aux :: (Truncated, a) -> Candidate x
-    aux (truncated, a) = Candidate{
-          shrunkTree
-        , truncated
-        , outcome = f a
-        }
-
-eitherCandidate ::
-     Candidate (IsValidShrink p n)
+evalSampleTree :: forall a p n.
+     (a -> IsValidShrink p n)
+  -> Gen a
+  -> SampleTree
   -> Either (Candidate p) (Candidate n)
-eitherCandidate c@Candidate{outcome} =
-    case outcome of
-      ValidShrink   x -> Left  c{outcome = x}
-      InvalidShrink x -> Right c{outcome = x}
+evalSampleTree prop gen shrunkTree =
+     uncurry aux . second prop $ runExplain gen shrunkTree
+  where
+    aux :: Truncated -> IsValidShrink p n -> Either (Candidate p) (Candidate n)
+    aux truncated = \case
+        ValidShrink   p -> Left  $ mkCandidate p
+        InvalidShrink n -> Right $ mkCandidate n
+      where
+        mkCandidate :: x -> Candidate x
+        mkCandidate x = Candidate{shrunkTree, truncated, outcome = x}
 
 {-------------------------------------------------------------------------------
   Shrink step
@@ -239,11 +242,20 @@ shrinkStep shortcut = go
     go (Prim (P f _)) (SampleTree s l r) =
         (\s' -> SampleTree (Shrunk s') l r) <$> f s
 
-    -- Finally, for 'Bind' we shrink either the left or the right tree; as is
-    -- usual, this introduces a left bias.
+    -- For 'Bind' we shrink either the left or the right tree.
+    -- As is usual, this introduces a left bias.
     go (Bind x f) (SampleTree s l r) = shortcut . concat $ [
           (\l' -> SampleTree s l' r)  <$> go x             l
         , (\r' -> SampleTree s l  r') <$> go (f $ run x l) r
+        ]
+
+    -- The case for 'Select' is similar except that that we shrink the right
+    -- subtree /only/ if it used: this is the raison d'être of 'Select'.
+    go (Select e f) (SampleTree s l r) = shortcut . concat $ [
+          (\l' -> SampleTree s l' r) <$> go e l
+        , case run e l of
+            Left  _ -> (\r' -> SampleTree s l r') <$> go f r
+            Right _ -> []
         ]
 
 {-------------------------------------------------------------------------------

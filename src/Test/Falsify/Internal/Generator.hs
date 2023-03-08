@@ -14,6 +14,7 @@ module Test.Falsify.Internal.Generator (
     -- * Running
   , run
   , shrink
+  , shrinkWithShortcut
   , shrinkExplain
   ) where
 

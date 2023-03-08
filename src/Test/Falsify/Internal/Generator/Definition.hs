@@ -13,6 +13,8 @@ module Test.Falsify.Internal.Generator.Definition (
   ) where
 
 import Control.Monad
+import Control.Selective
+import Data.Bifunctor
 import Data.Word
 
 import Test.Falsify.Internal.Generator.Truncated
@@ -52,9 +54,10 @@ import qualified Test.Falsify.SampleTree as SampleTree
 -- 'Test.Falsify.Generator.Compound.list' generator for this purpose, which
 -- improves on this in a few ways).
 data Gen a where
-  Pure :: a -> Gen a
-  Prim :: Prim a -> Gen a
-  Bind :: Gen a -> (a -> Gen b) -> Gen b
+  Pure   :: a -> Gen a
+  Prim   :: Prim a -> Gen a
+  Bind   :: Gen a -> (a -> Gen b) -> Gen b
+  Select :: Gen (Either a b) -> Gen (a -> b) -> Gen b
 
 {-------------------------------------------------------------------------------
   Primitive generators
@@ -96,13 +99,17 @@ primWith shrinker = Prim (P shrinker id)
 -------------------------------------------------------------------------------}
 
 instance Functor Gen where
-  fmap g (Pure x)   = Pure (g x)
-  fmap g (Prim p)   = Prim (fmap g p)
-  fmap g (Bind x f) = Bind x (fmap g . f)
+  fmap g (Pure x)     = Pure (g x)
+  fmap g (Prim p)     = Prim (fmap g p)
+  fmap g (Bind x f)   = Bind x (fmap g . f)
+  fmap g (Select e f) = Select (fmap (second g) e) (fmap (g .) f)
 
 instance Applicative Gen where
   pure   = Pure
   (<*>)  = ap
+
+instance Selective Gen where
+  select = Select
 
 instance Monad Gen where
   return = pure
@@ -128,6 +135,7 @@ withoutShrinking = go
     go (Pure x)       = Pure x
     go (Prim (P _ f)) = Prim (P (const []) f)
     go (Bind x f)     = Bind (go x) (go . f)
+    go (Select e f)   = Select (go e) (go f)
 
 {-------------------------------------------------------------------------------
   Running
@@ -139,7 +147,7 @@ run g = snd . runExplain g
 runExplain :: Gen a -> SampleTree -> (Truncated, a)
 runExplain = flip go
   where
-    go :: SampleTree -> Gen a -> (Truncated, a)
+    go :: forall a. SampleTree -> Gen a -> (Truncated, a)
     go st = \case
         Pure x       -> (E, x)
         Prim (P _ f) -> let s = SampleTree.next st in (S s, f s)
@@ -147,3 +155,9 @@ runExplain = flip go
                             (l', a) = go l x
                             (r', b) = go r (f a)
                         in (B l' r', b)
+        Select e f   -> let (l, r)   = SampleTree.split st
+                            (l', ab) = go l e
+                        in case ab of
+                             Left  a -> let (r', b) = ($ a) <$> go r f in
+                                        (B l' r', b)
+                             Right b -> (B l' E,  b)

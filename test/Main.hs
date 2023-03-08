@@ -6,8 +6,8 @@ import qualified TestSuite.Sanity.Auxiliary
 import qualified TestSuite.Sanity.Compound
 import qualified TestSuite.Sanity.Prim
 import qualified TestSuite.Sanity.Range
+import qualified TestSuite.Sanity.Selective
 import qualified TestSuite.Sanity.Simple
-import qualified TestSuite.Sanity.Tree
 
 main :: IO ()
 main = defaultMain $ testGroup "falsify" [
@@ -17,6 +17,6 @@ main = defaultMain $ testGroup "falsify" [
         , TestSuite.Sanity.Auxiliary.tests
         , TestSuite.Sanity.Simple.tests
         , TestSuite.Sanity.Compound.tests
-        , TestSuite.Sanity.Tree.tests
+        , TestSuite.Sanity.Selective.tests
         ]
     ]
