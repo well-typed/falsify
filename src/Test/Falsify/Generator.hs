@@ -16,6 +16,12 @@ module Test.Falsify.Generator (
   , either
   , list
   , tree
+    -- ** Functions
+  , Fun
+  , pattern Fn
+  , pattern Fn2
+  , pattern Fn3
+  , fun
     -- ** User-specified shrinking
   , shrinkToOneOf
   , firstThen
@@ -37,4 +43,5 @@ import Prelude hiding (either)
 import Test.Falsify.Generator.Auxiliary
 import Test.Falsify.Internal.Generator
 import Test.Falsify.Reexported.Generator.Compound
+import Test.Falsify.Reexported.Generator.Function
 import Test.Falsify.Reexported.Generator.Simple

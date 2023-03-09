@@ -11,6 +11,8 @@ import Data.Bits
 import Test.Falsify.Generator.Auxiliary
 import Test.Falsify.Internal.Generator
 import Test.Falsify.Range (Range(..), origin)
+import Test.Falsify.SampleTree (Sample(..), sampleValue)
+
 import qualified Test.Falsify.Range as Range
 
 {-------------------------------------------------------------------------------
@@ -38,7 +40,7 @@ integer p r =
 --
 -- Chooses with equal probability between 'True' and 'False'.
 bool :: Bool -> Gen Bool
-bool target = aux <$> prim
+bool target = aux . sampleValue <$> primWith shrinker
   where
     aux :: Word64 -> Bool
     aux x | msbSet x  = not target
@@ -46,6 +48,10 @@ bool target = aux <$> prim
 
     msbSet :: forall a. FiniteBits a => a -> Bool
     msbSet x = testBit x (finiteBitSize (undefined :: a) - 1)
+
+    shrinker :: Sample -> [Word64]
+    shrinker (Shrunk 0) = []
+    shrinker _          = [0]
 
 -- | Uniform selection of random value in the specified range
 integral :: forall a. (Integral a, FiniteBits a) => Range a -> Gen a

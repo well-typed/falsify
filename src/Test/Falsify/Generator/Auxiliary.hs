@@ -1,3 +1,4 @@
+{-# LANGUAGE TypeOperators #-}
 -- | Auxiliary generators
 --
 -- The generators in this module are primarily intended to be used as building
@@ -18,14 +19,18 @@ module Test.Falsify.Generator.Auxiliary (
   , Fraction(..)
   , mkFraction
     -- * Generators
+    -- ** @n@-bit words
   , unsignedWordN
   , signedWordN
+    -- ** Fractions
   , fraction
   , signedFraction
     -- * User-specified shrinking
   , shrinkToOneOf
   , firstThen
   , shrinkWith
+    -- * Support for shrink trees
+  , fromShrinkTree
   ) where
 
 import Data.Bits
@@ -221,17 +226,10 @@ firstThen x y = x `shrinkToOneOf` [y]
 
 -- | Shrink with provided shrinker
 --
--- This provides a way to do QuickCheck-style manual shrinking.
+-- This provides compatibility with QuickCheck-style manual shrinking.
 --
--- This is O(n^2) in the number of shrink steps: as this shrinks, the generator
--- is growing a path of indices which locates a particular value in the shrink
--- tree (resulting from unfolding the provided shrinking function). At each
--- step during the shrinking process the shrink tree is re-evaluated and the
--- next value in the tree is located; since this path throws linearly, the
--- overall cost is O(n^2).
---
--- The O(n^2) cost is only incurred on /locating/ the next element to be tested;
--- the property is not reevaluated at already-shrunk values.
+-- Defined in terms of 'fromShrinkTree'; see discussion there for some
+-- notes on performance.
 shrinkWith :: forall a. (a -> [a]) -> Gen a -> Gen a
 shrinkWith f gen = do
     -- It is critical that we do not apply normal shrinking of the 'SampleTree'
@@ -248,6 +246,19 @@ shrinkWith f gen = do
   Shrink trees
 -------------------------------------------------------------------------------}
 
+-- | Construct generator from shrink tree
+--
+-- This provides compatibility with Hedgehog-style integrated shrinking.
+--
+-- This is O(n^2) in the number of shrink steps: as this shrinks, the generator
+-- is growing a path of indices which locates a particular value in the shrink
+-- tree (resulting from unfolding the provided shrinking function). At each
+-- step during the shrinking process the shrink tree is re-evaluated and the
+-- next value in the tree is located; since this path throws linearly, the
+-- overall cost is O(n^2).
+--
+-- The O(n^2) cost is only incurred on /locating/ the next element to be tested;
+-- the property is not reevaluated at already-shrunk values.
 fromShrinkTree :: forall a. Rose.Tree a -> Gen a
 fromShrinkTree = go
   where
@@ -257,3 +268,4 @@ fromShrinkTree = go
         case next of
           Nothing -> return x
           Just x' -> go x'
+

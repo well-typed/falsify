@@ -8,6 +8,9 @@
 module Test.Falsify.Internal.Generator.ShrinkStep (
     Step -- opaque
   , step
+    -- * Combinators
+  , butPrefer
+  , one
     -- * Shrinking subtrees
   , left
   , right
@@ -34,7 +37,30 @@ import qualified Test.Falsify.SampleTree as SampleTree
 -- We separately record ways in which the value can be shrunk that is
 -- independent of the 'SampleTree'.
 newtype Step a = Step { step :: SampleTree -> [(a, SampleTree)] }
-  deriving (Functor, Semigroup, Monoid)
+  deriving stock (Functor)
+  deriving newtype (Semigroup, Monoid)
+
+{-------------------------------------------------------------------------------
+  Combinators
+-------------------------------------------------------------------------------}
+
+-- | Record additional ways to shrink a value, independent of the sample tree
+--
+-- The new ways will be listed /before/ the existing values, and will therefore
+-- be tried /first/.
+butPrefer :: Step a -> [a] -> Step a
+Step f `butPrefer` xs = Step $ \st -> map (,st) xs ++ f st
+
+-- | Shrink /one/ element in a list
+one :: forall a. (a -> Step a) -> [a] -> Step [a]
+one f = go
+  where
+    go :: [a] -> Step [a]
+    go []     = mempty
+    go (x:xs) = mconcat [
+                    ( :xs) <$> f  x
+                  , (x:  ) <$> go xs
+                  ]
 
 {-------------------------------------------------------------------------------
   Shrinking subtrees

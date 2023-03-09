@@ -38,25 +38,32 @@ common lang
   default-language:
       Haskell2010
   default-extensions:
+      DefaultSignatures
+      DeriveAnyClass
       DeriveFoldable
       DeriveFunctor
       DeriveGeneric
       DeriveTraversable
       DerivingStrategies
+      DerivingVia
       DisambiguateRecordFields
+      FlexibleContexts
       FlexibleInstances
       GADTs
       GeneralizedNewtypeDeriving
+      KindSignatures
       LambdaCase
       MultiParamTypeClasses
       NamedFieldPuns
       NumericUnderscores
       PatternSynonyms
+      QuantifiedConstraints
       RankNTypes
       ScopedTypeVariables
       StandaloneDeriving
       TupleSections
       TypeApplications
+      TypeOperators
       ViewPatterns
 
 library
@@ -91,6 +98,9 @@ library
       Test.Falsify.Internal.Search
       Test.Falsify.Internal.Tasty
       Test.Falsify.Reexported.Generator.Compound
+      Test.Falsify.Reexported.Generator.Function
+      Test.Falsify.Reexported.Generator.Function.Perturb
+      Test.Falsify.Reexported.Generator.Function.Reified
       Test.Falsify.Reexported.Generator.Simple
   hs-source-dirs:
       src
@@ -121,6 +131,7 @@ test-suite test-falsify
   other-modules:
       TestSuite.Sanity.Auxiliary
       TestSuite.Sanity.Compound
+      TestSuite.Sanity.Functions
       TestSuite.Sanity.Prim
       TestSuite.Sanity.Range
       TestSuite.Sanity.Selective
