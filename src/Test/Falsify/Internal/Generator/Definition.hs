@@ -9,12 +9,14 @@ module Test.Falsify.Internal.Generator.Definition (
   , withoutShrinking
     -- * Running
   , run
-  , runExplain
+    -- * Debugging
+  , explainGen
   ) where
 
 import Control.Monad
 import Control.Selective
 import Data.Bifunctor
+import Data.Function
 import Data.Word
 
 import Test.Falsify.Internal.Generator.Truncated
@@ -142,22 +144,40 @@ withoutShrinking = go
 -------------------------------------------------------------------------------}
 
 run :: Gen a -> SampleTree -> a
-run g = snd . runExplain g
-
-runExplain :: Gen a -> SampleTree -> (Truncated, a)
-runExplain = flip go
+run = flip go
   where
-    go :: forall a. SampleTree -> Gen a -> (Truncated, a)
+    go :: SampleTree -> Gen a -> a
     go st = \case
-        Pure x       -> (E, x)
-        Prim (P _ f) -> let s = SampleTree.next st in (S s, f s)
-        Bind x f     -> let (l, r)  = SampleTree.split st
-                            (l', a) = go l x
-                            (r', b) = go r (f a)
-                        in (B l' r', b)
-        Select e f   -> let (l, r)   = SampleTree.split st
-                            (l', ab) = go l e
-                        in case ab of
-                             Left  a -> let (r', b) = ($ a) <$> go r f in
-                                        (B l' r', b)
-                             Right b -> (B l' E,  b)
+        Pure x       -> x
+        Prim (P _ f) -> f (SampleTree.next st)
+        Bind x f     -> go (SampleTree.left st) x &
+                        go (SampleTree.right st) . f
+        Select e f   -> go (SampleTree.left st) e &
+                        either (go (SampleTree.right st) f) id
+
+{-------------------------------------------------------------------------------
+  Debugging
+-------------------------------------------------------------------------------}
+
+-- | Return a 'Truncated'' 'SampleTree' as part of the result of the generator
+--
+-- This can help to explain how the generator is behaving. Used for debugging
+-- only.
+explainGen :: Gen a -> Gen (Truncated, a)
+explainGen = go
+  where
+    go :: Gen a -> Gen (Truncated, a)
+    go (Pure x)       = Pure (E, x)
+    go (Prim (P f g)) = Prim $ P f (\s -> (S s, g s))
+    go (Bind x f)     = Bind (go x) $ \(~(l, a)) -> first (B l) <$> go (f a)
+    go (Select e f)   = Select (auxE <$> go e) (auxF <$> go f)
+      where
+        auxE :: (Truncated, Either a b) -> Either (Truncated, a) (Truncated, b)
+        auxE (l, Left  a) = Left  (  l  , a)
+        auxE (l, Right b) = Right (B l E, b)
+
+        auxF :: (Truncated, a -> b) -> (Truncated, a) -> (Truncated, b)
+        auxF ~(r, g) ~(l, a) = (B l r, g a)
+
+
+
