@@ -22,7 +22,6 @@ import Data.List.NonEmpty (NonEmpty((:|)))
 import GHC.Stack
 
 import Test.Falsify.Internal.Generator.Definition
-import Test.Falsify.Internal.Generator.Truncated
 import Test.Falsify.SampleTree (SampleTree(..), Sample(..))
 
 {-------------------------------------------------------------------------------
@@ -192,9 +191,6 @@ data Candidate x = Candidate {
       -- | The shrunk 'SampleTree'
       shrunkTree :: SampleTree
 
-      -- | The parts of the shrunk 'SampleTree' the generator looked at
-    , truncated :: Truncated
-
       -- | The result of the generator
     , outcome :: x
     }
@@ -206,15 +202,11 @@ evalSampleTree :: forall a p n.
   -> SampleTree
   -> Either (Candidate p) (Candidate n)
 evalSampleTree prop gen shrunkTree =
-     uncurry aux . second prop $ runExplain gen shrunkTree
+     aux . prop $ run gen shrunkTree
   where
-    aux :: Truncated -> IsValidShrink p n -> Either (Candidate p) (Candidate n)
-    aux truncated = \case
-        ValidShrink   p -> Left  $ mkCandidate p
-        InvalidShrink n -> Right $ mkCandidate n
-      where
-        mkCandidate :: x -> Candidate x
-        mkCandidate x = Candidate{shrunkTree, truncated, outcome = x}
+    aux :: IsValidShrink p n -> Either (Candidate p) (Candidate n)
+    aux (ValidShrink   p) = Left  $ Candidate{shrunkTree, outcome = p}
+    aux (InvalidShrink n) = Right $ Candidate{shrunkTree, outcome = n}
 
 {-------------------------------------------------------------------------------
   Shrink step

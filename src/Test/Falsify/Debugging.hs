@@ -11,7 +11,7 @@ module Test.Falsify.Debugging (
   , toTruncated'
   , expandTruncated'
     -- * Running
-  , runExplain
+  , explainGen
     -- * Shrinking
   , ShrinkExplanation(..)
   , IsValidShrink(..)

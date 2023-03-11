@@ -131,7 +131,7 @@ test_maybe_towardsNothing = do
           , (Nothing, 0)
           )
     assertEqual "run Nothing" (nothingTree, nothingResult) $
-      runExplain gen minimalTree
+      Gen.run (explainGen gen) minimalTree
 
     -- To find out the shape of the tree required by the generator to produce
     -- 'Just', we need to replace the first @0@ by a @1@:
@@ -145,7 +145,7 @@ test_maybe_towardsNothing = do
           , (Just 0, 0)
           )
     assertEqual "run Just" (justTree, justResult) $
-      runExplain gen modifiedTree
+      Gen.run (explainGen gen) modifiedTree
 
     -- When we merge these two trees, we realize that the generators look
     -- at different parts of the sample tree (other than that first value)
