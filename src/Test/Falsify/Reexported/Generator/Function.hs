@@ -160,22 +160,28 @@ shrinkReified step = go
 
 removeSome :: [a] -> [[a]]
 removeSome xs = concat [
-     removeChunkOfSize k xs
-   | k <- takeWhile (> 0) (iterate (`div` 2) n)
+     -- remove all, half, 1/4th, .. of all elements
+     concat [
+          removeChunkOfSize k n xs
+        | k <- takeWhile (> 0) (iterate (`div` 2) n)
+        ]
    ]
  where
    n = length xs
 
 -- | All ways to remove @k@ consecutive elements from a list
---
--- Unlike in 'QuickCheck, we prefer to remove elements from the /end/ of the
--- list. For the case of function tables, this means that we prefer to keep
--- entries in the table for smaller values.
-removeChunkOfSize :: Int -> [a] -> [[a]]
-removeChunkOfSize k = reverse . go
+removeChunkOfSize ::
+     Int  -- ^ Size of the chunks to remove
+  -> Int  -- ^ Total length of the list
+  -> [a] -> [[a]]
+removeChunkOfSize k = go
   where
-    go :: [a] -> [[a]]
-    go [] = []
-    go xs = xs2 : map (xs1 ++) (go xs2)
+    go ::
+         Int  -- Remaining length of the list
+      -> [a] -> [[a]]
+    go n xs
+      | k > n     = []   -- we need to remove more elements than we have left
+      | null xs2  = [[]] -- we need to remove all elements
+      | otherwise = xs2 : map (xs1 ++) (go (n - k) xs2)
       where
         (xs1, xs2) = splitAt k xs
