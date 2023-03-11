@@ -221,11 +221,6 @@ test_either = do
           ]
     assertEqual "gen2" expectedHistory2 $
       Gen.shrink (not . prop) gen2 (tree2 4)
-
-    -- TODO: Might this is in fact OK to do for Either, /by default/..? Is
-    -- everything is lazy enough that only the parts we look at are generated,
-    -- and as we shrink, the other parts should be GCed as we go? Unsure. Need
-    -- to think carefully/experiment.
   where
     gen1 :: Gen (Either Word64 Word64)
     gen1 = do
