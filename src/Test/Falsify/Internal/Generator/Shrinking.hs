@@ -2,8 +2,6 @@ module Test.Falsify.Internal.Generator.Shrinking (
     -- * Shrinking
     shrink
   , shrinkWithShortcut
-  , Shortcut
-  , shortcutMinimal
     -- * With full history
   , ShrinkExplanation(..)
   , ShrinkHistory(..)
@@ -12,8 +10,6 @@ module Test.Falsify.Internal.Generator.Shrinking (
   , shrinkExplain
   , limitShrinkSteps
   , shrinkHistory
-    -- * Debugging
-  , shrinkStep
   ) where
 
 import Data.Bifunctor
@@ -22,7 +18,9 @@ import Data.List.NonEmpty (NonEmpty((:|)))
 import GHC.Stack
 
 import Test.Falsify.Internal.Generator.Definition
-import Test.Falsify.SampleTree (SampleTree(..), Sample(..))
+import Test.Falsify.SampleTree (SampleTree(..))
+
+import qualified Test.Falsify.Internal.Generator.ShrinkStep as Step
 
 {-------------------------------------------------------------------------------
   Explanation
@@ -121,12 +119,12 @@ shrink :: forall a.
   -> Gen a
   -> SampleTree
   -> NonEmpty a
-shrink = shrinkWithShortcut shortcutMinimal
+shrink = shrinkWithShortcut Step.shortcutMinimal
 
 -- | Generalization of 'shrink'
 shrinkWithShortcut :: forall a.
      HasCallStack
-  => Shortcut
+  => Step.Shortcut
   -> (a -> Bool) -- ^ Predicate to check if something is a valid shrink
   -> Gen a
   -> SampleTree
@@ -159,11 +157,11 @@ data IsValidShrink p n =
 -- number of shrinking steps.
 shrinkExplain :: forall a p n.
      HasCallStack
-  => Shortcut
+  => Step.Shortcut
   -> (a -> IsValidShrink p n)
   -> Gen a -> SampleTree -> ShrinkExplanation p n
-shrinkExplain shortcut p g = \st ->
-    case evalSampleTree p g st of
+shrinkExplain shortcut p gen = \st ->
+    case evalSampleTree p (run gen st, st) of
       Left  c -> ShrinkExplanation c $ go st
       Right _ -> error "shrink: precondition violated"
   where
@@ -180,7 +178,9 @@ shrinkExplain shortcut p g = \st ->
           (c:_, _)       -> ShrunkTo c $ go (shrunkTree c)
       where
         candidates :: [Either (Candidate p) (Candidate n)]
-        candidates = map (evalSampleTree p g) $ shrinkStep shortcut g st
+        candidates =
+            map (evalSampleTree p) $
+              Step.step (Step.sampleTree shortcut gen) st
 
 {-------------------------------------------------------------------------------
   Shrinking candidates
@@ -196,86 +196,11 @@ data Candidate x = Candidate {
     }
   deriving (Functor)
 
-evalSampleTree :: forall a p n.
+evalSampleTree ::
      (a -> IsValidShrink p n)
-  -> Gen a
-  -> SampleTree
+  -> (a, SampleTree)
   -> Either (Candidate p) (Candidate n)
-evalSampleTree prop gen shrunkTree =
-     aux . prop $ run gen shrunkTree
-  where
-    aux :: IsValidShrink p n -> Either (Candidate p) (Candidate n)
-    aux (ValidShrink   p) = Left  $ Candidate{shrunkTree, outcome = p}
-    aux (InvalidShrink n) = Right $ Candidate{shrunkTree, outcome = n}
-
-{-------------------------------------------------------------------------------
-  Shrink step
-
-  This could be considered to be the core of the @falsify@ approach.
--------------------------------------------------------------------------------}
-
--- | Single step in shrinking
---
--- This is an auxiliary function used in shrinking; users will typically never
--- have to call this function.
-shrinkStep :: Shortcut -> Gen a -> SampleTree -> [SampleTree]
-shrinkStep shortcut = go
-  where
-    go :: Gen a -> SampleTree -> [SampleTree]
-
-    -- Tree is already minimal: /cannot/ shrink any further
-    go _ Minimal = []
-
-    -- The generator is independent of the tree: /no point/ shrinking
-    go (Pure _) _ = []
-
-    -- Actual shrinking only happens for the primitive generator
-    -- We cannot shrink if the value is already minimal.
-    go (Prim (P f _)) (SampleTree s l r) =
-        (\s' -> SampleTree (Shrunk s') l r) <$> f s
-
-    -- For 'Bind' we shrink either the left or the right tree.
-    -- As is usual, this introduces a left bias.
-    go (Bind x f) (SampleTree s l r) = shortcut . concat $ [
-          (\l' -> SampleTree s l' r)  <$> go x             l
-        , (\r' -> SampleTree s l  r') <$> go (f $ run x l) r
-        ]
-
-    -- The case for 'Select' is similar except that that we shrink the right
-    -- subtree /only/ if it used: this is the raison d'être of 'Select'.
-    go (Select e f) (SampleTree s l r) = shortcut . concat $ [
-          (\l' -> SampleTree s l' r) <$> go e l
-        , case run e l of
-            Left  _ -> (\r' -> SampleTree s l r') <$> go f r
-            Right _ -> []
-        ]
-
-{-------------------------------------------------------------------------------
-  Shortcuts
--------------------------------------------------------------------------------}
-
--- | Shortcut shrinking
---
--- A shortcut is a way to shrink "faster" than the normal generator-driven
--- shrinker would shrink. It is given the shrunk sample trees that regular
--- shrinking would compute, and it can modify this list as it sees fit. The
--- identity function is a valid shortcut, but only in the absence of infinite
--- generators (see 'shortcutMinimal').
-type Shortcut = [SampleTree] -> [SampleTree]
-
--- | Introduce the 'Minimal' sample tree /if/ we can minimize at all
---
--- It is important to introduce 'Minimal' when dealing with infinite generators:
--- since these look at an infinite portion of the sample tree. It is important
--- that we cut off this portion by introducing 'Minimal' at some point, to
--- ensure that shrinking terminates. The precise point of /where/ we introduce
--- 'Minimal' will depend on the property being tested: on the condition that
--- that property only depends on a finite part of the generated value, there
--- /must/ be a part of the sample tree that is not relevant and hence can
--- successfully be replaced by 'Minimal' without affecting what is being tested.
---
--- We only introduce 'Minimal' if we can shrink at all; this is an optimization
--- that avoids introducing unnecessary shrink steps.
-shortcutMinimal :: Shortcut
-shortcutMinimal [] = []
-shortcutMinimal ts = Minimal : ts
+evalSampleTree prop (a, shrunkTree) =
+    case prop a of
+      ValidShrink   p -> Left  $ Candidate{shrunkTree, outcome = p}
+      InvalidShrink n -> Right $ Candidate{shrunkTree, outcome = n}

@@ -123,10 +123,10 @@ instance Monad Gen where
 
 -- | Disable shrinking in the given generator
 --
--- This should be considered a hint only: in particular, values may /always/ be
--- shrunk to their minimum value, and if the structure of a generator changes
--- and random samples are interpreted in a different context, we might "shrink"
--- from any value to another other value (including even larger values).
+-- Due to the nature of internal shrinking, it is always possible that a
+-- generator gets reapplied to samples that were shrunk wrt to a /different/
+-- generator. In this sense, 'withoutShrinking' should be considered to be a
+-- hint only.
 --
 -- This function is only occassionally necessary; most users will probably not
 -- need to use it.

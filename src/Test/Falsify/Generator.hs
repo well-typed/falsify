@@ -17,7 +17,7 @@ module Test.Falsify.Generator (
   , list
   , tree
     -- ** User-specified shrinking
-  , shrinkTo
+  , shrinkToOneOf
   , firstThen
   , shrinkWith
     -- ** Primitive

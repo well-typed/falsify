@@ -16,11 +16,8 @@ module Test.Falsify.Debugging (
   , ShrinkExplanation(..)
   , IsValidShrink(..)
   , shrinkExplain
-  , shrinkStep
   , limitShrinkSteps
   , shrinkHistory
-  , Shortcut
-  , shortcutMinimal
   ) where
 
 import Test.Falsify.Internal.Generator.Definition
