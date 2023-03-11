@@ -9,6 +9,7 @@ module Test.Falsify.Reexported.Generator.Function.Perturb (
   , Perturb(..)
   ) where
 
+import Data.Bits
 import Data.Int
 import Data.Ratio (Ratio)
 import Data.Word
@@ -25,6 +26,9 @@ import qualified Test.Falsify.SampleTree                    as SampleTree
 
 {-------------------------------------------------------------------------------
   Focus
+
+  The implementation of 'variant' is an adaptation of @integerVariant@ in
+  QuickCheck.
 -------------------------------------------------------------------------------}
 
 data Focus = FocusHere | FocusLeft Focus | FocusRight Focus
@@ -37,9 +41,39 @@ instance Semigroup Focus where
 instance Monoid Focus where
   mempty = FocusHere
 
+-- | Mark variant
+--
+-- See 'Perturb'.
 variant :: Integer -> Focus
-variant 0 = FocusLeft FocusHere
-variant n = FocusRight $ variant (n - 1)
+variant = \n ->
+    if n >= 1
+      then gamma n       $ FocusLeft  FocusHere
+      else gamma (1 - n) $ FocusRight FocusHere
+  where
+    gamma :: Integer -> Focus -> Focus
+    gamma n = encode n (ilog2 n) . zeroes k
+      where
+        k = ilog2 n
+
+    encode :: Integer -> Int -> Focus -> Focus
+    encode n = go
+      where
+        go (-1) g = g
+        go k g
+          | testBit n k = go (k - 1) $ FocusRight g
+          | otherwise   = go (k - 1) $ FocusLeft  g
+
+    -- The zeroes are effectively an encoding of the "length" of the number,
+    -- in terms of the number of bits required to encode it as a binary number.
+    -- This is used to ensure that, say, variant @0b11@ doesn't get a subtree
+    -- of the sample tree used for @0b1@.
+    zeroes :: Int -> Focus -> Focus
+    zeroes 0 g = g
+    zeroes k g = zeroes (k - 1) $ FocusLeft  g
+
+    ilog2 :: Integer -> Int
+    ilog2 1 = 0
+    ilog2 n = 1 + ilog2 (n `div` 2)
 
 {-------------------------------------------------------------------------------
   Using 'Focus'
@@ -67,6 +101,9 @@ stepAtFocus = go
   Perturbations
 -------------------------------------------------------------------------------}
 
+-- | Perturb the PRNG
+--
+-- This is the analogue of 'CoArbitrary' in QuickCheck.
 class Perturb a where
   perturb :: a -> Focus
 
