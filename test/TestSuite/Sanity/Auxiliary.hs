@@ -142,7 +142,7 @@ test_shrinkTo = do
     gen = Gen.prim
 
     gen' :: Gen Word64
-    gen' = shrinkTo 3 [0 .. 2]
+    gen' = shrinkToOneOf 3 [0 .. 2]
 
     prop :: Word64 -> Bool
     prop = even
@@ -204,19 +204,14 @@ test_shrinkWith_list listLength = do
         assertEqual (show seed) [1,0] $
           NE.last $ Gen.shrink (not . prop) gen (SampleTree.fromSeed seed)
   where
+    -- NOTE: `mod` is normally /NOT/ a valid way to generate a value in a
+    -- smaller range, since this will not shrink correcty when using internal
+    -- shrinking. With manual shrinking, however, this does not matter.
     gen :: Gen [Word64]
-    gen = shrinkWith QuickCheck.shrink $ do
-        -- This generator generates a list of [0..99] elements, with the
-        -- elements themselves ranging from [0..9]. Note that @mod@ here is
-        -- NOT normally the correct way to cut-off a range: for some @x@ chosen
-        -- from a larger range (here, the full Word64), @x mod n@ will NOT
-        -- shrink as @x@ shrinks (but rather, it will loop over its range).
-        -- However, since we override the shrinker, this doesn't matter.
-        if listLength == 0 then
-          return []
-        else do
-          n <- (`mod` listLength) <$> Gen.prim
-          replicateM (fromIntegral n) $ (`mod` 10) <$> Gen.prim
+    gen =
+        shrinkWith QuickCheck.shrink $
+          replicateM (fromIntegral listLength) $
+            (`mod` 10) <$> Gen.prim
 
     prop :: [Word64] -> Bool
     prop = pairwiseAll (<=)

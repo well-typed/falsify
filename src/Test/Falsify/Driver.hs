@@ -27,6 +27,7 @@ import Test.Falsify.SampleTree (SampleTree)
 
 import qualified Test.Falsify.Generator  as Gen
 import qualified Test.Falsify.SampleTree as SampleTree
+import qualified Test.Falsify.Internal.Generator.ShrinkStep as Step
 
 {-------------------------------------------------------------------------------
   Options
@@ -118,8 +119,13 @@ falsify opts prop = do
           -- message before shrinking, which we are typically not interested in.
           Left _-> do
             let explanation :: ShrinkExplanation (String, TestRun) TestRun
-                explanation = limitShrinkSteps (maxShrinks opts) . second snd $
-                    shrinkExplain shortcutMinimal isValid (runProperty prop) st
+                explanation =
+                    limitShrinkSteps (maxShrinks opts) . second snd $
+                      shrinkExplain
+                        Step.shortcutMinimal
+                        isValid
+                        (runProperty prop)
+                        st
 
                 failure :: Failure
                 failure = Failure {

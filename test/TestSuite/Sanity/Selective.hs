@@ -163,7 +163,11 @@ test_tree_ifBoth = do
         run (tree ifBoth depth) (sampleTree depth)
     didTimeout <- timeout 10_000_000 $ assertBool "shrunk" $
       all isBiased $
-        shrinkWithShortcut id (const True) (tree ifBoth depth) (sampleTree depth)
+        shrinkWithShortcut
+          (const id)
+          (const True)
+          (tree ifBoth depth)
+          (sampleTree depth)
     case didTimeout of
       Just () -> assertFailure "Expected timeout, but did not get it"
       Nothing -> return "Timed out as expected"
@@ -179,7 +183,11 @@ test_tree_ifS depth = do
         run (tree ifS depth) (sampleTree depth)
     assertBool "shrunk" $
       all isBiased $
-        shrinkWithShortcut id (const True) (tree ifS depth) (sampleTree depth)
+        shrinkWithShortcut
+          (const id)
+          (const True)
+          (tree ifS depth)
+          (sampleTree depth)
   where
     -- We reuse the depth as a seed
     sampleTree :: Word64 -> SampleTree
