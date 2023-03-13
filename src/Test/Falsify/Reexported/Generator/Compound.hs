@@ -3,10 +3,12 @@ module Test.Falsify.Reexported.Generator.Compound (
     -- * Auxiliary
     shrinkToNothing
   , mark
-    -- * Compound generators
+    -- * Standard compound generators
   , either
   , list
+    -- * Trees
   , tree
+  , bst
   ) where
 
 import Prelude hiding (either)
@@ -16,7 +18,7 @@ import Control.Selective
 import Data.Maybe (mapMaybe)
 
 import Data.Falsify.Marked (Marked(..))
-import Data.Falsify.Tree (Tree(..))
+import Data.Falsify.Tree (Tree(..), Interval(..), Endpoint(..))
 import Test.Falsify.Generator.Auxiliary
 import Test.Falsify.Internal.Generator
 import Test.Falsify.Range (Range)
@@ -136,6 +138,28 @@ tree size gen = do
         inLeft <- integral $ Range.num (0, n - 1) ((n - 1) `div` 2)
         let inRight = (n - 1) - inLeft
         Branch x <$> go inLeft <*> go inRight
+
+-- | Construct binary search tree
+--
+-- Shrinks by replacing entire subtrees by the empty tree.
+bst :: forall a b. Integral a => (a -> Gen b) -> Interval a -> Gen (Tree (a, b))
+bst gen = go
+  where
+    go :: Interval a -> Gen (Tree (a, b))
+    go i =
+        case Tree.inclusiveBounds i of
+          Nothing       -> pure Leaf
+          Just (lo, hi) -> firstThen id (const Leaf) <*> go' lo hi
+
+    -- inclusive bounds, lo <= hi
+    go' :: a -> a -> Gen (Tree (a, b))
+    go' lo hi = (\b -> Branch (mid, b))
+            <$> gen mid
+            <*> go (Interval (Inclusive lo) (Exclusive mid))
+            <*> go (Interval (Exclusive mid) (Inclusive hi))
+      where
+        mid :: a
+        mid = lo + ((hi - lo) `div` 2)
 
 {-------------------------------------------------------------------------------
   Auxiliary: 'Selective'

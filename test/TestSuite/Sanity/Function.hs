@@ -95,10 +95,10 @@ test_Word8ToBool_constant = do
 test_IntegerToBool_constant :: Assertion
 test_IntegerToBool_constant = do
     assertEqual "" expected $
-      show . NE.last $ Gen.shrink (not . prop) gen (SampleTree.fromSeed 4)
+      show . NE.last $ Gen.shrink (not . prop) gen (SampleTree.fromSeed 0)
   where
     expected :: String
-    expected = "{3142->True, _->False}"
+    expected = "{1618->True, _->False}"
 
     gen :: Gen (Fun Integer Bool)
     gen = Gen.fun (Gen.bool False)
@@ -114,10 +114,10 @@ test_IntegerToBool_constant = do
 test_IntToInt_mapFilter :: Assertion
 test_IntToInt_mapFilter = do
     assertEqual "" expected $
-      show . NE.last $ Gen.shrink (not . prop) gen (SampleTree.fromSeed 0)
+      show . NE.last $ Gen.shrink (not . prop) gen (SampleTree.fromSeed 1)
   where
     expected :: String
-    expected = "({_->0},{16->True, _->False},[16])"
+    expected = "({_->0},{43->True, _->False},[43])"
 
     gen :: Gen (Fun Int Int, Fun Int Bool, [Int])
     gen =
@@ -145,7 +145,7 @@ test_IntToInt_mapFilter = do
 test_StringToBool :: Assertion
 test_StringToBool = do
     assertEqual "" expected $
-      show . NE.last $ Gen.shrink (not . prop) gen (SampleTree.fromSeed 8)
+      show . NE.last $ Gen.shrink (not . prop) gen (SampleTree.fromSeed 9)
   where
     expected :: String
     expected = "{\"Standard ML\"->True, _->False}"

@@ -4,6 +4,8 @@ module Data.Falsify.Tree (
   , size
   , weight
   , height
+    -- * Construction
+  , singleton
     -- * Balancing
   , isWeightBalanced
   , isHeightBalanced
@@ -11,11 +13,16 @@ module Data.Falsify.Tree (
   , propagate
   , truncate
   , keepAtLeast
+    -- * Binary search trees
+  , Interval(..)
+  , Endpoint(..)
+  , inclusiveBounds
+  , lookup
     -- * Debugging
   , draw
   ) where
 
-import Prelude hiding (drop, truncate)
+import Prelude hiding (drop, truncate, lookup)
 
 import Control.Monad.State
 import GHC.Show
@@ -68,6 +75,13 @@ weight = succ . size
 height :: Tree a -> Word
 height Leaf              = 0
 height (Branch_ s _ _ _) = height_ s
+
+{-------------------------------------------------------------------------------
+  Construction
+-------------------------------------------------------------------------------}
+
+singleton :: a -> Tree a
+singleton x = Branch x Leaf Leaf
 
 {-------------------------------------------------------------------------------
   Pattern synonyms that hide the size argument
@@ -213,6 +227,49 @@ keepAtLeast = \n t ->
           -- "drop property", we /must/ mark this node as 'Keep'
           put $ n - 1
           Branch (Keep x) <$> go l <*> go r
+
+{-------------------------------------------------------------------------------
+  BST
+-------------------------------------------------------------------------------}
+
+data Endpoint a = Inclusive a | Exclusive a
+data Interval a = Interval (Endpoint a) (Endpoint a)
+
+-- | Compute interval with inclusive bounds, without exceeding range
+--
+-- Returns 'Nothing' if the interval is empty, and @Just@ the inclusive
+-- lower and upper bound otherwise.
+inclusiveBounds :: forall a. (Ord a, Enum a) => Interval a -> Maybe (a, a)
+inclusiveBounds = \(Interval lo hi) -> go lo hi
+  where
+    -- The inequality checks in @go@ justify the use of @pred@ or @succ@
+    go :: Endpoint a -> Endpoint a -> Maybe (a, a)
+    go (Inclusive lo) (Inclusive hi)
+      | lo <= hi  = Just (lo, hi)
+      | otherwise = Nothing
+    go (Exclusive lo) (Inclusive hi)
+      | lo < hi   = Just (succ lo, hi)
+      | otherwise = Nothing
+    go (Inclusive lo) (Exclusive hi)
+      | lo < hi   = Just (lo, pred hi)
+      | otherwise = Nothing
+    go (Exclusive lo) (Exclusive hi)
+      | lo < hi   = if succ lo > pred hi
+                      then Nothing
+                      else Just (succ lo, pred hi)
+      | otherwise = Nothing
+
+
+-- | Look value up in BST
+--
+-- NOTE: The 'Tree' datatype itself does /NOT/ guarantee that the tree is in
+-- fact a BST. It is the responsibility of the caller to ensure this.
+lookup :: Ord a => a -> Tree (a, b) -> Maybe b
+lookup a' (Branch (a, b) l r)
+  | a' < a    = lookup a' l
+  | a' > a    = lookup a' r
+  | otherwise = Just b
+lookup _ Leaf = Nothing
 
 {-------------------------------------------------------------------------------
   Debugging

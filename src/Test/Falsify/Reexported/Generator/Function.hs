@@ -13,12 +13,14 @@ module Test.Falsify.Reexported.Generator.Function (
 
 import Prelude hiding (sum)
 
+import Control.Monad
 import Data.Bifunctor
 import Data.Char
+import Data.Foldable (toList)
 import Data.Int
 import Data.Kind
 import Data.List (intercalate)
-import Data.Maybe (catMaybes, fromMaybe)
+import Data.Maybe (fromMaybe, mapMaybe)
 import Data.Ratio (Ratio)
 import Data.Word
 import GHC.Generics
@@ -26,9 +28,12 @@ import Numeric.Natural
 
 import qualified Data.Ratio as Ratio
 
+import Data.Falsify.Tree (Tree, Interval(..), Endpoint(..))
 import Test.Falsify.Generator.Auxiliary (firstThen)
 import Test.Falsify.Internal.Generator (Gen)
-import Test.Falsify.Reexported.Generator.Compound (shrinkToNothing)
+import Test.Falsify.Reexported.Generator.Compound (shrinkToNothing, bst)
+
+import qualified Data.Falsify.Tree as Tree
 
 {-------------------------------------------------------------------------------
   Functions that can be shrunk and shown
@@ -63,14 +68,16 @@ fun gen = do
 
 data (:->) :: Type -> Type -> Type where
   Nil   :: a :-> b
-  Table :: Eq a => [(a, b)] -> a :-> b
+  Unit  :: a -> () :-> a
+  Table :: Ord a => Tree (a, Maybe b) -> a :-> b
   Sum   :: (a :-> c) -> (b :-> c) -> (Either a b :-> c)
   Prod  :: (a :-> (b :-> c)) -> (a, b) :-> c
   Map   :: (b -> a) -> (a -> b) -> (a :-> c) -> (b :-> c)
 
 instance Functor ((:->) a) where
   fmap _ Nil           = Nil
-  fmap f (Table xs)    = Table (map (second f) xs)
+  fmap f (Unit x)      = Unit (f x)
+  fmap f (Table xs)    = Table (fmap (second (fmap f)) xs)
   fmap f (Sum x y)     = Sum (fmap f x) (fmap f y)
   fmap f (Prod x)      = Prod (fmap (fmap f) x)
   fmap f (Map ab ba x) = Map ab ba (fmap f x)
@@ -85,9 +92,10 @@ functionMap = Map
 -- | Apply concrete function
 abstract :: (a :-> b) -> b -> (a -> b)
 abstract Nil         d _     = d
+abstract (Unit x)    _ _     = x
 abstract (Prod p)    d (x,y) = abstract (fmap (\q -> abstract q d y) p) d x
 abstract (Sum p q)   d exy   = either (abstract p d) (abstract q d) exy
-abstract (Table xys) d x     = head ([y | (x',y) <- xys, x == x'] ++ [d])
+abstract (Table xys) d x     = fromMaybe d . join $ Tree.lookup x xys
 abstract (Map g _ p) d x     = abstract p d (g x)
 
 {-------------------------------------------------------------------------------
@@ -125,12 +133,14 @@ applyFun3 f a b c = applyFun f (a, b, c)
 shrinkToNil :: Gen (a :-> b) -> Gen (a :-> b)
 shrinkToNil gen = fromMaybe Nil <$> shrinkToNothing gen
 
-table :: forall a b. (Eq a, Enum a, Bounded a) => Gen b -> Gen (a :-> b)
-table gen =
-    Table . catMaybes <$> mapM aux [minBound .. maxBound]
+table :: forall a b. (Integral a, Bounded a) => Gen b -> Gen (a :-> b)
+table gen = Table <$> bst (\_a -> shrinkToNothing gen) i
   where
-    aux :: a -> Gen (Maybe (a, b))
-    aux a = shrinkToNothing $ (a,) <$> gen
+    i :: Interval a
+    i = Interval (Inclusive minBound) (Inclusive maxBound)
+
+unit :: Gen c -> Gen (() :-> c)
+unit gen = shrinkToNil (Unit <$> gen)
 
 sum ::
      (Gen c -> Gen (       a   :-> c))
@@ -173,10 +183,11 @@ showFunction p d = concat [
 -- This is only used in the 'Show' instance.
 toTable :: (a :-> b) -> [(a, b)]
 toTable Nil         = []
+toTable (Unit x)    = [((), x)]
 toTable (Prod p)    = [ ((x,y),c) | (x,q) <- toTable p, (y,c) <- toTable q ]
 toTable (Sum p q)   = [ (Left x, c) | (x,c) <- toTable p ]
                    ++ [ (Right y,c) | (y,c) <- toTable q ]
-toTable (Table xys) = xys
+toTable (Table xys) = mapMaybe (\(a, b) -> (a,) <$> b) $ toList xys
 toTable (Map _ h p) = [ (h x, c) | (x,c) <- toTable p ]
 
 {-------------------------------------------------------------------------------
@@ -334,7 +345,7 @@ instance GFunction f => GFunction (M1 i c f) where
   gFunction = fmap (functionMap unM1 M1) . gFunction @f
 
 instance GFunction U1 where
-  gFunction = fmap (functionMap unwrap wrap) . table
+  gFunction = fmap (functionMap unwrap wrap) . unit
     where
       unwrap :: U1 p -> ()
       unwrap _ = ()
