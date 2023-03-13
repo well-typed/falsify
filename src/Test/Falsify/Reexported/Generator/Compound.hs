@@ -1,9 +1,14 @@
 -- | Compound generators
 module Test.Falsify.Reexported.Generator.Compound (
-    -- * Compound generators
-    either
+    -- * Auxiliary
+    shrinkToNothing
+  , mark
+    -- * Standard compound generators
+  , either
   , list
+    -- * Trees
   , tree
+  , bst
   ) where
 
 import Prelude hiding (either)
@@ -13,7 +18,7 @@ import Control.Selective
 import Data.Maybe (mapMaybe)
 
 import Data.Falsify.Marked (Marked(..))
-import Data.Falsify.Tree (Tree(..))
+import Data.Falsify.Tree (Tree(..), Interval(..), Endpoint(..))
 import Test.Falsify.Generator.Auxiliary
 import Test.Falsify.Internal.Generator
 import Test.Falsify.Range (Range)
@@ -27,9 +32,15 @@ import qualified Test.Falsify.Range  as Range
   Auxiliary: marking elements
 -------------------------------------------------------------------------------}
 
+-- | Start with @Just x@ for some @x@, then shrink to @Nothing@
+shrinkToNothing :: Gen a -> Gen (Maybe a)
+shrinkToNothing g = firstThen Just (const Nothing) <*> g
+
 -- | Mark an element, shrinking towards 'Drop'
 --
--- This is an ingredient in many of the compound generators.
+-- This is similar to 'shrinkToNothing', except that 'Marked' still has a value in the
+-- 'Drop' case: marks are merely hints, that we may or may not use (e.g., see
+-- 'Marked.keepAtLeast').
 mark :: Gen a -> Gen (Marked a)
 mark g = firstThen Keep Drop <*> g
 
@@ -127,6 +138,27 @@ tree size gen = do
         inLeft <- integral $ Range.num (0, n - 1) ((n - 1) `div` 2)
         let inRight = (n - 1) - inLeft
         Branch x <$> go inLeft <*> go inRight
+
+-- | Construct binary search tree
+--
+-- Shrinks by replacing entire subtrees by the empty tree.
+bst :: forall a b. Integral a => (a -> Gen b) -> Interval a -> Gen (Tree (a, b))
+bst gen = go >=> traverse (\a -> (a,) <$> gen a)
+  where
+    go :: Interval a -> Gen (Tree a)
+    go i =
+        case Tree.inclusiveBounds i of
+          Nothing       -> pure Leaf
+          Just (lo, hi) -> firstThen id (const Leaf) <*> go' lo hi
+
+    -- inclusive bounds, lo <= hi
+    go' :: a -> a -> Gen (Tree a)
+    go' lo hi = Branch mid
+            <$> go (Interval (Inclusive lo) (Exclusive mid))
+            <*> go (Interval (Exclusive mid) (Inclusive hi))
+      where
+        mid :: a
+        mid = lo + ((hi - lo) `div` 2)
 
 {-------------------------------------------------------------------------------
   Auxiliary: 'Selective'

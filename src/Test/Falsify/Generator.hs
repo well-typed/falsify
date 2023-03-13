@@ -18,6 +18,7 @@ module Test.Falsify.Generator (
   , tree
     -- ** Functions
   , Fun
+  , applyFun
   , pattern Fn
   , pattern Fn2
   , pattern Fn3

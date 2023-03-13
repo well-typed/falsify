@@ -1,42 +1,102 @@
 module Test.Falsify.Reexported.Generator.Function (
     Fun -- opaque
+  , applyFun
   , pattern Fn
   , pattern Fn2
   , pattern Fn3
+    -- * Generation
   , fun
+    -- * Reificating
+  , Function(..)
+  , functionMap
   ) where
 
-import qualified Data.Tree as Rose
+import Prelude hiding (sum)
 
-import Test.Falsify.Generator.Auxiliary
-import Test.Falsify.Internal.Generator
-import Test.Falsify.Internal.Generator.ShrinkStep (Step)
-import Test.Falsify.Reexported.Generator.Function.Perturb
-import Test.Falsify.Reexported.Generator.Function.Reified
-import Test.Falsify.SampleTree (SampleTree)
+import Control.Monad
+import Data.Bifunctor
+import Data.Char
+import Data.Foldable (toList)
+import Data.Int
+import Data.Kind
+import Data.List (intercalate)
+import Data.Maybe (fromMaybe, mapMaybe)
+import Data.Ratio (Ratio)
+import Data.Word
+import GHC.Generics
+import Numeric.Natural
 
-import qualified Test.Falsify.Internal.Generator.ShrinkStep as Step
+import qualified Data.Ratio as Ratio
+
+import Data.Falsify.Tree (Tree, Interval(..), Endpoint(..))
+import Test.Falsify.Generator.Auxiliary (firstThen)
+import Test.Falsify.Internal.Generator (Gen)
+import Test.Falsify.Reexported.Generator.Compound (shrinkToNothing, bst)
+
+import qualified Data.Falsify.Tree as Tree
 
 {-------------------------------------------------------------------------------
   Functions that can be shrunk and shown
-
-  This is the public facing API.
 -------------------------------------------------------------------------------}
 
-data Fun a b = Fun (a :-> b, b, IsFullyShrunk) (a -> b)
+data Fun a b = Fun {
+      concrete      :: a :-> b
+    , defaultValue  :: b
+
+      -- Since functions are typically infinite, they can only safely be shown
+      -- once they are fully shrunk: after all, once a function has been fully
+      -- shrunk, we /know/ it must be finite, because in any given property, a
+      -- function will only ever be applied a finite number of times.
+    , isFullyShrunk :: Bool
+    }
   deriving (Functor)
 
-instance (Show a, Show b) => Show (Fun a b) where
-  show (Fun (_, _, NotFullyShrunk) _) = "<fun>"
-  show (Fun (p, d, FullyShrunk)    _) = showFunction p (Just d)
+fun :: Function a => Gen b -> Gen (Fun a b)
+fun gen = do
+    -- Generate value first, so that we try to shrink that first
+    defaultValue  <- gen
+    concrete      <- function gen
+    isFullyShrunk <- firstThen False True
+    return Fun{concrete, defaultValue, isFullyShrunk}
 
--- | Internal marker: has the function been fully shrunk?
+{-------------------------------------------------------------------------------
+  Concrete functions
+
+  NOTE: @Nil@ is useful as a separate constructor, since it does not have an
+  @Eq@ constraint.
+-------------------------------------------------------------------------------}
+
+data (:->) :: Type -> Type -> Type where
+  Nil   :: a :-> b
+  Unit  :: a -> () :-> a
+  Table :: Ord a => Tree (a, Maybe b) -> a :-> b
+  Sum   :: (a :-> c) -> (b :-> c) -> (Either a b :-> c)
+  Prod  :: (a :-> (b :-> c)) -> (a, b) :-> c
+  Map   :: (b -> a) -> (a -> b) -> (a :-> c) -> (b :-> c)
+
+instance Functor ((:->) a) where
+  fmap _ Nil           = Nil
+  fmap f (Unit x)      = Unit (f x)
+  fmap f (Table xs)    = Table (fmap (second (fmap f)) xs)
+  fmap f (Sum x y)     = Sum (fmap f x) (fmap f y)
+  fmap f (Prod x)      = Prod (fmap (fmap f) x)
+  fmap f (Map ab ba x) = Map ab ba (fmap f x)
+
+-- | The basic building block for 'Function' instances
 --
--- Since functions are typically infinite, they can only safely be shown once
--- they are fully shrunk: after all, once a function has been fully shrunk,
--- we /know/ it must be finite, because in any given property, a function will
--- only ever be applied a finite number of times.
-data IsFullyShrunk = FullyShrunk | NotFullyShrunk
+-- Provides a 'Function' instance by mapping to and from a type that
+-- already has a 'Function' instance.
+functionMap :: (b -> a) -> (a -> b) -> (a :-> c) -> b :-> c
+functionMap = Map
+
+-- | Apply concrete function
+abstract :: (a :-> b) -> b -> (a -> b)
+abstract Nil         d _     = d
+abstract (Unit x)    _ _     = x
+abstract (Prod p)    d (x,y) = abstract (fmap (\q -> abstract q d y) p) d x
+abstract (Sum p q)   d exy   = either (abstract p d) (abstract q d) exy
+abstract (Table xys) d x     = fromMaybe d . join $ Tree.lookup x xys
+abstract (Map g _ p) d x     = abstract p d (g x)
 
 {-------------------------------------------------------------------------------
   Patterns
@@ -53,8 +113,8 @@ pattern Fn2 f <- (applyFun2 -> f)
 pattern Fn3 :: (a -> b -> c -> d) -> Fun (a, b, c) d
 pattern Fn3 f <- (applyFun3 -> f)
 
-applyFun :: Fun a b -> (a -> b)
-applyFun (Fun _ f) = f
+applyFun :: Fun a b -> a -> b
+applyFun Fun{concrete, defaultValue} = abstract concrete defaultValue
 
 applyFun2 :: Fun (a, b) c -> (a -> b -> c)
 applyFun2 f a b = applyFun f (a, b)
@@ -67,121 +127,252 @@ applyFun3 f a b c = applyFun f (a, b, c)
 {-# COMPLETE Fn3 #-}
 
 {-------------------------------------------------------------------------------
-  Generation
+  Constructing concrete functions
 -------------------------------------------------------------------------------}
 
-fun :: forall a b. (Function a, Perturb a) => Gen b -> Gen (Fun a b)
-fun gen = do
-    def <- gen
-    st  <- captureLocalTree (const [])
+shrinkToNil :: Gen (a :-> b) -> Gen (a :-> b)
+shrinkToNil gen = fromMaybe Nil <$> shrinkToNothing gen
 
-    let f :: a -> b
-        f a = run gen $ getAtFocus (perturb a) st
-
-    uncurry (aux def) <$> fromShrinkTree (shrinkTreeReified gen st (function f))
+table :: forall a b. (Integral a, Bounded a) => Gen b -> Gen (a :-> b)
+table gen = Table <$> bst (\_a -> shrinkToNothing gen) i
   where
-    aux :: b -> IsFullyShrunk -> (a :-> b) -> Fun a b
-    aux def isFullyShrunk reified =
-        Fun (reified, def, isFullyShrunk)
-            (abstract reified def)
+    i :: Interval a
+    i = Interval (Inclusive minBound) (Inclusive maxBound)
 
--- | Shrink reified function
+unit :: Gen c -> Gen (() :-> c)
+unit gen = shrinkToNil (Unit <$> gen)
+
+sum ::
+     (Gen c -> Gen (       a   :-> c))
+  -> (Gen c -> Gen (         b :-> c))
+  -> (Gen c -> Gen (Either a b :-> c))
+sum f g gen = Sum <$> shrinkToNil (f gen) <*> shrinkToNil (g gen)
+
+prod ::
+     (forall c. Gen c -> Gen ( a     :-> c))
+  -> (forall c. Gen c -> Gen (    b  :-> c))
+  -> (forall c. Gen c -> Gen ((a, b) :-> c))
+prod f g = fmap Prod . f . g
+
+{-------------------------------------------------------------------------------
+  Show functions
+-------------------------------------------------------------------------------}
+
+instance (Show a, Show b) => Show (Fun a b) where
+  show Fun{concrete, defaultValue, isFullyShrunk}
+    | isFullyShrunk = showFunction concrete defaultValue
+    | otherwise     = "<fun>"
+
+-- | Show concrete function
 --
--- Also returns whether the function has been fully shrunk. Like QuickCheck, we
--- rely on shrinking order to set this flag.
-shrinkTreeReified :: forall a b.
-     Gen b
-  -> SampleTree
-  -> (a :-> b) -> Rose.Tree (IsFullyShrunk, a :-> b)
-shrinkTreeReified gen = \st f ->
-    markFullyShrunk $ Rose.unfoldTree aux (f, st)
-  where
-    aux :: (a :-> b, SampleTree) -> (a :-> b, [(a :-> b, SampleTree)])
-    aux (f, st) = (f, Step.step (shrinkReified stepGen f) st)
-
-    -- We do not need the old value generated in order to shrink it: regular
-    -- shrinking does not proceed by looking at previous values, but rather by
-    -- re-running the generator on a shrunk sample tree.
-    stepGen :: b -> Step b
-    stepGen _ = Step.sampleTree Step.shortcutMinimal gen
-
-    -- Add new leaves into the tree that mark the function as fully shrunk
-    markFullyShrunk :: Rose.Tree (a :-> b) -> Rose.Tree (IsFullyShrunk, a :-> b)
-    markFullyShrunk (Rose.Node f fs) =
-        Rose.Node (NotFullyShrunk, f) $ concat [
-            map markFullyShrunk fs
-          , [Rose.Node (FullyShrunk, f) []]
+-- Only use this on finite functions.
+showFunction :: (Show a, Show b) => (a :-> b) -> b -> String
+showFunction p d = concat [
+      "{"
+    , intercalate ", " $ concat [
+          [ show x ++ "->" ++ show c
+          | (x,c) <- toTable p
           ]
-
-{-------------------------------------------------------------------------------
-  Shrinking reified functions
--------------------------------------------------------------------------------}
-
--- | Shrink a pair @(a, b)@ belonging to the graph of a function
-shrinkFnPair :: forall a b. Perturb a => (b -> Step b) -> (a, b) -> Step (a, b)
-shrinkFnPair step (a, b) = (a,) <$> stepAtFocus (perturb a) (step b)
-
--- | Shrink a reified function
---
--- This is the centrepiece of this whole module. We follow a similar strategy
--- as QuickCheck does, but the details are different. In particular, the
--- QuickCheck version depends on a shrinker for the result of the function,
--- which of course we not have: we must shrink sample trees instead.
-shrinkReified :: forall a c. (c -> Step c) -> (a :-> c) -> Step (a :-> c)
-shrinkReified step = go
-  where
-    -- When we generate a reified function it will typically be infinitely
-    -- large. It is therefore critical that we can replace entire chunks of the
-    -- concrete function with 'Nil', so that shrinking will terminate (this is
-    -- very similar to replacing entire parts of the sample tree with Minimal).
-    go :: forall x. (x :-> c) -> Step (x :-> c)
-    go Nil = go' Nil
-    go f   = go' f `Step.butPrefer` [Nil]
-
-    go' :: forall x. (x :-> c) -> Step (x :-> c)
-    go' Nil         = mempty
-    go' (Unit c)    = Unit      <$> step c
-    go' (Map f g p) = mkMap f g <$> go p
-    go' (Prod f)    = mkProd    <$> shrinkReified go f
-    go' (Sum f g)   = mconcat [
-                          (\f' -> mkSum f' g ) <$> go f
-                        , (\g' -> mkSum f  g') <$> go g
-                        ]
-    go' (Table xys) = mkTable   <$> (   Step.one (shrinkFnPair step) xys
-                                      `Step.butPrefer`
-                                        removeSome xys
-                                    )
-
-{-------------------------------------------------------------------------------
-  Internal auxiliary: sample-tree independent shrinking
-
-  This is adapted from code in QuickCheck.
--------------------------------------------------------------------------------}
-
-removeSome :: [a] -> [[a]]
-removeSome xs = concat [
-     -- remove all, half, 1/4th, .. of all elements
-     concat [
-          removeChunkOfSize k n xs
-        | k <- takeWhile (> 0) (iterate (`div` 2) n)
+        , ["_->" ++ show d]
         ]
-   ]
- where
-   n = length xs
+    , "}"
+    ]
 
--- | All ways to remove @k@ consecutive elements from a list
-removeChunkOfSize ::
-     Int  -- ^ Size of the chunks to remove
-  -> Int  -- ^ Total length of the list
-  -> [a] -> [[a]]
-removeChunkOfSize k = go
+-- | Generating a table from a concrete function
+--
+-- This is only used in the 'Show' instance.
+toTable :: (a :-> b) -> [(a, b)]
+toTable Nil         = []
+toTable (Unit x)    = [((), x)]
+toTable (Prod p)    = [ ((x,y),c) | (x,q) <- toTable p, (y,c) <- toTable q ]
+toTable (Sum p q)   = [ (Left x, c) | (x,c) <- toTable p ]
+                   ++ [ (Right y,c) | (y,c) <- toTable q ]
+toTable (Table xys) = mapMaybe (\(a, b) -> (a,) <$> b) $ toList xys
+toTable (Map _ h p) = [ (h x, c) | (x,c) <- toTable p ]
+
+{-------------------------------------------------------------------------------
+  Class to construct functions
+-------------------------------------------------------------------------------}
+
+class Function a where
+  function :: Gen b -> Gen (a :-> b)
+
+  default function :: (Generic a, GFunction (Rep a)) => Gen b -> Gen (a :-> b)
+  function gen = functionMap from to <$> gFunction gen
+
+instance Function Word8 where function = table
+instance Function Int8  where function = table
+
+instance Function Int     where function = integral
+instance Function Int16   where function = integral
+instance Function Int32   where function = integral
+instance Function Int64   where function = integral
+instance Function Word    where function = integral
+instance Function Word16  where function = integral
+instance Function Word32  where function = integral
+instance Function Word64  where function = integral
+instance Function Integer where function = integral
+instance Function Natural where function = integral
+
+instance Function Float  where function = realFrac
+instance Function Double where function = realFrac
+
+instance (Integral a, Function a) => Function (Ratio a) where
+  function = fmap (functionMap toPair fromPair) . function
+    where
+      toPair :: Ratio a -> (a, a)
+      toPair r = (Ratio.numerator r, Ratio.denominator r)
+
+      fromPair :: (a, a) -> Ratio a
+      fromPair (n, d) = n Ratio.% d
+
+instance Function Char where
+  function = fmap (functionMap ord chr) . function
+
+-- instances that depend on generics
+
+instance Function ()
+instance Function Bool
+
+instance (Function a, Function b) => Function (Either a b)
+
+instance Function a => Function [a]
+instance Function a => Function (Maybe a)
+
+-- Tuples (these are also using generics)
+
+-- 2
+instance
+     ( Function a
+     , Function b
+     )
+  => Function (a, b)
+
+-- 3
+instance
+     ( Function a
+     , Function b
+     , Function c
+     )
+  => Function (a, b, c)
+
+-- 4
+instance
+     ( Function a
+     , Function b
+     , Function c
+     , Function d
+     )
+  => Function (a, b, c, d)
+
+-- 5
+instance
+     ( Function a
+     , Function b
+     , Function c
+     , Function d
+     , Function e
+     )
+  => Function (a, b, c, d, e)
+
+-- 6
+instance
+     ( Function a
+     , Function b
+     , Function c
+     , Function d
+     , Function e
+     , Function f
+     )
+  => Function (a, b, c, d, e, f)
+
+-- 7
+instance
+     ( Function a
+     , Function b
+     , Function c
+     , Function d
+     , Function e
+     , Function f
+     , Function g
+     )
+  => Function (a, b, c, d, e, f, g)
+
+{-------------------------------------------------------------------------------
+  Support for numbers
+-------------------------------------------------------------------------------}
+
+integral :: Integral a => Gen b -> Gen (a :-> b)
+integral =
+      fmap (functionMap
+             (fmap bytes  . toSignedNatural   . toInteger)
+             (fromInteger . fromSignedNatural . fmap unbytes)
+           )
+    . function
   where
-    go ::
-         Int  -- Remaining length of the list
-      -> [a] -> [[a]]
-    go n xs
-      | k > n     = []   -- we need to remove more elements than we have left
-      | null xs2  = [[]] -- we need to remove all elements
-      | otherwise = xs2 : map (xs1 ++) (go (n - k) xs2)
-      where
-        (xs1, xs2) = splitAt k xs
+    bytes :: Natural -> [Word8]
+    bytes 0 = []
+    bytes n = fromIntegral (n `mod` 256) : bytes (n `div` 256)
+
+    unbytes :: [Word8] -> Natural
+    unbytes []     = 0
+    unbytes (w:ws) = fromIntegral w + 256 * unbytes ws
+
+realFrac :: RealFrac a => Gen b -> Gen (a :-> b)
+realFrac = fmap (functionMap toRational fromRational) . function
+
+data Signed a = Pos a | Neg a
+  deriving stock (Show, Functor, Generic)
+  deriving anyclass (Function)
+
+toSignedNatural :: Integer -> Signed Natural
+toSignedNatural n
+  | n < 0     = Neg (fromInteger (abs n - 1))
+  | otherwise = Pos (fromInteger n)
+
+fromSignedNatural :: Signed Natural -> Integer
+fromSignedNatural (Neg n) = negate (toInteger n + 1)
+fromSignedNatural (Pos n) = toInteger n
+
+{-------------------------------------------------------------------------------
+  Generic support for 'Function'
+-------------------------------------------------------------------------------}
+
+class GFunction f where
+  gFunction :: Gen b -> Gen (f p :-> b)
+
+instance GFunction f => GFunction (M1 i c f) where
+  gFunction = fmap (functionMap unM1 M1) . gFunction @f
+
+instance GFunction U1 where
+  gFunction = fmap (functionMap unwrap wrap) . unit
+    where
+      unwrap :: U1 p -> ()
+      unwrap _ = ()
+
+      wrap :: () -> U1 p
+      wrap _ = U1
+
+instance (GFunction f, GFunction g) => GFunction (f :*: g) where
+  gFunction = fmap (functionMap unwrap wrap) . prod (gFunction @f) (gFunction @g)
+    where
+      unwrap :: (f :*: g) p -> (f p, g p)
+      unwrap (x :*: y) = (x, y)
+
+      wrap :: (f p, g p) -> (f :*: g) p
+      wrap (x, y) = x :*: y
+
+instance (GFunction f, GFunction g) => GFunction (f :+: g) where
+  gFunction =
+      fmap (functionMap unwrap wrap) . sum (gFunction @f) (gFunction @g)
+    where
+      unwrap :: (f :+: g) p -> Either (f p) (g p)
+      unwrap (L1 x) = Left  x
+      unwrap (R1 y) = Right y
+
+      wrap :: Either (f p) (g p) -> (f :+: g) p
+      wrap (Left  x) = L1 x
+      wrap (Right y) = R1 y
+
+instance Function a => GFunction (K1 i a) where
+  gFunction = fmap (functionMap unK1 K1) . function @a
