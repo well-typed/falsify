@@ -1,4 +1,4 @@
-module TestSuite.Sanity.Functions (tests) where
+module TestSuite.Sanity.Function (tests) where
 
 import Test.Tasty
 import Test.Tasty.HUnit
@@ -14,7 +14,7 @@ import qualified Test.Falsify.Range      as Range
 import qualified Test.Falsify.SampleTree as SampleTree
 
 tests :: TestTree
-tests = testGroup "TestSuite.Sanity.Functions" [
+tests = testGroup "TestSuite.Sanity.Function" [
       testGroup "BoolToBool" [
           testCase "notConstant" test_BoolToBool_notConstant
         , testCase "constant"    test_BoolToBool_constant

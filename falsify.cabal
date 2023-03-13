@@ -131,7 +131,7 @@ test-suite test-falsify
   other-modules:
       TestSuite.Sanity.Auxiliary
       TestSuite.Sanity.Compound
-      TestSuite.Sanity.Functions
+      TestSuite.Sanity.Function
       TestSuite.Sanity.Prim
       TestSuite.Sanity.Range
       TestSuite.Sanity.Selective
