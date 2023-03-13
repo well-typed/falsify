@@ -1,27 +1,36 @@
 -- | Compound generators
 module Test.Falsify.Reexported.Generator.Compound (
-    -- * Auxiliary
-    shrinkToNothing
-  , mark
-    -- * Standard compound generators
-  , either
-  , list
+    -- * Lists
+    list
+  , elem
     -- * Trees
+    -- ** Binary trees
   , tree
   , bst
+    -- ** Rose trees
+  , RoseTree
+  , path
+    -- * Auxiliary
+  , shrinkToNothing
+  , mark
   ) where
 
-import Prelude hiding (either)
+import Prelude hiding (either, elem)
 
 import Control.Monad
-import Control.Selective
+import Data.Foldable (toList)
+import Data.List.NonEmpty (NonEmpty(..))
 import Data.Maybe (mapMaybe)
+
+import qualified Data.List.NonEmpty as NE
+import qualified Data.Tree          as Rose
 
 import Data.Falsify.Marked (Marked(..))
 import Data.Falsify.Tree (Tree(..), Interval(..), Endpoint(..))
 import Test.Falsify.Generator.Auxiliary
 import Test.Falsify.Internal.Generator
 import Test.Falsify.Range (Range)
+import Test.Falsify.Reexported.Generator.Instances
 import Test.Falsify.Reexported.Generator.Simple
 
 import qualified Data.Falsify.Marked as Marked
@@ -45,51 +54,8 @@ mark :: Gen a -> Gen (Marked a)
 mark g = firstThen Keep Drop <*> g
 
 {-------------------------------------------------------------------------------
-  Compound generators
+  Lists
 -------------------------------------------------------------------------------}
-
--- | Generate a value with one of two generators
---
--- Shrinks towards the first ('Left') generator.
---
--- In the remainder of this docstring we give some background to this function,
--- which may be useful for general understanding of the @falsify@ library.
---
--- The implementation of @either l r@ takes advantage of the that 'Gen' is a
--- selective functor to ensure that the two generators can shrink independently:
--- if the initial value of the generator is @Right y@ for some @y@, later shrunk
--- to @Right y'@, then if the generator can shrink to @Left x@ at some point,
--- shrinking effectively "starts over": the value of @y@ is independent of @x'@.
---
--- That is different from doing this:
---
--- > do b <- bool
--- >    if b then l else r
---
--- In this case, @l@ and @r@ will be generated from the /same/ sample tree,
--- and so cannot shrink independently.
---
--- It is /also/ different from
---
--- > do x <- l
--- >    y <- r
--- >    b <- bool
--- >    return $ if b then x else y
---
--- In this case, @l@ and @r@ are run against /different/ sample trees, like in
--- @either l r@, /but/ in this case if the current value produced by the
--- generator is @Right y@ for some @y@, then @x@ will always be shrunk to the
--- minimal value that @l@ can produce: this /must/ be possible because we're not
--- currently using @x@!
---
--- To rephrase that last point: generating values that are not actually used
--- will lead to poor shrinking, since those values can always be shrunk to their
--- minimal value, independently from whatever property is being tested: the
--- shrinker does not know that the value is not being used. The correct way to
--- conditionally use a value is to use the selective interface, as 'either'
--- does.
-either :: Gen a -> Gen b -> Gen (Either a b)
-either = eitherS (bool True)
 
 -- | Generate list of specified length
 list :: Range Word -> Gen a -> Gen [a]
@@ -113,6 +79,12 @@ list len gen = do
     n <- integral len
     mapMaybe Marked.shouldKeep . Marked.keepAtLeast (Range.origin len) <$>
       replicateM (fromIntegral n) (mark gen)
+
+-- | Choose random element
+--
+-- Shrinks towards earlier elements.
+elem :: NonEmpty a -> Gen a
+elem xs = (toList xs !!) <$> integral (Range.between (0, length xs - 1))
 
 {-------------------------------------------------------------------------------
   Binary trees
@@ -161,9 +133,16 @@ bst gen = go >=> traverse (\a -> (a,) <$> gen a)
         mid = lo + ((hi - lo) `div` 2)
 
 {-------------------------------------------------------------------------------
-  Auxiliary: 'Selective'
+  Rose trees
 -------------------------------------------------------------------------------}
 
--- | A typed version of 'ifS'
-eitherS :: Selective f => f Bool -> f a -> f b -> f (Either a b)
-eitherS b t f = ifS b (Left <$> t) (Right <$> f)
+type RoseTree = Rose.Tree
+
+-- | Generate random path through the tree
+--
+-- Shrinks towards shorter paths, and towards paths that use subtrees that
+-- appear earlier in the list of subtrees at any node in the tree.
+path :: RoseTree a -> Gen (NonEmpty a)
+path (Rose.Node x [])     = pure (x :| [])
+path (Rose.Node x (y:ys)) = pure (x :| [])
+                       <!> (elem (y :| ys) >>= fmap (NE.cons x) . path)

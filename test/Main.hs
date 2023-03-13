@@ -10,6 +10,8 @@ import qualified TestSuite.Sanity.Range
 import qualified TestSuite.Sanity.Selective
 import qualified TestSuite.Sanity.Simple
 
+import qualified TestSuite.Prop.Generator.Simple
+
 main :: IO ()
 main = defaultMain $ testGroup "falsify" [
       testGroup "Sanity" [
@@ -20,5 +22,8 @@ main = defaultMain $ testGroup "falsify" [
         , TestSuite.Sanity.Compound.tests
         , TestSuite.Sanity.Selective.tests
         , TestSuite.Sanity.Function.tests
+        ]
+    , testGroup "Prop" [
+          TestSuite.Prop.Generator.Simple.tests
         ]
     ]

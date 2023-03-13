@@ -5,11 +5,13 @@
 module Test.Falsify.Internal.Tasty (
     -- * Test property
     testProperty
+  , testShrinking
     -- * Configure test behaviour
   , TestOptions(..)
   , Verbose(..)
   , ExpectFailure(..)
   , testPropertyWith
+  , testShrinkingWith
   ) where
 
 import Prelude hiding (log)
@@ -171,7 +173,7 @@ renderSuccess (ix, Driver.Success{successRun}) =
       ]
 
 renderLog :: Log -> String
-renderLog (Log log) = intercalate "\n" $ map renderLogEntry log
+renderLog (Log log) = intercalate "\n" $ map renderLogEntry (reverse log)
 
 renderLogEntry :: LogEntry -> String
 renderLogEntry = \case
@@ -185,13 +187,42 @@ renderLogEntry = \case
   User API
 -------------------------------------------------------------------------------}
 
-testProperty :: TestName -> Property () -> TestTree
+-- | Generalization of 'testPropertyWith' using default options
+testProperty ::
+     TestName
+  -> Property ()
+  -> TestTree
 testProperty = testPropertyWith def
 
-testPropertyWith :: TestOptions -> TestName -> Property () -> TestTree
+testPropertyWith ::
+     TestOptions
+  -> TestName
+  -> Property ()
+  -> TestTree
 testPropertyWith testOpts name =
       singleTest name
     . Test testOpts
+
+-- | Generalization of 'testShrinkingWith' using default options
+testShrinking ::
+     Show a
+  => TestName
+  -> (a -> a -> Bool)
+  -> Property a
+  -> TestTree
+testShrinking = testShrinkingWith def
+
+-- | Test shrinking
+testShrinkingWith ::
+     Show a
+  => TestOptions
+  -> TestName
+  -> (a -> a -> Bool) -- ^ Property that should hold for any shrink step
+  -> Property a       -- ^ Generator to test
+  -> TestTree
+testShrinkingWith testOpts name p =
+      testPropertyWith testOpts name
+    . shrinkProperty p
 
 {-------------------------------------------------------------------------------
   Options specific to the tasty test runner

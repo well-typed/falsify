@@ -55,6 +55,7 @@ common lang
       KindSignatures
       LambdaCase
       MultiParamTypeClasses
+      MultiWayIf
       NamedFieldPuns
       NumericUnderscores
       PatternSynonyms
@@ -101,6 +102,7 @@ library
       Test.Falsify.Reexported.Generator.Compound
       Test.Falsify.Reexported.Generator.Function
       Test.Falsify.Reexported.Generator.Simple
+      Test.Falsify.Reexported.Generator.Instances
   hs-source-dirs:
       src
   build-depends:
@@ -112,6 +114,7 @@ library
     , mtl
     , optparse-applicative
     , selective
+    , semigroupoids
     , splitmix
     , tagged
     , tasty
@@ -135,6 +138,7 @@ test-suite test-falsify
       TestSuite.Sanity.Range
       TestSuite.Sanity.Selective
       TestSuite.Sanity.Simple
+      TestSuite.Prop.Generator.Simple
   build-depends:
     , containers
     , data-default
@@ -152,8 +156,9 @@ executable demo
   main-is:
       Main.hs
   other-modules:
-      Demo.Simple
       Demo.HowToSpecifyIt
+      Demo.Simple
+      Demo.TestShrinking
   build-depends:
     , data-default
     , falsify

@@ -7,27 +7,43 @@
 module Test.Falsify.Generator (
     -- * Definition
     Gen -- opaque
-    -- ** Specific generators
-    -- * Simple (non-compound)
+    -- * Simple (non-compound) generators
   , bool
   , integral
   , enum
-    -- ** Compound
-  , either
+    -- ** Auxiliary
+  , Precision(..)
+  , integerWithPrecision
+  , integerFromFraction
+    -- * Compound generators
+    -- ** Lists
   , list
+  , elem
+    -- ** Trees
+    -- *** Binary trees
   , tree
-    -- ** Functions
+  , bst
+    -- *** Rose trees
+  , RoseTree
+  , path
+    -- ** Auxiliary
+  , shrinkToNothing
+  , mark
+    -- * Functions
   , Fun
   , applyFun
   , pattern Fn
   , pattern Fn2
   , pattern Fn3
   , fun
-    -- ** User-specified shrinking
+    -- * User-specified shrinking
   , shrinkToOneOf
   , firstThen
   , shrinkWith
-    -- ** Primitive
+    -- * Shrink trees
+  , fromShrinkTree
+  , toShrinkTree
+    -- * Primitive
   , prim
   , primWith
   , captureLocalTree
@@ -37,12 +53,15 @@ module Test.Falsify.Generator (
   , run
   , shrink
   , shrinkWithShortcut
+    -- * Re-exports
+  , Alt(..)
   ) where
 
-import Prelude hiding (either)
+import Prelude hiding (either, elem)
 
 import Test.Falsify.Generator.Auxiliary
 import Test.Falsify.Internal.Generator
 import Test.Falsify.Reexported.Generator.Compound
 import Test.Falsify.Reexported.Generator.Function
+import Test.Falsify.Reexported.Generator.Instances
 import Test.Falsify.Reexported.Generator.Simple
