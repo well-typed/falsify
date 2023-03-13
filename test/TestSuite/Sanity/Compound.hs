@@ -1,15 +1,17 @@
 module TestSuite.Sanity.Compound (tests) where
 
+import Data.Foldable (toList)
 import Data.List.NonEmpty (NonEmpty((:|)), nub)
 import Data.Word
 import Test.Tasty
 import Test.Tasty.HUnit
 
 import qualified Data.List.NonEmpty as NE
+import qualified Data.Tree          as Rose
 
 import Data.Falsify.List (pairwiseAll)
 import Data.Falsify.Tree (Tree(..))
-import Test.Falsify.Generator (Gen)
+import Test.Falsify.Generator (Gen, RoseTree)
 
 import qualified Data.Falsify.Tree       as Tree
 import qualified Test.Falsify.Generator  as Gen
@@ -28,6 +30,10 @@ tests = testGroup "TestSuite.Sanity.Compound" [
         , testCase "towardsSmaller2" test_tree_towardsSmaller2
         , testCase "towardsOrigin1"  test_tree_towardsOrigin1
         , testCase "towardsOrigin2"  test_tree_towardsOrigin2
+        ]
+    , testGroup "rose" [
+          testCase "path"       test_rose_path
+        , testCase "shrinkTree" test_rose_shrinkTree
         ]
     ]
 
@@ -70,8 +76,9 @@ test_list_towardsLonger :: Assertion
 test_list_towardsLonger = do
     -- We increase the list length to max immediately, and then shrink towards
     -- exactly one 1.
-    let expectedHistory = [0,1,1,0,0,0] :| [
-            [0,1,1,0,0,0,0,0,1,1]
+    let expectedHistory = [1,1,1,0,0,0] :| [
+            [1,1,1,0,0,0,0,0,1,1]
+          , [0,1,1,0,0,0,0,0,1,1]
           , [0,0,1,0,0,0,0,0,1,1]
           , [0,0,1,0,0,0,0,0,0,0]
           ]
@@ -87,12 +94,11 @@ test_list_towardsLonger = do
 
 test_list_towardsOrigin :: Assertion
 test_list_towardsOrigin = do
-    let expectedHistory = [5,5,5,0] :| [
-            [5,5,5,0,0]
-          , [0,5,5,0,0]
-          , [0,0,5,0,0]
-          , [0,0,2,0,0]
-          , [0,0,1,0,0]
+    let expectedHistory = [5,5,5,1] :| [
+            [5,5,5,1,0]
+          , [0,5,5,1,0]
+          , [0,0,5,1,0]
+          , [0,0,0,1,0]
           ]
     assertEqual "shrink" expectedHistory $
       nub $ Gen.shrink (not . prop) gen (SampleTree.fromSeed 14)
@@ -223,5 +229,37 @@ test_tree_towardsOrigin2 = do
     prop :: Tree Word8 -> Bool
     prop = Tree.isWeightBalanced
 
+{-------------------------------------------------------------------------------
+  Rose trees
+-------------------------------------------------------------------------------}
 
+test_rose_path :: Assertion
+test_rose_path = do
+    assertEqual "" ["", "a", "aa"] $
+      NE.last $ Gen.shrink (not . prop) gen (SampleTree.fromSeed 5)
+  where
+    gen :: Gen [String]
+    gen = toList <$> Gen.path rose
 
+    prop :: [String] -> Bool
+    prop xs = length xs < 3
+
+    -- Infinite rose tree containing all strings containing lowercase letters
+    rose :: RoseTree String
+    rose = Rose.unfoldTree (\xs -> (xs, map (:xs) ['a' .. 'z'])) ""
+
+test_rose_shrinkTree :: Assertion
+test_rose_shrinkTree = do
+    -- Should be any kind of path in which the last two pairs of numbers are
+    -- NOT decreasing.
+    assertEqual "" [16, 8, 54] $
+      NE.last $ Gen.shrink (not . prop) gen (SampleTree.fromSeed 5)
+  where
+    genToTest :: Gen Word64
+    genToTest = (`mod` 100) <$> Gen.prim
+
+    gen :: Gen [Word64]
+    gen = Gen.toShrinkTree genToTest >>= fmap toList . Gen.path
+
+    prop :: [Word64] -> Bool
+    prop = pairwiseAll (>)

@@ -14,6 +14,8 @@ module Test.Falsify.Internal.Property (
   , genWith
   , info
   , assert
+    -- * Test shrinking
+  , shrinkProperty
   ) where
 
 import Prelude hiding (log)
@@ -23,6 +25,9 @@ import Control.Monad.State
 import GHC.Stack
 
 import Test.Falsify.Generator (Gen)
+
+import qualified Test.Falsify.Generator as Gen
+import Data.Foldable (toList)
 
 {-------------------------------------------------------------------------------
   Definition
@@ -35,7 +40,7 @@ import Test.Falsify.Generator (Gen)
 newtype Property a = Property {
     unwrapProperty :: ExceptT String (StateT TestRun Gen) a
   }
-  deriving newtype (Functor, Applicative, Monad)
+  deriving newtype (Functor, Applicative, Monad, MonadError String)
 
 -- | Construct property
 --
@@ -91,16 +96,20 @@ initTestRun = TestRun {
 
 -- | Generate value and add it to the log
 gen :: (HasCallStack, Show a) => Gen a -> Property a
-gen = genWith show
+gen = genWith (Just . show)
 
 -- | Generalization of 'gen' that doesn't depend on a 'Show' instance
-genWith :: forall a. HasCallStack => (a -> String) -> Gen a -> Property a
+--
+-- No log entry is added if 'Nothing'.
+genWith :: forall a. HasCallStack => (a -> Maybe String) -> Gen a -> Property a
 genWith f g = mkProperty $ \run -> aux run <$> g
   where
     aux :: TestRun -> a -> (Either String a, TestRun)
     aux run@TestRun{runLog = Log log} x = (
           Right x
-        , run{ runLog           = Log $ Generated callStack (f x) : log
+        , run{ runLog = Log $ case f x of
+                                Just entry -> Generated callStack entry : log
+                                Nothing    -> log
              , runDeterministic = False
              }
         )
@@ -110,9 +119,9 @@ genWith f g = mkProperty $ \run -> aux run <$> g
 -- This will be shown in verbose mode.
 info :: HasCallStack => String -> Property ()
 info msg =
-    mkProperty $ \run@TestRun{ runLog = Log log } -> return (
+    mkProperty $ \run@TestRun{runLog = Log log} -> return (
         Right ()
-      , run{ runLog = Log $ Info callStack msg : log }
+      , run{runLog = Log $ Info callStack msg : log}
       )
 
 -- | Assert boolean
@@ -120,5 +129,48 @@ info msg =
 -- If the property is false, the test fails.
 assert :: String -> Bool -> Property ()
 assert _ True  = return ()
-assert e False = mkProperty $ \log -> return (Left e, log)
+assert e False = throwError e
 
+{-------------------------------------------------------------------------------
+  Test shrinking
+-------------------------------------------------------------------------------}
+
+appendLog :: Log -> Property ()
+appendLog (Log log') = mkProperty $ \run@TestRun{runLog = Log log} -> return (
+      Right ()
+    , run{runLog = Log $ log' ++ log}
+    )
+
+-- | Test shrinking
+--
+-- The property under test is not expected to fail; if it does, the resulting
+-- property fails, also.
+shrinkProperty :: forall a.
+     Show a
+  => (a -> a -> Bool) -> Property a -> Property ()
+shrinkProperty p prop = do
+    st <- genWith (const Nothing) $ Gen.toShrinkTree (runProperty prop)
+    xs <- genWith (const Nothing) $ Gen.path st
+    case findCounterExample (toList xs) of
+      Left e ->
+        throwError e
+      Right Nothing ->
+        return ()
+      Right (Just ((x, xLog), (y, yLog))) -> do
+        info "Before shrinking:"
+        appendLog xLog
+        info "After shrinking:"
+        appendLog yLog
+        throwError $ "Invalid shrink: " ++ show x ++ " ~> " ++ show y
+  where
+    findCounterExample ::
+         [(Either String a, TestRun)]
+      -> Either String (Maybe ((a, Log), (a, Log)))
+    findCounterExample = \case
+        []                                         -> Right Nothing
+        [_]                                        -> Right Nothing
+        (Left e, _)     :     _                    -> Left e
+        _               :     (Left e, _)     : _  -> Left e
+        (Right x, logX) : ys@((Right y, logY) : _) ->
+          if p x y then findCounterExample ys
+                   else Right $ Just ((x, runLog logX), (y, runLog logY))

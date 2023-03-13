@@ -43,19 +43,29 @@ test_integral = do
       Gen.run gen $ tree minBound
 
     -- @maxBound@ corresponds in the maximum /negative/ fraction.
-    -- This corresponds to being as far /left/ of the origin as possible.
-    assertEqual "run maxBound" (0, 0, 0) $
+    -- This corresponds to being as far /left/ of the origin as possible
+    -- when the range is split; otherwise, it simply corresponds to being
+    -- as far away as possible from the origin.
+    assertEqual "run maxBound" (6, 0, 0) $
       Gen.run gen $ tree maxBound
 
     -- @maxBound - 1@ corresponds in the maximum /positive/ fraction.
-    -- This corresponds to being as far /right/ of the origin as possible.
-    assertEqual "run maxBound-1" (6, 6, 6) $
+    -- This corresponds to being as far /right/ of the origin as possible if
+    -- split; otherwise, the sign makes no difference.
+    assertEqual "run maxBound-1" (6, 0, 6) $
       Gen.run gen $ tree (maxBound - 1)
 
     -- Note that we are shrinking to a perfect minimal counter-example here: the
     -- 6 and 3 are at their "minimal" value, and if we were to shrink that 1 any
     -- further, it would no longer be a counter-example.
-    let expectedHistory = (6,6,6) :| [(3,6,6),(1,6,6),(1,6,6),(1,6,3)]
+    let expectedHistory = (6,0,6) :| [
+            (3,0,6)
+          , (2,0,6)
+          , (1,0,6)
+          , (1,0,6)
+          , (1,6,6)
+          , (1,6,3)
+          ]
     assertEqual "shrink" expectedHistory $
       Gen.shrink (not . prop) gen (tree (maxBound - 1))
   where

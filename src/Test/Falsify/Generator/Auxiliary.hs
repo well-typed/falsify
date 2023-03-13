@@ -11,6 +11,7 @@ module Test.Falsify.Generator.Auxiliary (
     -- * Auxiliary types
     -- ** Signed values
     Signed(..)
+  , forgetSign
     -- ** @n@-bit words
   , Precision(..)
   , precisionRequiredToRepresent
@@ -31,6 +32,7 @@ module Test.Falsify.Generator.Auxiliary (
   , shrinkWith
     -- * Support for shrink trees
   , fromShrinkTree
+  , toShrinkTree
   ) where
 
 import Data.Bits
@@ -40,7 +42,9 @@ import qualified Data.Tree as Rose
 
 import Test.Falsify.Internal.Generator
 import Test.Falsify.Internal.Search
-import Test.Falsify.SampleTree (Sample(..), sampleValue)
+import Test.Falsify.SampleTree (Sample(..), sampleValue, SampleTree)
+
+import qualified Test.Falsify.Internal.Generator.ShrinkStep as Step
 
 {-------------------------------------------------------------------------------
   Auxiliary type: signed values
@@ -52,7 +56,11 @@ import Test.Falsify.SampleTree (Sample(..), sampleValue)
 -- @Neg 0@ represent the same value, for instance, so that 'Signed Word63' is
 -- nearly but not quite isomorphic to 'Int64'.
 data Signed a = Pos a | Neg a
-  deriving stock (Functor, Show, Eq, Ord)
+  deriving stock (Functor, Show, Eq)
+
+forgetSign :: Signed a -> a
+forgetSign (Pos x) = x
+forgetSign (Neg x) = x
 
 {-------------------------------------------------------------------------------
   Auxiliary type: @n@-bit word
@@ -107,7 +115,7 @@ truncateAt desiredPrecision x =
 -------------------------------------------------------------------------------}
 
 -- | Value in the range [0 .. 1]
-newtype Fraction = Fraction Double
+newtype Fraction = Fraction { getFraction :: Double }
   deriving stock (Show, Eq, Ord)
 
 -- | Compute fraction from @n@-bit word
@@ -269,3 +277,18 @@ fromShrinkTree = go
           Nothing -> return x
           Just x' -> go x'
 
+-- | Expose the full shrink tree of a generator
+--
+-- This generator does not shrink.
+toShrinkTree :: forall a. Gen a -> Gen (Rose.Tree a)
+toShrinkTree gen =
+    Rose.unfoldTree aux . initialValue <$> captureLocalTree (const [])
+  where
+    initialValue :: SampleTree -> (a, SampleTree)
+    initialValue st = (run gen st, st)
+
+    aux :: (a, SampleTree) -> (a, [(a, SampleTree)])
+    aux (val, st) = (
+          val
+        , Step.step (Step.sampleTree Step.shortcutMinimal gen) st
+        )
