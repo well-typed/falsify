@@ -51,6 +51,7 @@ common lang
       FlexibleInstances
       GADTs
       GeneralizedNewtypeDeriving
+      InstanceSigs
       KindSignatures
       LambdaCase
       MultiParamTypeClasses
@@ -99,8 +100,6 @@ library
       Test.Falsify.Internal.Tasty
       Test.Falsify.Reexported.Generator.Compound
       Test.Falsify.Reexported.Generator.Function
-      Test.Falsify.Reexported.Generator.Function.Perturb
-      Test.Falsify.Reexported.Generator.Function.Reified
       Test.Falsify.Reexported.Generator.Simple
   hs-source-dirs:
       src

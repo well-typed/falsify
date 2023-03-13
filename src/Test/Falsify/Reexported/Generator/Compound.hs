@@ -1,7 +1,10 @@
 -- | Compound generators
 module Test.Falsify.Reexported.Generator.Compound (
+    -- * Auxiliary
+    shrinkToNothing
+  , mark
     -- * Compound generators
-    either
+  , either
   , list
   , tree
   ) where
@@ -27,9 +30,15 @@ import qualified Test.Falsify.Range  as Range
   Auxiliary: marking elements
 -------------------------------------------------------------------------------}
 
+-- | Start with @Just x@ for some @x@, then shrink to @Nothing@
+shrinkToNothing :: Gen a -> Gen (Maybe a)
+shrinkToNothing g = firstThen Just (const Nothing) <*> g
+
 -- | Mark an element, shrinking towards 'Drop'
 --
--- This is an ingredient in many of the compound generators.
+-- This is similar to 'shrinkToNothing', except that 'Marked' still has a value in the
+-- 'Drop' case: marks are merely hints, that we may or may not use (e.g., see
+-- 'Marked.keepAtLeast').
 mark :: Gen a -> Gen (Marked a)
 mark g = firstThen Keep Drop <*> g
 

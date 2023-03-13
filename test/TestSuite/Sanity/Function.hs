@@ -38,7 +38,7 @@ tests = testGroup "TestSuite.Sanity.Function" [
 test_BoolToBool_notConstant :: Assertion
 test_BoolToBool_notConstant = do
     assertEqual "" expected $
-      show . NE.last $ Gen.shrink (not . prop) gen (SampleTree.fromSeed 1)
+      show . NE.last $ Gen.shrink (not . prop) gen (SampleTree.fromSeed 0)
   where
     expected :: String
     expected = "{_->False}"
@@ -53,7 +53,7 @@ test_BoolToBool_notConstant = do
 test_BoolToBool_constant :: Assertion
 test_BoolToBool_constant = do
     assertEqual "" expected $
-      show . NE.last $ Gen.shrink (not . prop) gen (SampleTree.fromSeed 0)
+      show . NE.last $ Gen.shrink (not . prop) gen (SampleTree.fromSeed 1)
   where
     expected :: String
     expected = "{True->True, _->False}"
@@ -114,10 +114,10 @@ test_IntegerToBool_constant = do
 test_IntToInt_mapFilter :: Assertion
 test_IntToInt_mapFilter = do
     assertEqual "" expected $
-      show . NE.last $ Gen.shrink (not . prop) gen (SampleTree.fromSeed 1)
+      show . NE.last $ Gen.shrink (not . prop) gen (SampleTree.fromSeed 0)
   where
     expected :: String
-    expected = "({_->0},{59->True, _->False},[59])"
+    expected = "({_->0},{16->True, _->False},[16])"
 
     gen :: Gen (Fun Int Int, Fun Int Bool, [Int])
     gen =
@@ -145,7 +145,7 @@ test_IntToInt_mapFilter = do
 test_StringToBool :: Assertion
 test_StringToBool = do
     assertEqual "" expected $
-      show . NE.last $ Gen.shrink (not . prop) gen (SampleTree.fromSeed 2)
+      show . NE.last $ Gen.shrink (not . prop) gen (SampleTree.fromSeed 8)
   where
     expected :: String
     expected = "{\"Standard ML\"->True, _->False}"
@@ -159,4 +159,3 @@ test_StringToBool = do
     implies :: Bool -> Bool -> Bool
     implies False _ = True
     implies True  b = b
-
