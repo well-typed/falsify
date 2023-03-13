@@ -75,7 +75,7 @@ test_Word8ToBool_constant = do
       show . NE.last $ Gen.shrink (not . prop) gen (SampleTree.fromSeed 0)
   where
     expected :: String
-    expected = "{255->True, _->False}"
+    expected = "{127->True, _->False}"
 
     gen :: Gen (Fun Word8 Bool)
     gen = Gen.fun (Gen.bool False)
@@ -117,7 +117,7 @@ test_IntToInt_mapFilter = do
       show . NE.last $ Gen.shrink (not . prop) gen (SampleTree.fromSeed 1)
   where
     expected :: String
-    expected = "({_->0},{43->True, _->False},[43])"
+    expected = "({_->0},{24->True, _->False},[24])"
 
     gen :: Gen (Fun Int Int, Fun Int Bool, [Int])
     gen =

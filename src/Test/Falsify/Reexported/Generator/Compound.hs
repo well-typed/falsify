@@ -143,19 +143,18 @@ tree size gen = do
 --
 -- Shrinks by replacing entire subtrees by the empty tree.
 bst :: forall a b. Integral a => (a -> Gen b) -> Interval a -> Gen (Tree (a, b))
-bst gen = go
+bst gen = go >=> traverse (\a -> (a,) <$> gen a)
   where
-    go :: Interval a -> Gen (Tree (a, b))
+    go :: Interval a -> Gen (Tree a)
     go i =
         case Tree.inclusiveBounds i of
           Nothing       -> pure Leaf
           Just (lo, hi) -> firstThen id (const Leaf) <*> go' lo hi
 
     -- inclusive bounds, lo <= hi
-    go' :: a -> a -> Gen (Tree (a, b))
-    go' lo hi = (\b -> Branch (mid, b))
-            <$> gen mid
-            <*> go (Interval (Inclusive lo) (Exclusive mid))
+    go' :: a -> a -> Gen (Tree a)
+    go' lo hi = Branch mid
+            <$> go (Interval (Inclusive lo) (Exclusive mid))
             <*> go (Interval (Exclusive mid) (Inclusive hi))
       where
         mid :: a
