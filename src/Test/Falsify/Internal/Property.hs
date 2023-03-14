@@ -19,7 +19,7 @@ module Test.Falsify.Internal.Property (
   , assert
   , assertBool
     -- * Test shrinking
-  , shrinkProperty
+  , testShrinking
   ) where
 
 import Prelude hiding (log)
@@ -86,7 +86,7 @@ data LogEntry =
     Generated CallStack String
 
     -- | Some additional information
-  | Info CallStack String
+  | Info String
   deriving (Show)
 
 -- | Log of the events happened during a test run
@@ -140,11 +140,11 @@ genWithCallStack stack f g = mkProperty $ \run -> aux run <$> g
 -- | Log some additional information about the test
 --
 -- This will be shown in verbose mode.
-info :: HasCallStack => String -> Property ()
+info :: String -> Property ()
 info msg =
     mkProperty $ \run@TestRun{runLog = Log log} -> return (
         Right ()
-      , run{runLog = Log $ Info callStack msg : log}
+      , run{runLog = Log $ Info msg : log}
       )
 
 -- | Assert boolean
@@ -172,10 +172,10 @@ appendLog (Log log') = mkProperty $ \run@TestRun{runLog = Log log} -> return (
 --
 -- The property under test is not expected to fail; if it does, the resulting
 -- property fails, also.
-shrinkProperty :: forall a.
+testShrinking :: forall a.
      Show a
   => (a -> a -> Bool) -> Property a -> Property ()
-shrinkProperty p prop = do
+testShrinking p prop = do
     st <- genWith (const Nothing) $ Gen.toShrinkTree (runProperty prop)
     xs <- genWith (const Nothing) $ Gen.path st
     case findCounterExample (toList xs) of

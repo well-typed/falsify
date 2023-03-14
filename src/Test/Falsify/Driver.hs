@@ -236,40 +236,41 @@ testResult verbose expectFailure (initSeed, successes, mFailure) =
       --
 
       (NotVerbose, ExpectFailure, Just e) -> TestResult {
-            testPassed = True
-          , testOutput = unlines [
-                "expected failure after " ++ countryHistory history
-              , fst $ NE.last history
-              ]
-          }
-        where
-          history = shrinkHistory (failureRun e)
+             testPassed = True
+           , testOutput = unlines [
+                 "expected failure after " ++ countryHistory history
+               , fst $ NE.last history
+               ]
+           }
+         where
+           history = shrinkHistory (failureRun e)
 
       (Verbose, ExpectFailure, Just e) -> TestResult {
-            testPassed = True
-          , testOutput = unlines [
-                "expected failure after " ++ countryHistory history
-              , fst $ NE.last history
-              , ""
-              , "Logs for failed test run:"
-              , renderLog . runLog . snd $ NE.last history
-              ]
-          }
-        where
-          history = shrinkHistory (failureRun e)
+             testPassed = True
+           , testOutput = unlines [
+                 "expected failure after " ++ countryHistory history
+               , fst $ NE.last history
+               , ""
+               , "Logs for failed test run:"
+               , renderLog . runLog . snd $ NE.last history
+               ]
+           }
+         where
+           history = shrinkHistory (failureRun e)
 
       (_, DontExpectFailure, Just e) -> TestResult {
-            testPassed = False
-          , testOutput = unlines [
-                "failed after " ++ countryHistory history
-              , fst $ NE.last history
-              , ""
-              , "Logs for failed test run:"
-              , renderLog . runLog . snd $ NE.last history
-              ]
-          }
-        where
-          history = shrinkHistory (failureRun e)
+             testPassed = False
+           , testOutput = unlines [
+                 "failed after " ++ countryHistory history
+               , fst $ NE.last history
+               , ""
+               , "Logs for failed test run:"
+               , renderLog . runLog . snd $ NE.last history
+               , showSeed initSeed
+               ]
+           }
+         where
+           history = shrinkHistory (failureRun e)
   where
     countSuccess, countAll :: String
     countSuccess
@@ -298,12 +299,14 @@ renderSuccess (ix, Success{successRun}) =
       ]
 
 renderLog :: Log -> String
-renderLog (Log log) = concatMap renderLogEntry (reverse log)
+renderLog (Log log) = unlines $ map renderLogEntry (reverse log)
 
 renderLogEntry :: LogEntry -> String
 renderLogEntry = \case
-    Generated stack x -> aux stack ("generated " ++ x)
-    Info      stack x -> aux stack x
-  where
-    aux :: CallStack -> String -> String
-    aux stack x = x ++ " at " ++ prettyCallStack stack ++ "\n"
+    Generated stack x -> concat [
+        "generated "
+      , show x
+      , " at "
+      , prettyCallStack stack
+      ]
+    Info x -> x
