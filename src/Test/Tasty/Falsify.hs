@@ -20,10 +20,16 @@ module Test.Tasty.Falsify (
   , Property -- opaque
   , gen
   , assert
+  , assertBool
   , info
+    -- ** Functions
+  , pattern Gen.Fn
+  , pattern Gen.Fn2
+  , pattern Gen.Fn3
   ) where
-
 
 import Test.Falsify.Generator (Gen)
 import Test.Falsify.Internal.Tasty
 import Test.Falsify.Property
+
+import qualified Test.Falsify.Reexported.Generator.Function as Gen

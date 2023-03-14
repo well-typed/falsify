@@ -72,7 +72,6 @@ library
   import:
       lang
   exposed-modules:
-      Test.Falsify
       Test.Falsify.Debugging
       Test.Falsify.Driver
       Test.Falsify.Driver.ReplaySeed
@@ -156,8 +155,9 @@ executable demo
   main-is:
       Main.hs
   other-modules:
+      Demo.Functions
       Demo.HowToSpecifyIt
-      Demo.Simple
+      Demo.TestOptions
       Demo.TestShrinking
   build-depends:
     , data-default
