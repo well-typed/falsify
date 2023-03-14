@@ -7,6 +7,7 @@ module Test.Falsify.Property (
     Property -- opaque
   , gen
   , assert
+  , assertBool
   , info
   ) where
 

@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 -- | Properties
 --
 -- Intended for unqualified import.
@@ -9,11 +11,13 @@ module Test.Falsify.Internal.Property (
   , TestRun(..)
   , Log(..)
   , LogEntry(..)
-    -- * Construction
+    -- * Running generators
   , gen
   , genWith
+    -- * Other 'Property' features
   , info
   , assert
+  , assertBool
     -- * Test shrinking
   , shrinkProperty
   ) where
@@ -22,12 +26,16 @@ import Prelude hiding (log)
 
 import Control.Monad.Except
 import Control.Monad.State
+import Data.Foldable (toList)
 import GHC.Stack
+
+#if !MIN_VERSION_base(4,13,0)
+import Control.Monad.Fail (MonadFail(..))
+#endif
 
 import Test.Falsify.Generator (Gen)
 
 import qualified Test.Falsify.Generator as Gen
-import Data.Foldable (toList)
 
 {-------------------------------------------------------------------------------
   Definition
@@ -41,6 +49,9 @@ newtype Property a = Property {
     unwrapProperty :: ExceptT String (StateT TestRun Gen) a
   }
   deriving newtype (Functor, Applicative, Monad, MonadError String)
+
+instance MonadFail Property where
+  fail = throwError
 
 -- | Construct property
 --
@@ -91,28 +102,40 @@ initTestRun = TestRun {
     }
 
 {-------------------------------------------------------------------------------
-  Construction
+  Running generators
 -------------------------------------------------------------------------------}
 
 -- | Generate value and add it to the log
 gen :: (HasCallStack, Show a) => Gen a -> Property a
-gen = genWith (Just . show)
+gen = genWithCallStack callStack (Just . show)
 
 -- | Generalization of 'gen' that doesn't depend on a 'Show' instance
 --
 -- No log entry is added if 'Nothing'.
-genWith :: forall a. HasCallStack => (a -> Maybe String) -> Gen a -> Property a
-genWith f g = mkProperty $ \run -> aux run <$> g
+genWith :: HasCallStack => (a -> Maybe String) -> Gen a -> Property a
+genWith = genWithCallStack callStack
+
+-- | Internal auxiliary
+genWithCallStack :: forall a.
+     CallStack           -- ^ Explicit argument to avoid irrelevant entries
+                         -- (users don't care that 'gen' uses 'genWith').
+  -> (a -> Maybe String) -- ^ Entry to add to the log (if any)
+  -> Gen a -> Property a
+genWithCallStack stack f g = mkProperty $ \run -> aux run <$> g
   where
     aux :: TestRun -> a -> (Either String a, TestRun)
     aux run@TestRun{runLog = Log log} x = (
           Right x
         , run{ runLog = Log $ case f x of
-                                Just entry -> Generated callStack entry : log
-                                Nothing    -> log
+                 Just entry -> Generated stack entry : log
+                 Nothing    -> log
              , runDeterministic = False
              }
         )
+
+{-------------------------------------------------------------------------------
+  Other 'Property' features
+-------------------------------------------------------------------------------}
 
 -- | Log some additional information about the test
 --
@@ -130,6 +153,10 @@ info msg =
 assert :: String -> Bool -> Property ()
 assert _ True  = return ()
 assert e False = throwError e
+
+-- | Like 'assert', but with a standard message.
+assertBool :: Bool -> Property ()
+assertBool = assert "Failed"
 
 {-------------------------------------------------------------------------------
   Test shrinking
