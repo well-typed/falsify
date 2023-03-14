@@ -6,22 +6,25 @@
 module Test.Tasty.Falsify (
     -- * Test property
     testProperty
-  , testShrinking
     -- * Configure test behaviour
   , TestOptions(..)
   , Verbose(..)
   , ExpectFailure(..)
   , testPropertyWith
-  , testShrinkingWith
     -- * Re-exports
     -- ** Generators
   , Gen
     -- ** Properties
   , Property -- opaque
+    -- *** Running generators
   , gen
+  , genWith
+    -- *** Additional 'Property' features
   , assert
   , assertBool
   , info
+    -- *** Testing shrinking
+  , testShrinking
     -- ** Functions
   , pattern Gen.Fn
   , pattern Gen.Fn2
