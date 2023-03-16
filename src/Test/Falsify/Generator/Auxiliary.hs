@@ -41,10 +41,9 @@ import Data.Word
 import qualified Data.Tree as Rose
 
 import Test.Falsify.Internal.Generator
+import Test.Falsify.Internal.Generator.Truncated (Truncated)
 import Test.Falsify.Internal.Search
 import Test.Falsify.SampleTree (Sample(..), sampleValue, SampleTree)
-
-import qualified Test.Falsify.Internal.Generator.ShrinkStep as Step
 
 {-------------------------------------------------------------------------------
   Auxiliary type: signed values
@@ -282,13 +281,7 @@ fromShrinkTree = go
 -- This generator does not shrink.
 toShrinkTree :: forall a. Gen a -> Gen (Rose.Tree a)
 toShrinkTree gen =
-    Rose.unfoldTree aux . initialValue <$> captureLocalTree (const [])
+    Rose.unfoldTree aux . runGen gen <$> captureLocalTree
   where
-    initialValue :: SampleTree -> (a, SampleTree)
-    initialValue st = (run gen st, st)
-
-    aux :: (a, SampleTree) -> (a, [(a, SampleTree)])
-    aux (val, st) = (
-          val
-        , Step.step (Step.sampleTree Step.shortcutMinimal gen) st
-        )
+    aux :: (a, Truncated, [SampleTree]) -> (a,[(a, Truncated, [SampleTree])])
+    aux (x, _, shrunk) = (x, map (runGen gen) shrunk)

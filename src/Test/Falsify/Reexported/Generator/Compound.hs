@@ -1,7 +1,9 @@
 -- | Compound generators
 module Test.Falsify.Reexported.Generator.Compound (
+    -- * Taking advantage of 'Selective'
+    choose
     -- * Lists
-    list
+  , list
   , elem
     -- * Trees
     -- ** Binary trees
@@ -18,6 +20,7 @@ module Test.Falsify.Reexported.Generator.Compound (
 import Prelude hiding (either, elem)
 
 import Control.Monad
+import Control.Selective
 import Data.Foldable (toList)
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.Maybe (mapMaybe)
@@ -30,12 +33,60 @@ import Data.Falsify.Tree (Tree(..), Interval(..), Endpoint(..))
 import Test.Falsify.Generator.Auxiliary
 import Test.Falsify.Internal.Generator
 import Test.Falsify.Range (Range)
-import Test.Falsify.Reexported.Generator.Instances
 import Test.Falsify.Reexported.Generator.Simple
 
 import qualified Data.Falsify.Marked as Marked
 import qualified Data.Falsify.Tree   as Tree
 import qualified Test.Falsify.Range  as Range
+
+{-------------------------------------------------------------------------------
+  Taking advantage of 'Selective'
+-------------------------------------------------------------------------------}
+
+-- | Generate a value with one of two generators
+--
+-- Shrinks towards the first generator.
+--
+-- In the remainder of this docstring we give some background to this function,
+-- which may be useful for general understanding of the @falsify@ library.
+--
+-- The implementation takes advantage of the that 'Gen' is a selective functor
+-- to ensure that the two generators can shrink independently: if the initial
+-- value of the generator is some @y@ produced by the second generator, later
+-- shrunk to some @y'@, then if the generator can shrink to @x@ at some point,
+-- produced by the /first/ generator, then shrinking effectively "starts over":
+-- the value of @x@ is independent of @y'@.
+--
+-- That is different from doing this:
+--
+-- > do b <- bool
+-- >    if b then l else r
+--
+-- In this case, @l@ and @r@ will be generated from the /same/ sample tree,
+-- and so cannot shrink independently.
+--
+-- It is /also/ different from
+--
+-- > do x <- l
+-- >    y <- r
+-- >    b <- bool
+-- >    return $ if b then x else y
+--
+-- In this case, @l@ and @r@ are run against /different/ sample trees, like we
+-- do here, /but/ in this case if the current value produced by the generator is
+-- produced by the right generator, then the sample tree used for the left
+-- generator will always shrink to 'Minimal' (this /must/ be possible because
+-- we're not currently using it); this means that we would then only be able to
+-- shrink to a value from the left generator if the /minimal/ value produced by
+-- that generator happens to work.
+--
+-- To rephrase that last point: generating values that are not actually used
+-- will lead to poor shrinking, since those values can always be shrunk to their
+-- minimal value, independently from whatever property is being tested: the
+-- shrinker does not know that the value is not being used. The correct way to
+-- conditionally use a value is to use the selective interface, as we do here.
+choose :: Gen a -> Gen a -> Gen a
+choose = ifS (bool True)
 
 {-------------------------------------------------------------------------------
   Auxiliary: marking elements
@@ -144,5 +195,6 @@ type RoseTree = Rose.Tree
 -- appear earlier in the list of subtrees at any node in the tree.
 path :: RoseTree a -> Gen (NonEmpty a)
 path (Rose.Node x [])     = pure (x :| [])
-path (Rose.Node x (y:ys)) = pure (x :| [])
-                       <!> (elem (y :| ys) >>= fmap (NE.cons x) . path)
+path (Rose.Node x (y:ys)) = choose
+                              (pure $ x :| [])
+                              (elem (y :| ys) >>= fmap (NE.cons x) . path)

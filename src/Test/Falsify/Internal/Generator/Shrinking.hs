@@ -1,13 +1,10 @@
 module Test.Falsify.Internal.Generator.Shrinking (
     -- * Shrinking
-    shrink
-  , shrinkWithShortcut
+    shrinkFrom
     -- * With full history
   , ShrinkExplanation(..)
   , ShrinkHistory(..)
-  , Candidate(..)
   , IsValidShrink(..)
-  , shrinkExplain
   , limitShrinkSteps
   , shrinkHistory
   ) where
@@ -15,12 +12,10 @@ module Test.Falsify.Internal.Generator.Shrinking (
 import Data.Bifunctor
 import Data.Either
 import Data.List.NonEmpty (NonEmpty((:|)))
-import GHC.Stack
 
 import Test.Falsify.Internal.Generator.Definition
+import Test.Falsify.Internal.Generator.Truncated (Truncated)
 import Test.Falsify.SampleTree (SampleTree(..))
-
-import qualified Test.Falsify.Internal.Generator.ShrinkStep as Step
 
 {-------------------------------------------------------------------------------
   Explanation
@@ -32,7 +27,7 @@ import qualified Test.Falsify.Internal.Generator.ShrinkStep as Step
 -- valid shrinks), and @n@ is the type of \"negative\" which didn't.
 data ShrinkExplanation p n = ShrinkExplanation {
       -- | The value we started, before shrinking
-      initial :: Candidate p
+      initial :: p
 
       -- | The full shrink history
     , history :: ShrinkHistory p n
@@ -41,14 +36,14 @@ data ShrinkExplanation p n = ShrinkExplanation {
 -- | Shrink explanation
 data ShrinkHistory p n =
     -- | We successfully executed a single shrink step
-    ShrunkTo (Candidate p) (ShrinkHistory p n)
+    ShrunkTo p (ShrinkHistory p n)
 
     -- | We could no shrink any further
     --
     -- We also record all rejected next steps. This is occasionally useful when
     -- trying to figure out why a value didn't shrink any further (what did it
     -- try to shrink to?)
-  | ShrinkingDone [Candidate n]
+  | ShrinkingDone [n]
 
     -- | We stopped shrinking early
     --
@@ -73,10 +68,10 @@ limitShrinkSteps (Just limit) = \case
 -- | Simplify the shrink explanation to keep only the shrink history
 shrinkHistory :: ShrinkExplanation p n -> NonEmpty p
 shrinkHistory (ShrinkExplanation unshrunk shrunk) =
-    outcome unshrunk :| go shrunk
+    unshrunk :| go shrunk
   where
     go :: ShrinkHistory p n -> [p]
-    go (ShrunkTo x xs)   = outcome x : go xs
+    go (ShrunkTo x xs)   = x : go xs
     go (ShrinkingDone _) = []
     go ShrinkingStopped  = []
 
@@ -86,16 +81,16 @@ shrinkHistory (ShrinkExplanation unshrunk shrunk) =
 
 instance Bifunctor ShrinkExplanation where
   bimap f g ShrinkExplanation{initial, history} = ShrinkExplanation{
-        initial = fmap f initial
+        initial = f initial
       , history = bimap f g history
       }
 
 instance Bifunctor ShrinkHistory where
   bimap f g = \case
       ShrunkTo truncated history ->
-        ShrunkTo (fmap f truncated) (bimap f g history)
+        ShrunkTo (f truncated) (bimap f g history)
       ShrinkingDone rejected ->
-        ShrinkingDone (map (fmap g) rejected)
+        ShrinkingDone (map g rejected)
       ShrinkingStopped ->
         ShrinkingStopped
 
@@ -103,70 +98,31 @@ instance Bifunctor ShrinkHistory where
   Shrinking
 -------------------------------------------------------------------------------}
 
--- | Find smallest value that the generator can produce and still satisfies
--- the predicate.
---
--- Returns the full shrink history.
---
--- Precondition: in @shrink p g st@, we should have
---
--- > p (run g st)
---
--- In other words, the predicate should hold for the initial sample tree.
-shrink :: forall a.
-     HasCallStack
-  => (a -> Bool) -- ^ Predicate to check if something is a valid shrink
-  -> Gen a
-  -> SampleTree
-  -> NonEmpty a
-shrink = shrinkWithShortcut Step.shortcutMinimal
-
--- | Generalization of 'shrink'
-shrinkWithShortcut :: forall a.
-     HasCallStack
-  => Step.Shortcut
-  -> (a -> Bool) -- ^ Predicate to check if something is a valid shrink
-  -> Gen a
-  -> SampleTree
-  -> NonEmpty a
-shrinkWithShortcut shortcut p g =
-    shrinkHistory . shrinkExplain shortcut p' g
-  where
-    p' :: a -> IsValidShrink a ()
-    p' x = if p x then ValidShrink x else InvalidShrink ()
-
-{-------------------------------------------------------------------------------
-  Generalized shrinking interface
--------------------------------------------------------------------------------}
-
 -- | Does a given shrunk value represent a valid shrink step?
 data IsValidShrink p n =
     ValidShrink p
   | InvalidShrink n
 
--- | Generalization of 'shrink' which explains the process
+-- | Find smallest value that the generator can produce and still satisfies
+-- the predicate.
 --
--- This is occassionally useful when debugging a generator, for example when it
--- is shrinking in unexpected ways.
+-- Returns the full shrink history.
 --
--- This function has a more precise type than 'shrink', which suffers from
--- boolean blindness; here we get /evidence/ whether or not something is a valid
--- shrink step.
+-- To avoid boolean blindness, we use different types for values that satisfy
+-- the property and values that do not.
 --
 -- This is lazy in the shrink history; see 'limitShrinkSteps' to limit the
 -- number of shrinking steps.
-shrinkExplain :: forall a p n.
-     HasCallStack
-  => Step.Shortcut
-  -> (a -> IsValidShrink p n)
-  -> Gen a -> SampleTree -> ShrinkExplanation p n
-shrinkExplain shortcut p gen = \st ->
-    case evalSampleTree p (run gen st, st) of
-      Left  c -> ShrinkExplanation c $ go st
-      Right _ -> error "shrink: precondition violated"
+shrinkFrom :: forall a p n.
+     (a -> IsValidShrink p n)
+  -> Gen a
+  -> (p, [SampleTree]) -- ^ Initial result of the generator
+  -> ShrinkExplanation p n
+shrinkFrom prop gen = \(p, shrunk) ->
+    ShrinkExplanation p $ go shrunk
   where
-    go :: SampleTree -> ShrinkHistory p n
-    go st =
+    go :: [SampleTree] -> ShrinkHistory p n
+    go shrunk =
         -- Shrinking is a greedy algorithm: we go with the first candidate that
         -- works, and discard the others.
         --
@@ -174,33 +130,14 @@ shrinkExplain shortcut p gen = \st ->
         --
         -- > head . fst $ partitionEithers [Left True, undefined] == True
         case partitionEithers candidates of
-          ([], rejected) -> ShrinkingDone rejected
-          (c:_, _)       -> ShrunkTo c $ go (shrunkTree c)
+          ([], rejected)      -> ShrinkingDone rejected
+          ((p, shrunk'):_, _) -> ShrunkTo p $ go shrunk'
       where
-        candidates :: [Either (Candidate p) (Candidate n)]
-        candidates =
-            map (evalSampleTree p) $
-              Step.step (Step.sampleTree shortcut gen) st
+        candidates :: [Either (p, [SampleTree]) n]
+        candidates = map consider $ map (runGen gen) shrunk
 
-{-------------------------------------------------------------------------------
-  Shrinking candidates
--------------------------------------------------------------------------------}
-
--- | Candidate during shrink
-data Candidate x = Candidate {
-      -- | The shrunk 'SampleTree'
-      shrunkTree :: SampleTree
-
-      -- | The result of the generator
-    , outcome :: x
-    }
-  deriving (Functor)
-
-evalSampleTree ::
-     (a -> IsValidShrink p n)
-  -> (a, SampleTree)
-  -> Either (Candidate p) (Candidate n)
-evalSampleTree prop (a, shrunkTree) =
-    case prop a of
-      ValidShrink   p -> Left  $ Candidate{shrunkTree, outcome = p}
-      InvalidShrink n -> Right $ Candidate{shrunkTree, outcome = n}
+    consider :: (a, Truncated, [SampleTree]) -> Either (p, [SampleTree]) n
+    consider (a, _, shrunk) =
+        case prop a of
+          ValidShrink p   -> Left (p, shrunk)
+          InvalidShrink n -> Right n

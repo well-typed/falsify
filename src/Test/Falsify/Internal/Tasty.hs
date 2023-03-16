@@ -112,24 +112,25 @@ instance IsOption Verbose where
 newtype Tests      = Tests      { getTests      :: Word             }
 newtype MaxShrinks = MaxShrinks { getMaxShrinks :: Maybe Word       }
 newtype Replay     = Replay     { getReplay     :: Maybe ReplaySeed }
+newtype MaxRatio   = MaxRatio   { getMaxRatio   :: Word             }
 
 instance IsOption Tests where
   defaultValue   = Tests (Driver.tests def)
   parseValue     = fmap Tests . Tasty.safeRead . filter (/= '_')
-  optionName     = Tagged $ "falsify-tests"
-  optionHelp     = Tagged $ "Number of test cases to generate"
+  optionName     = Tagged "falsify-tests"
+  optionHelp     = Tagged "Number of test cases to generate"
 
 instance IsOption MaxShrinks where
   defaultValue   = MaxShrinks (Driver.maxShrinks def)
   parseValue     = fmap (MaxShrinks . Just) . Tasty.safeRead
-  optionName     = Tagged $ "falsify-shrinks"
-  optionHelp     = Tagged $ "Random seed to use for replaying a previous test run"
+  optionName     = Tagged "falsify-shrinks"
+  optionHelp     = Tagged "Random seed to use for replaying a previous test run"
 
 instance IsOption Replay where
   defaultValue   = Replay (Driver.replay def)
   parseValue     = fmap (Replay . Just) . safeReadReplaySeed
-  optionName     = Tagged $ "falsify-replay"
-  optionHelp     = Tagged $ "Random seed to use for replaying test"
+  optionName     = Tagged "falsify-replay"
+  optionHelp     = Tagged "Random seed to use for replaying test"
   optionCLParser = Opts.option readReplaySeed $ mconcat [
                        Opts.long $ untag $ optionName @Replay
                      , Opts.help $ untag $ optionHelp @Replay
@@ -138,9 +139,16 @@ instance IsOption Replay where
       readReplaySeed :: Opts.ReadM Replay
       readReplaySeed = Opts.str >>= fmap (Replay . Just) . parseReplaySeed
 
+instance IsOption MaxRatio where
+  defaultValue   = MaxRatio (Driver.maxRatio def)
+  parseValue     = fmap MaxRatio . Tasty.safeRead . filter (/= '_')
+  optionName     = Tagged "falsify-max-ratio"
+  optionHelp     = Tagged "Maximum number of discarded tests per successful test"
+
 driverOptions :: OptionSet -> Driver.Options
 driverOptions opts = Driver.Options {
       tests         = getTests      $ Tasty.lookupOption opts
     , maxShrinks    = getMaxShrinks $ Tasty.lookupOption opts
     , replay        = getReplay     $ Tasty.lookupOption opts
+    , maxRatio      = getMaxRatio   $ Tasty.lookupOption opts
     }

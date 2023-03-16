@@ -1,16 +1,16 @@
 module TestSuite.Sanity.Compound (tests) where
 
 import Data.Foldable (toList)
-import Data.List.NonEmpty (NonEmpty((:|)), nub)
+import Data.List (nub)
 import Data.Word
 import Test.Tasty
 import Test.Tasty.HUnit
 
-import qualified Data.List.NonEmpty as NE
-import qualified Data.Tree          as Rose
+import qualified Data.Tree as Rose
 
 import Data.Falsify.List (pairwiseAll)
 import Data.Falsify.Tree (Tree(..))
+import Test.Falsify.Debugging
 import Test.Falsify.Generator (Gen, RoseTree)
 
 import qualified Data.Falsify.Tree       as Tree
@@ -48,8 +48,9 @@ test_list_towardsShorter = do
     --
     -- In principle the filtered list could /grow/ in size during shrinking (if
     -- a previously odd number is shrunk to be even).
-    let expectedHistory = [6,8,8,2,10,2,2] :| [
-            [6,8,8,2,10,2]
+    let expectedHistory = [
+            [6,8,8,2,10,2,2]
+          , [6,8,8,2,10,2]
           , [6,8,8,2]
           , [8,8,2]
           , [8,2]
@@ -62,7 +63,7 @@ test_list_towardsShorter = do
      -- to optimize that at some point, although this might be difficult:
      -- shrinking only values that are /used/ is hard.
     assertEqual "shrink" expectedHistory $
-      nub $ Gen.shrink (not . prop) gen (SampleTree.fromSeed 1)
+      nub $ shrink (not . prop) gen (SampleTree.fromSeed 1)
   where
     gen :: Gen [Word8]
     gen = fmap (filter even) $
@@ -76,14 +77,15 @@ test_list_towardsLonger :: Assertion
 test_list_towardsLonger = do
     -- We increase the list length to max immediately, and then shrink towards
     -- exactly one 1.
-    let expectedHistory = [1,1,1,0,0,0] :| [
-            [1,1,1,0,0,0,0,0,1,1]
+    let expectedHistory = [
+            [1,1,1,0,0,0]
+          , [1,1,1,0,0,0,0,0,1,1]
           , [0,1,1,0,0,0,0,0,1,1]
           , [0,0,1,0,0,0,0,0,1,1]
           , [0,0,1,0,0,0,0,0,0,0]
           ]
     assertEqual "shrink" expectedHistory $
-      nub $ Gen.shrink (not . prop) gen (SampleTree.fromSeed 3)
+      nub $ shrink (not . prop) gen (SampleTree.fromSeed 3)
   where
     gen :: Gen [Word8]
     gen = Gen.list (Range.invert $ Range.between (0, 10)) $
@@ -94,14 +96,15 @@ test_list_towardsLonger = do
 
 test_list_towardsOrigin :: Assertion
 test_list_towardsOrigin = do
-    let expectedHistory = [5,5,5,1] :| [
-            [5,5,5,1,0]
+    let expectedHistory = [
+            [5,5,5,1]
+          , [5,5,5,1,0]
           , [0,5,5,1,0]
           , [0,0,5,1,0]
           , [0,0,0,1,0]
           ]
     assertEqual "shrink" expectedHistory $
-      nub $ Gen.shrink (not . prop) gen (SampleTree.fromSeed 14)
+      nub $ shrink (not . prop) gen (SampleTree.fromSeed 14)
   where
     gen :: Gen [Word8]
     gen = Gen.list (Range.num (0, 10) 5) $
@@ -117,7 +120,7 @@ test_list_towardsOrigin = do
 test_tree_towardsSmaller1 :: Assertion
 test_tree_towardsSmaller1 = do
     assertEqual "" expected $
-      NE.last $ Gen.shrink (not . prop) gen (SampleTree.fromSeed 0)
+      last $ shrink (not . prop) gen (SampleTree.fromSeed 0)
   where
     expected :: Tree Word8
     expected =
@@ -135,7 +138,7 @@ test_tree_towardsSmaller1 = do
 test_tree_towardsSmaller2 :: Assertion
 test_tree_towardsSmaller2 = do
     assertEqual "" expected $
-      NE.last $ Gen.shrink (not . prop) gen (SampleTree.fromSeed 0)
+      last $ shrink (not . prop) gen (SampleTree.fromSeed 0)
   where
     -- For a minimal tree that is not weight-balanced, we need three elements in
     -- one subtree and none in the other: the weight of the empty tree is 1,
@@ -162,7 +165,7 @@ test_tree_towardsSmaller2 = do
 test_tree_towardsOrigin1 :: Assertion
 test_tree_towardsOrigin1 = do
     assertEqual "" expected $
-      NE.last $ Gen.shrink (not . prop) gen (SampleTree.fromSeed 0)
+      last $ shrink (not . prop) gen (SampleTree.fromSeed 0)
   where
     -- If we prefer a counter-example with 10 nodes, then this tree is indeed
     -- nicely minimal: note that the tree is /almost/ balanced, it's off by
@@ -197,7 +200,7 @@ test_tree_towardsOrigin1 = do
 test_tree_towardsOrigin2 :: Assertion
 test_tree_towardsOrigin2 = do
     assertEqual "" expected $
-      NE.last $ Gen.shrink (not . prop) gen (SampleTree.fromSeed 0)
+      last $ shrink (not . prop) gen (SampleTree.fromSeed 0)
   where
     -- Another beautiful example of a tree that is /not/ weight-balanced, but
     -- only barely so, with as side condition that we prefer to have 10 elements
@@ -236,7 +239,7 @@ test_tree_towardsOrigin2 = do
 test_rose_path :: Assertion
 test_rose_path = do
     assertEqual "" ["", "a", "aa"] $
-      NE.last $ Gen.shrink (not . prop) gen (SampleTree.fromSeed 5)
+      last $ shrink (not . prop) gen (SampleTree.fromSeed 5)
   where
     gen :: Gen [String]
     gen = toList <$> Gen.path rose
@@ -253,7 +256,7 @@ test_rose_shrinkTree = do
     -- Should be any kind of path in which the last two pairs of numbers are
     -- NOT decreasing.
     assertEqual "" [16, 8, 54] $
-      NE.last $ Gen.shrink (not . prop) gen (SampleTree.fromSeed 5)
+      last $ shrink (not . prop) gen (SampleTree.fromSeed 5)
   where
     genToTest :: Gen Word64
     genToTest = (`mod` 100) <$> Gen.prim

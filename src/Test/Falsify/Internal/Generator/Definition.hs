@@ -2,27 +2,21 @@ module Test.Falsify.Internal.Generator.Definition (
     -- * Definition
     Gen(..)
     -- * Primitive generators
-  , Prim(..)
   , prim
   , primWith
   , captureLocalTree
     -- * Combinators
   , withoutShrinking
-    -- * Running
-  , run
-    -- * Debugging
-  , explainGen
   ) where
 
 import Control.Monad
 import Control.Selective
-import Data.Bifunctor
-import Data.Function
+import Data.List.NonEmpty (NonEmpty((:|)))
 import Data.Word
 
 import Test.Falsify.Internal.Generator.Truncated
 import Test.Falsify.Internal.Search
-import Test.Falsify.SampleTree (SampleTree, Sample, sampleValue)
+import Test.Falsify.SampleTree (SampleTree(..), Sample (..), pattern Inf)
 
 import qualified Test.Falsify.SampleTree as SampleTree
 
@@ -56,71 +50,86 @@ import qualified Test.Falsify.SampleTree as SampleTree
 -- said, users may prefer to use the dedicated
 -- 'Test.Falsify.Generator.Compound.list' generator for this purpose, which
 -- improves on this in a few ways).
-data Gen a where
-  Pure   :: a -> Gen a
-  Prim   :: Prim a -> Gen a
-  Bind   :: Gen a -> (a -> Gen b) -> Gen b
-  Select :: Gen (Either a b) -> Gen (a -> b) -> Gen b
+--
+-- NOTE: 'Gen' is /NOT/ an instance of 'Alternative'; this would not be
+-- compatible with the generation of infinite data structures.
+newtype Gen a = Gen { runGen :: SampleTree -> (a, Truncated, [SampleTree]) }
+  deriving stock (Functor)
+
+instance Applicative Gen where
+  pure x = Gen $ \_st -> (x, E, [])
+  (<*>)  = ap
+
+instance Monad Gen where
+  return  = pure
+  x >>= f = Gen $ \(Inf s l r) ->
+      let (a, tl, ls) = runGen x l
+          (b, tr, rs) = runGen (f a) r
+      in (b, B tl tr, combineShrunk s (l :| ls) (r :| rs))
+
+instance Selective Gen where
+  select e f = Gen $ \(Inf s l r) -> do
+      let (ma, tl, ls) = runGen e l
+      case ma of
+        Left a ->
+          let (f', tr, rs) = runGen f r
+          in (f' a, B tl tr, combineShrunk s (l :| ls) (r :| rs))
+        Right b ->
+          (b, B tl E, combineShrunk s (l :| ls) (r :| []))
+
+-- | Combine shrunk left and right sample trees
+--
+-- This is an internal function only.
+combineShrunk ::
+     Sample
+  -> NonEmpty SampleTree -- ^ Original and shrunk left  trees
+  -> NonEmpty SampleTree -- ^ Original and shrunk right trees
+  -> [SampleTree]
+combineShrunk s (l :| ls) (r :| rs) = shortcut $ concat [
+      [SampleTree s l' r  | l' <- unlessMinimal l ls]
+    , [SampleTree s l  r' | r' <- unlessMinimal r rs]
+    ]
+  where
+    -- We must be careful not to force @ls@/@rs@ if the tree is already minimal.
+    unlessMinimal :: SampleTree -> [a] -> [a]
+    unlessMinimal Minimal _  = []
+    unlessMinimal _       xs = xs
+
+    shortcut :: [SampleTree] -> [SampleTree]
+    shortcut [] = []
+    shortcut ts = Minimal : ts
 
 {-------------------------------------------------------------------------------
   Primitive generators
 -------------------------------------------------------------------------------}
-
--- | Primitive generator
---
--- This is an internal type, not part of the public API.
---
--- It is important that 'Prim' supports a 'Functor' instance. If a primitive
--- generator would always return something of type 'Word64', then we would need
--- rely on 'Bind' to implement 'Functor' for 'Gen', which would have unfortunate
--- consequences. For example, it would mean that a generator such as
---
--- > do x <- bool
--- >    if x then negate <$> prim else prim
---
--- would shrink in unexpected ways: @negate <$> prim@ and @prim@ would look at
--- different parts of the sample tree.
-data Prim a = P (SampleTree -> [SampleTree]) (SampleTree -> a)
-  deriving (Functor)
 
 -- | Uniform selection of 'Word64', shrinking towards 0, using binary search
 --
 -- This is a primitive generator; most users will probably not want to use this
 -- generator directly.
 prim :: Gen Word64
-prim = sampleValue <$> primWith (binarySearch . sampleValue)
+prim =
+    SampleTree.sampleValue <$>
+      primWith (binarySearch . SampleTree.sampleValue)
 
 -- | Generalization of 'prim' that allows to override the shrink behaviour
 --
 -- This is only required in rare circumstances. Most users will probably never
 -- need to use this generator.
 primWith :: (Sample -> [Word64]) -> Gen Sample
-primWith f = Prim $ P (SampleTree.shrinkNextWith f) SampleTree.next
+primWith f = Gen $ \(Inf s l r) -> (
+      s
+    , S s
+    , (\s' -> SampleTree (Shrunk s') l r) <$> f s
+    )
 
 -- | Capture the local sample tree
-captureLocalTree :: (SampleTree -> [SampleTree]) -> Gen SampleTree
-captureLocalTree f = Prim $ P f id
-
-{-------------------------------------------------------------------------------
-  Composition
--------------------------------------------------------------------------------}
-
-instance Functor Gen where
-  fmap g (Pure x)     = Pure (g x)
-  fmap g (Prim p)     = Prim (fmap g p)
-  fmap g (Bind x f)   = Bind x (fmap g . f)
-  fmap g (Select e f) = Select (fmap (second g) e) (fmap (g .) f)
-
-instance Applicative Gen where
-  pure   = Pure
-  (<*>)  = ap
-
-instance Selective Gen where
-  select = Select
-
-instance Monad Gen where
-  return = pure
-  (>>=)  = Bind
+--
+-- This generator does not shrink.
+--
+-- NOTE: This does not produce a valid 'Truncated' tree.
+captureLocalTree :: Gen SampleTree
+captureLocalTree = Gen $ \st -> (st, E, [])
 
 {-------------------------------------------------------------------------------
   Combinators
@@ -136,53 +145,8 @@ instance Monad Gen where
 -- This function is only occassionally necessary; most users will probably not
 -- need to use it.
 withoutShrinking :: Gen a -> Gen a
-withoutShrinking = go
+withoutShrinking (Gen g) = Gen $ aux . g
   where
-    go :: Gen a -> Gen a
-    go (Pure x)       = Pure x
-    go (Prim (P _ f)) = Prim (P (const []) f)
-    go (Bind x f)     = Bind (go x) (go . f)
-    go (Select e f)   = Select (go e) (go f)
-
-{-------------------------------------------------------------------------------
-  Running
--------------------------------------------------------------------------------}
-
-run :: Gen a -> SampleTree -> a
-run = flip go
-  where
-    go :: SampleTree -> Gen a -> a
-    go st = \case
-        Pure x       -> x
-        Prim (P _ f) -> f st
-        Bind x f     -> go (SampleTree.left st) x &
-                        go (SampleTree.right st) . f
-        Select e f   -> go (SampleTree.left st) e &
-                        either (go (SampleTree.right st) f) id
-
-{-------------------------------------------------------------------------------
-  Debugging
--------------------------------------------------------------------------------}
-
--- | Return a 'Truncated'' 'SampleTree' as part of the result of the generator
---
--- This can help to explain how the generator is behaving. Used for debugging
--- only.
-explainGen :: Gen a -> Gen (Truncated, a)
-explainGen = go
-  where
-    go :: Gen a -> Gen (Truncated, a)
-    go (Pure x)       = Pure (E, x)
-    go (Prim (P f g)) = Prim $ P f (\s -> (S (SampleTree.next s), g s))
-    go (Bind x f)     = Bind (go x) $ \(~(l, a)) -> first (B l) <$> go (f a)
-    go (Select e f)   = Select (auxE <$> go e) (auxF <$> go f)
-      where
-        auxE :: (Truncated, Either a b) -> Either (Truncated, a) (Truncated, b)
-        auxE (l, Left  a) = Left  (  l  , a)
-        auxE (l, Right b) = Right (B l E, b)
-
-        auxF :: (Truncated, a -> b) -> (Truncated, a) -> (Truncated, b)
-        auxF ~(r, g) ~(l, a) = (B l r, g a)
-
-
+    aux :: (a, Truncated, [SampleTree]) -> (a, Truncated, [SampleTree])
+    aux (outcome, truncated, _) = (outcome, truncated, [])
 

@@ -1,6 +1,5 @@
 module TestSuite.Sanity.Simple (tests) where
 
-import Data.List.NonEmpty (NonEmpty((:|)))
 import Data.Word
 import Test.Tasty
 import Test.Tasty.HUnit
@@ -22,13 +21,14 @@ tests = testGroup "TestSuite.Sanity.Simple" [
 test_bool :: Assertion
 test_bool = do
     assertEqual "run" (False, True) $
-      Gen.run gen SampleTree.minimal
+      run gen SampleTree.minimal
 
-    let expectedHistory = (True,False) :| [
-            (False,True)
+    let expectedHistory = [
+            (True,False)
+          , (False,True)
           ]
     assertEqual "shrink" expectedHistory $
-      Gen.shrink (const True) gen (tree maxBound maxBound)
+      shrink (const True) gen (tree maxBound maxBound)
   where
     gen :: Gen (Bool, Bool)
     gen = (,) <$> Gen.bool False <*> Gen.bool True
@@ -40,26 +40,27 @@ test_bool = do
 test_integral :: Assertion
 test_integral = do
     assertEqual "run minBound" (0, 6, 3) $
-      Gen.run gen $ tree minBound
+      run gen $ tree minBound
 
     -- @maxBound@ corresponds in the maximum /negative/ fraction.
     -- This corresponds to being as far /left/ of the origin as possible
     -- when the range is split; otherwise, it simply corresponds to being
     -- as far away as possible from the origin.
     assertEqual "run maxBound" (6, 0, 0) $
-      Gen.run gen $ tree maxBound
+      run gen $ tree maxBound
 
     -- @maxBound - 1@ corresponds in the maximum /positive/ fraction.
     -- This corresponds to being as far /right/ of the origin as possible if
     -- split; otherwise, the sign makes no difference.
     assertEqual "run maxBound-1" (6, 0, 6) $
-      Gen.run gen $ tree (maxBound - 1)
+      run gen $ tree (maxBound - 1)
 
     -- Note that we are shrinking to a perfect minimal counter-example here: the
     -- 6 and 3 are at their "minimal" value, and if we were to shrink that 1 any
     -- further, it would no longer be a counter-example.
-    let expectedHistory = (6,0,6) :| [
-            (3,0,6)
+    let expectedHistory = [
+            (6,0,6)
+          , (3,0,6)
           , (2,0,6)
           , (1,0,6)
           , (1,0,6)
@@ -67,7 +68,7 @@ test_integral = do
           , (1,6,3)
           ]
     assertEqual "shrink" expectedHistory $
-      Gen.shrink (not . prop) gen (tree (maxBound - 1))
+      shrink (not . prop) gen (tree (maxBound - 1))
   where
     gen :: Gen (Word, Word, Word)
     gen = (,,)

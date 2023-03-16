@@ -93,7 +93,6 @@ library
       Test.Falsify.Internal.Generator
       Test.Falsify.Internal.Generator.Definition
       Test.Falsify.Internal.Generator.Shrinking
-      Test.Falsify.Internal.Generator.ShrinkStep
       Test.Falsify.Internal.Generator.Truncated
       Test.Falsify.Internal.Property
       Test.Falsify.Internal.Search
@@ -101,7 +100,6 @@ library
       Test.Falsify.Reexported.Generator.Compound
       Test.Falsify.Reexported.Generator.Function
       Test.Falsify.Reexported.Generator.Simple
-      Test.Falsify.Reexported.Generator.Instances
   hs-source-dirs:
       src
   build-depends:
@@ -113,7 +111,6 @@ library
     , mtl
     , optparse-applicative
     , selective
-    , semigroupoids
     , splitmix
     , tagged
     , tasty

@@ -6,17 +6,14 @@
 -- Intended for unqualified import.
 module Test.Falsify.Internal.Generator (
     Gen -- opaque
+  , runGen
+  , shrinkFrom
     -- * Primitive generators
   , prim
   , primWith
   , captureLocalTree
     -- * Combinators
   , withoutShrinking
-    -- * Running
-  , run
-  , shrink
-  , shrinkWithShortcut
-  , shrinkExplain
   ) where
 
 import Test.Falsify.Internal.Generator.Definition
