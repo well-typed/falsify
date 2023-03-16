@@ -16,6 +16,8 @@ module Test.Falsify.Generator (
   , integerWithPrecision
   , integerFromFraction
     -- * Compound generators
+    -- ** Taking advantage of 'Selective'
+  , choose
     -- ** Lists
   , list
   , elem
@@ -53,8 +55,6 @@ module Test.Falsify.Generator (
   , run
   , shrink
   , shrinkWithShortcut
-    -- * Re-exports
-  , Alt(..)
   ) where
 
 import Prelude hiding (either, elem)
@@ -63,5 +63,4 @@ import Test.Falsify.Generator.Auxiliary
 import Test.Falsify.Internal.Generator
 import Test.Falsify.Reexported.Generator.Compound
 import Test.Falsify.Reexported.Generator.Function
-import Test.Falsify.Reexported.Generator.Instances
 import Test.Falsify.Reexported.Generator.Simple
