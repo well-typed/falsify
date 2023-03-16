@@ -245,7 +245,8 @@ shrinkWith f gen = do
     -- through the shrink tree.
     --
     -- Of course, it can still happen that the generator gets reapplied in a
-    -- different context; we must take this case into account in 'shrinkTo'.
+    -- different context; we must take this case into account in
+    -- 'shrinkToOneOf'.
     x <- withoutShrinking gen
     fromShrinkTree $ Rose.unfoldTree (\x' -> (x', f x')) x
 

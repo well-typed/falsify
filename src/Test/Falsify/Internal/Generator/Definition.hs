@@ -132,7 +132,7 @@ captureLocalTree :: Gen SampleTree
 captureLocalTree = Gen $ \st -> (st, E, [])
 
 {-------------------------------------------------------------------------------
-  Combinators
+  Shrinking combinators
 -------------------------------------------------------------------------------}
 
 -- | Disable shrinking in the given generator
@@ -149,4 +149,3 @@ withoutShrinking (Gen g) = Gen $ aux . g
   where
     aux :: (a, Truncated, [SampleTree]) -> (a, Truncated, [SampleTree])
     aux (outcome, truncated, _) = (outcome, truncated, [])
-
