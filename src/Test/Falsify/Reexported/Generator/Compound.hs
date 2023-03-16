@@ -47,7 +47,7 @@ import qualified Test.Falsify.Range  as Range
 --
 -- Shrinks towards the first generator.
 --
--- In the remainder of this docstring we give some background to this instance,
+-- In the remainder of this docstring we give some background to this function,
 -- which may be useful for general understanding of the @falsify@ library.
 --
 -- The implementation takes advantage of the that 'Gen' is a selective functor

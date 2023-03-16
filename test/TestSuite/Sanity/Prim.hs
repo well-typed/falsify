@@ -1,7 +1,6 @@
 module TestSuite.Sanity.Prim (tests) where
 
 import Control.Monad
-import Data.List.NonEmpty (NonEmpty((:|)))
 import Data.Maybe
 import Data.Word
 import Test.Tasty
@@ -31,25 +30,27 @@ tests = testGroup "TestSuite.Sanity.Prim" [
 test_pair_word_word :: Assertion
 test_pair_word_word = do
     assertEqual "run-3-2" (3, 2) $
-      Gen.run gen $ tree 3 2
+      run gen $ tree 3 2
     assertEqual "run-2-3" (2, 3) $
-      Gen.run gen $ tree 2 3
+      run gen $ tree 2 3
 
-    let expectedkHistory32 = (3, 2) :| [
-            (2, 2)
+    let expectedkHistory32 = [
+            (3, 2)
+          , (2, 2)
           , (2, 0)
           , (1, 0)
           ]
     assertEqual "shrink-3-2" expectedkHistory32 $
-      Gen.shrink (not . prop1) gen (tree 3 2)
+      shrink (not . prop1) gen (tree 3 2)
 
-    let expectedHistory23 = (2, 3) :| [
-            (1, 3)
+    let expectedHistory23 = [
+            (2, 3)
+          , (1, 3)
           , (1, 2)
           , (1, 1)
           ]
     assertEqual "shrink-2-3" expectedHistory23 $
-      Gen.shrink (not . prop2) gen (tree 2 3)
+      shrink (not . prop2) gen (tree 2 3)
   where
     gen :: Gen (Word64, Word64)
     gen = (,) <$> Gen.prim <*> Gen.prim
@@ -68,11 +69,11 @@ test_pair_word_word = do
 test_list_allEqual :: Assertion
 test_list_allEqual = do
     assertEqual "run" [1, 1, 2] $
-      Gen.run gen $ tree 1 1 2
+      run gen $ tree 1 1 2
 
-    let expectedHistory = [1,1,2] :| [[0,1,2],[0,1]]
+    let expectedHistory = [[1,1,2],[0,1,2],[0,1]]
     assertEqual "shrink" expectedHistory $
-      Gen.shrink (not . prop) gen (tree 1 1 2)
+      shrink (not . prop) gen (tree 1 1 2)
   where
     -- Tree that produces gen of three elements in the specified order
     tree :: Word64 -> Word64 -> Word64 -> SampleTree
@@ -99,9 +100,9 @@ test_list_sorted = do
     -- structure of the generator does not change, we don't re-interpret samples
     -- in a different context. We get HDD for free.
     -- (This generator can easily be combined with picking a list length first.)
-    let expectedHistory = [1,3,2] :| [[3,2],[3,0],[2,0],[1,0]]
+    let expectedHistory = [[1,3,2],[3,2],[3,0],[2,0],[1,0]]
     assertEqual "not . prop" expectedHistory $
-      Gen.shrink (not . prop) (gen 3) (tree 1 3 2)
+      shrink (not . prop) (gen 3) (tree 1 3 2)
   where
     -- Tree that produces list of three elements in the specified order
     tree :: Word64 -> Word64 -> Word64 -> SampleTree
@@ -126,12 +127,12 @@ test_maybe_towardsNothing :: Assertion
 test_maybe_towardsNothing = do
     -- When we start with the minimal tree, we get 'Nothing'
     let minimalTree = expandTruncated E
-        (nothingTree, nothingResult) = (
-            B (S (Shrunk 0)) (S (Shrunk 0))
-          , (Nothing, 0)
+        (nothingResult, nothingTree) = (
+            (Nothing, 0)
+          , B (S (Shrunk 0)) (S (Shrunk 0))
           )
-    assertEqual "run Nothing" (nothingTree, nothingResult) $
-      Gen.run (explainGen gen) minimalTree
+    assertEqual "run Nothing" (nothingResult, nothingTree) $
+      run' gen minimalTree
 
     -- To find out the shape of the tree required by the generator to produce
     -- 'Just', we need to replace the first @0@ by a @1@:
@@ -140,12 +141,12 @@ test_maybe_towardsNothing = do
               pick ss = error $ "pick: unexpected " ++ show ss
           in expandTruncated' (pick . Set.toList)  . toTruncated' $
                replaceValues [NotShrunk 1] nothingTree
-        (justTree, justResult) = (
-            B (S (NotShrunk 1)) (B (S (Shrunk 0)) (B (S (Shrunk 0)) E))
-          , (Just 0, 0)
+        (justResult, justTree) = (
+            (Just 0, 0)
+          , B (S (NotShrunk 1)) (B (S (Shrunk 0)) (B (S (Shrunk 0)) E))
           )
-    assertEqual "run Just" (justTree, justResult) $
-      Gen.run (explainGen gen) modifiedTree
+    assertEqual "run Just" (justResult, justTree) $
+      run' gen modifiedTree
 
     -- When we merge these two trees, we realize that the generators look
     -- at different parts of the sample tree (other than that first value)
@@ -164,12 +165,13 @@ test_maybe_towardsNothing = do
               pick [NotShrunk 1, Shrunk 0] = NotShrunk 1
               pick ss = error $ "pick: unexpected " ++ show ss
           in expandTruncated' (pick . Set.toList) $ mergedTree 5 1 3
-        expectedHistoryNotProp = (Just 1, 3) :| [
-            (Nothing, 5)
+        expectedHistoryNotProp = [
+            (Just 1, 3)
+          , (Nothing, 5)
           , (Nothing, 3)
           ]
     assertEqual "not . prop" expectedHistoryNotProp $
-      Gen.shrink (not . prop) gen tree
+      shrink (not . prop) gen tree
   where
     gen :: Gen (Maybe Word64, Word64)
     gen = do
@@ -186,9 +188,9 @@ test_maybe_towardsJust = do
     -- Unlike hypothesis, we are always dealing with infinite sample tree; if a
     -- "simpler" test case needs more samples, then they are available.
     -- (Note how we are shrinking from Nothing to Just in this example).
-    let expectedHistory = (Nothing,7) :| [(Just 6,2),(Just 0,2),(Just 0,1)]
+    let expectedHistory = [(Nothing,7),(Just 6,2),(Just 0,2),(Just 0,1)]
     assertEqual "const True" expectedHistory $
-      Gen.shrink (not . prop) gen (SampleTree.mod 10 $ SampleTree.fromSeed 0)
+      shrink (not . prop) gen (SampleTree.mod 10 $ SampleTree.fromSeed 0)
   where
     gen :: Gen (Maybe Word64, Word64)
     gen = do
@@ -204,23 +206,25 @@ test_either :: Assertion
 test_either = do
     -- Like Hypothesis, when the structure of the generator changes, we might
     -- reinterpret parts of the sample tree in a different context.
-    let expectedHistory1 = Right 4 :| [
-            Right 2
+    let expectedHistory1 = [
+            Right 4
+          , Right 2
           , Left  2  -- we are reusing the shrunk 2 as the 'Left' argument
           , Left  1
           ]
     assertEqual "gen1" expectedHistory1 $
-      Gen.shrink (not . prop) gen1 (tree1 4)
+      shrink (not . prop) gen1 (tree1 4)
 
     -- We can avoid this however by always generating both branches.
-    let expectedHistory2 = Right 4 :| [
+    let expectedHistory2 = [
             Right 4
+          , Right 4
           , Right 2
             -- Shrinking to Left at this point would result in Left 4,
             -- which is not a counter-example.
           ]
     assertEqual "gen2" expectedHistory2 $
-      Gen.shrink (not . prop) gen2 (tree2 4)
+      shrink (not . prop) gen2 (tree2 4)
   where
     gen1 :: Gen (Either Word64 Word64)
     gen1 = do
@@ -250,10 +254,11 @@ test_either = do
 test_stream :: Assertion
 test_stream = do
     assertEqual "run" [3,7,5,1,3,2,1] $
-      uncurry prefix $ Gen.run gen $ SampleTree.mod 10 (SampleTree.fromSeed 1)
+      uncurry prefix $ run gen $ SampleTree.mod 10 (SampleTree.fromSeed 1)
 
-    let expectedHistory = [3,7,5,1,3,2,1] :| [
-            [2,7,5,1,3,2,1]
+    let expectedHistory = [
+            [3,7,5,1,3,2,1]
+          , [2,7,5,1,3,2,1]
           , [1,7,5,1,3,2,1]
           , [1,4,5,1,3,2,1]
           , [1,2,5,1,3,2,1]
@@ -264,7 +269,7 @@ test_stream = do
           ]
     assertEqual "shrink" expectedHistory $
       fmap (uncurry prefix) $
-        Gen.shrink (not . prop) gen (SampleTree.mod 10 $ SampleTree.fromSeed 1)
+        shrink (not . prop) gen (SampleTree.mod 10 $ SampleTree.fromSeed 1)
   where
     gen :: Gen (Stream Word64, Word64)
     gen = (,) <$> genStream <*> Gen.prim

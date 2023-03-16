@@ -7,6 +7,7 @@
 module Test.Falsify.Generator (
     -- * Definition
     Gen -- opaque
+  , runGen
     -- * Simple (non-compound) generators
   , bool
   , integral
@@ -51,10 +52,6 @@ module Test.Falsify.Generator (
   , captureLocalTree
     -- * Combinators
   , withoutShrinking
-    -- * Execution
-  , run
-  , shrink
-  , shrinkWithShortcut
   ) where
 
 import Prelude hiding (either, elem)

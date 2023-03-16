@@ -1,5 +1,6 @@
 module Demo.TestOptions (tests) where
 
+import Control.Monad
 import Data.Default
 import Test.Tasty
 import Test.Tasty.Falsify
@@ -31,6 +32,17 @@ tests = testGroup "Demo.Simple" [
                                 , expectFailure   = ExpectFailure })
             "verboseExpectFailure" prop_even
        ]
+    , testGroup "Discard" [
+          testPropertyWith def
+            "def"                  prop_even_discard
+        , testPropertyWith (def { overrideVerbose = Just Verbose  })
+            "verbose"              prop_even_discard
+        , testPropertyWith (def { expectFailure   = ExpectFailure })
+            "expectFailure"        prop_even_discard
+        , testPropertyWith (def { overrideVerbose = Just Verbose
+                                , expectFailure   = ExpectFailure })
+            "verboseExpectFailure" prop_even_discard
+       ]
     ]
 
 -- | Valid property (property that holds)
@@ -47,5 +59,12 @@ prop_inRange = do
 prop_even :: Property ()
 prop_even = do
     x :: Word <- gen $ Gen.integral $ Range.num (0, 100) 0
+    assert ("not even: " ++ show x) $ even x
+
+-- | Like 'prop_even', but discarding tests that fail.
+prop_even_discard :: Property ()
+prop_even_discard = do
+    x :: Word <- gen $ Gen.integral $ Range.num (0, 100) 0
+    guard $ even x
     assert ("not even: " ++ show x) $ even x
 

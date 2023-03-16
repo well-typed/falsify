@@ -6,6 +6,7 @@
 module Test.Falsify.Internal.Property (
     -- * Property
     Property -- opaque
+  , Aborted(..)
   , runProperty
     -- * State
   , TestRun(..)
@@ -18,6 +19,7 @@ module Test.Falsify.Internal.Property (
   , info
   , assert
   , assertBool
+  , discard
     -- * Test shrinking
   , testShrinking
   ) where
@@ -36,6 +38,7 @@ import Control.Monad.Fail (MonadFail(..))
 import Test.Falsify.Generator (Gen)
 
 import qualified Test.Falsify.Generator as Gen
+import Control.Applicative
 
 {-------------------------------------------------------------------------------
   Definition
@@ -46,23 +49,54 @@ import qualified Test.Falsify.Generator as Gen
 -- A 'Property' is a generator that can fail and keeps a track of some
 -- information about the test run.
 newtype Property a = Property {
-    unwrapProperty :: ExceptT String (StateT TestRun Gen) a
+    unwrapProperty :: ExceptT Aborted (StateT TestRun Gen) a
   }
-  deriving newtype (Functor, Applicative, Monad, MonadError String)
+  deriving newtype (Functor, Applicative, Monad)
+
+-- | Reason a test was aborted
+data Aborted =
+    TestFailed String
+  | Discarded
 
 instance MonadFail Property where
   fail = throwError
+
+instance MonadError String Property where
+  throwError = Property . throwError . TestFailed
+
+  catchError :: forall a. Property a -> (String -> Property a) -> Property a
+  prop `catchError` handler = Property $
+      unwrapProperty prop `catchError` handler'
+    where
+      handler' :: Aborted -> ExceptT Aborted (StateT TestRun Gen) a
+      handler' Discarded      = throwError Discarded
+      handler' (TestFailed e) = unwrapProperty $ handler e
+
+-- | The 'Alternative' instance uses 'discard' for 'empty'.
+--
+-- This means that @<|>@ provides an alternative for /discarded/ tests, not
+-- for /failed/ tests.
+instance Alternative Property where
+  empty = discard
+
+  (<|>) :: forall a. Property a -> Property a -> Property a
+  prop <|> handler = Property $
+      unwrapProperty prop `catchError` handler'
+    where
+      handler' :: Aborted -> ExceptT Aborted (StateT TestRun Gen) a
+      handler' Discarded      = unwrapProperty handler
+      handler' (TestFailed e) = throwError (TestFailed e)
 
 -- | Construct property
 --
 -- This is a low-level function for internal use only.
 mkProperty ::
-     (TestRun -> Gen (Either String a, TestRun))
+     (TestRun -> Gen (Either Aborted a, TestRun))
   -> Property a
 mkProperty = Property . ExceptT . StateT
 
 -- | Run property
-runProperty :: Property a -> Gen (Either String a, TestRun)
+runProperty :: Property a -> Gen (Either Aborted a, TestRun)
 runProperty = flip runStateT initTestRun . runExceptT . unwrapProperty
 
 {-------------------------------------------------------------------------------
@@ -123,7 +157,7 @@ genWithCallStack :: forall a.
   -> Gen a -> Property a
 genWithCallStack stack f g = mkProperty $ \run -> aux run <$> g
   where
-    aux :: TestRun -> a -> (Either String a, TestRun)
+    aux :: TestRun -> a -> (Either Aborted a, TestRun)
     aux run@TestRun{runLog = Log log} x = (
           Right x
         , run{ runLog = Log $ case f x of
@@ -158,6 +192,10 @@ assert e False = throwError e
 assertBool :: Bool -> Property ()
 assertBool = assert "Failed"
 
+-- | Discard this test
+discard :: Property a
+discard = Property $ throwError Discarded
+
 {-------------------------------------------------------------------------------
   Test shrinking
 -------------------------------------------------------------------------------}
@@ -180,7 +218,7 @@ testShrinking p prop = do
     xs <- genWith (const Nothing) $ Gen.path st
     case findCounterExample (toList xs) of
       Left e ->
-        throwError e
+        Property $ throwError e
       Right Nothing ->
         return ()
       Right (Just ((x, xLog), (y, yLog))) -> do
@@ -191,8 +229,8 @@ testShrinking p prop = do
         throwError $ "Invalid shrink: " ++ show x ++ " ~> " ++ show y
   where
     findCounterExample ::
-         [(Either String a, TestRun)]
-      -> Either String (Maybe ((a, Log), (a, Log)))
+         [(Either Aborted a, TestRun)]
+      -> Either Aborted (Maybe ((a, Log), (a, Log)))
     findCounterExample = \case
         []                                         -> Right Nothing
         [_]                                        -> Right Nothing

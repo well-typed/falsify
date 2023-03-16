@@ -4,9 +4,9 @@ import Test.Tasty
 import Test.Tasty.HUnit
 import Data.Word
 
-import qualified Data.List.NonEmpty as NE
-import qualified Data.Set           as Set
+import qualified Data.Set as Set
 
+import Test.Falsify.Debugging
 import Test.Falsify.Generator (Gen, Fun, pattern Fn)
 
 import qualified Test.Falsify.Generator  as Gen
@@ -38,7 +38,7 @@ tests = testGroup "TestSuite.Sanity.Function" [
 test_BoolToBool_notConstant :: Assertion
 test_BoolToBool_notConstant = do
     assertEqual "" expected $
-      show . NE.last $ Gen.shrink (not . prop) gen (SampleTree.fromSeed 0)
+      show . last $ shrink (not . prop) gen (SampleTree.fromSeed 0)
   where
     expected :: String
     expected = "{_->False}"
@@ -53,7 +53,7 @@ test_BoolToBool_notConstant = do
 test_BoolToBool_constant :: Assertion
 test_BoolToBool_constant = do
     assertEqual "" expected $
-      show . NE.last $ Gen.shrink (not . prop) gen (SampleTree.fromSeed 1)
+      show . last $ shrink (not . prop) gen (SampleTree.fromSeed 1)
   where
     expected :: String
     expected = "{True->True, _->False}"
@@ -72,7 +72,7 @@ test_BoolToBool_constant = do
 test_Word8ToBool_constant :: Assertion
 test_Word8ToBool_constant = do
     assertEqual "" expected $
-      show . NE.last $ Gen.shrink (not . prop) gen (SampleTree.fromSeed 0)
+      show . last $ shrink (not . prop) gen (SampleTree.fromSeed 0)
   where
     expected :: String
     expected = "{127->True, _->False}"
@@ -95,7 +95,7 @@ test_Word8ToBool_constant = do
 test_IntegerToBool_constant :: Assertion
 test_IntegerToBool_constant = do
     assertEqual "" expected $
-      show . NE.last $ Gen.shrink (not . prop) gen (SampleTree.fromSeed 0)
+      show . last $ shrink (not . prop) gen (SampleTree.fromSeed 0)
   where
     expected :: String
     expected = "{1618->True, _->False}"
@@ -114,7 +114,7 @@ test_IntegerToBool_constant = do
 test_IntToInt_mapFilter :: Assertion
 test_IntToInt_mapFilter = do
     assertEqual "" expected $
-      show . NE.last $ Gen.shrink (not . prop) gen (SampleTree.fromSeed 1)
+      show . last $ shrink (not . prop) gen (SampleTree.fromSeed 1)
   where
     expected :: String
     expected = "({_->0},{99->True, _->False},[99])"
@@ -145,7 +145,7 @@ test_IntToInt_mapFilter = do
 test_StringToBool :: Assertion
 test_StringToBool = do
     assertEqual "" expected $
-      show . NE.last $ Gen.shrink (not . prop) gen (SampleTree.fromSeed 9)
+      show . last $ shrink (not . prop) gen (SampleTree.fromSeed 9)
   where
     expected :: String
     expected = "{\"Standard ML\"->True, _->False}"

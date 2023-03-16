@@ -93,7 +93,6 @@ library
       Test.Falsify.Internal.Generator
       Test.Falsify.Internal.Generator.Definition
       Test.Falsify.Internal.Generator.Shrinking
-      Test.Falsify.Internal.Generator.ShrinkStep
       Test.Falsify.Internal.Generator.Truncated
       Test.Falsify.Internal.Property
       Test.Falsify.Internal.Search
