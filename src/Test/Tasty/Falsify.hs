@@ -22,6 +22,7 @@ module Test.Tasty.Falsify (
     -- *** Additional 'Property' features
   , assert
   , assertBool
+  , assertEqual
   , info
     -- *** Testing shrinking
   , testShrinking

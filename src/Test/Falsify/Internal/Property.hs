@@ -19,6 +19,7 @@ module Test.Falsify.Internal.Property (
   , info
   , assert
   , assertBool
+  , assertEqual
   , discard
     -- * Test shrinking
   , testShrinking
@@ -191,6 +192,19 @@ assert e False = throwError e
 -- | Like 'assert', but with a standard message.
 assertBool :: Bool -> Property ()
 assertBool = assert "Failed"
+
+-- | Assert that two values are equal
+assertEqual ::
+     (Eq a, Show a)
+  => a  -- ^ Expected value
+  -> a  -- ^ Actual value
+  -> Property ()
+assertEqual x y
+  | x == y    = return ()
+  | otherwise = throwError $ unlines [
+        "expected: " ++ show x
+      , "but got:  " ++ show y
+      ]
 
 -- | Discard this test
 discard :: Property a

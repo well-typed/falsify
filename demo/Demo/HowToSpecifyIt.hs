@@ -36,6 +36,9 @@ tests = testGroup "Demo.HowToSpecifyIt" [
         , testGroup "TestYourTests" [
               testProperty "valid_gen" prop_valid_gen
             ]
+        , testGroup "Postconditions" [
+              testProperty "insert_post" prop_insert_post
+            ]
         ]
     ]
 
@@ -64,13 +67,13 @@ prop_reverse_id = forAllLists $ \xs -> do
 data BST k v = Leaf | Branch (BST k v) k v (BST k v)
   deriving (Eq, Show, Generic)
 
-_find :: forall k v. Ord k => k -> BST k v -> Maybe v
-_find k' = go
+find :: forall k v. Ord k => k -> BST k v -> Maybe v
+find k' = go
   where
     go :: BST k v -> Maybe v
     go (Branch l k v r)
       | k == k'   = Just v
-      | k <  k'   = go l
+      | k' < k    = go l
       | otherwise = go r
     go Leaf       = Nothing
 
@@ -207,3 +210,36 @@ prop_valid_union = forAllBST $ \t -> forAllBST $ \t' ->
 prop_valid_gen :: Property ()
 prop_valid_gen = forAllBST $ \t ->
     assert (show t) $ valid t
+
+-- observation: marking values in the sample tree as shrunk or unshrunk
+-- reintroduces the possibility of having generators that produce valid values
+-- but shrink to invalid ones; without that, every shrunk value also corresponds
+-- to a value that _could_ have been produced by a generator.
+-- (testing that shrinking actually /shrinks/ is different, and should be
+-- tested even with just baseline "hypothesis style" testing)
+
+-- observation: shrinking "invalid shrink steps" is tricky, because they
+-- typically happen at specific boundaries, so it's entirely plausible that
+-- a valid shrunk step is not one binary search step away from the counter
+-- example that was found.
+
+-- observation: "The problem here is that, even though QuickCheck initially
+-- found a valid tree with an invalid shrink, it shrunk the test case before
+-- reporting it using the invalid shrink function, resulting in an invalid tree
+-- with invalid shrinks." (from "How to specify it"). This cannot happen with
+-- our approach to shrinking: we generate _pairs_ of a value and its shrunk
+-- value, and they can be shrunk /together/.
+
+-- Section 4.2 Postconditions
+
+prop_insert_post :: Property ()
+prop_insert_post = forAllBST $ \t -> do
+    k  <- gen genKey
+    k' <- gen genKey
+    v  <- gen genValue
+    let t'       = insert k v t
+        expected = if k == k'
+                     then Just v
+                     else find k' t
+    info $ "t': " ++ show t'
+    assertEqual expected $ find k' t'

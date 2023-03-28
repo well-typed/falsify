@@ -375,7 +375,7 @@ testResult verbose expectFailure (initSeed, successes, TotalDiscarded discarded,
         ]
 
     showSeed :: ReplaySeed -> String
-    showSeed seed = "Replay-seed: " ++ show seed
+    showSeed seed = "Use --falsify-replay=" ++ show seed ++ " to replay."
 
 renderSuccess :: (Int, Success) -> String
 renderSuccess (ix, Success{successRun}) =
