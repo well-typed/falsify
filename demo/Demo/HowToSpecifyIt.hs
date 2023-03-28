@@ -5,6 +5,7 @@ module Demo.HowToSpecifyIt (tests) where
 import Control.Applicative
 import Control.Monad.State
 import Data.Default
+import Data.Function
 import Data.List (sort)
 import Data.Vector (Vector, (!))
 import GHC.Generics (Generic)
@@ -45,6 +46,12 @@ tests = testGroup "Demo.HowToSpecifyIt" [
             , testProperty "find_absent"  prop_post_find_absent
             ]
         , testProperty "complete_insert_delete" prop_complete_insert_delete
+        , testGroup "Metamorphic" [
+              testProperty "insert_insert"      prop_insert_insert
+            , testProperty "insert_insert_weak" prop_insert_insert_weak
+            , testProperty "insert_delete"      prop_insert_delete
+            , testProperty "insert_union"       prop_insert_union
+            ]
         ]
     ]
 
@@ -72,6 +79,9 @@ prop_reverse_id = forAllLists $ \xs -> do
 
 data BST k v = Leaf | Branch (BST k v) k v (BST k v)
   deriving (Eq, Show, Generic)
+
+equivBST :: (Eq k, Eq v) => BST k v -> BST k v -> Bool
+equivBST = (==) `on` toList
 
 showBST :: forall k v. (Show k, Show v) => BST k v -> String
 showBST = ("\n" ++) . Rose.drawTree . toRoseTree
@@ -290,3 +300,51 @@ prop_complete_insert_delete = forAllBST $ \t -> do
     case find k t of
       Nothing -> expect t $ delete k   t
       Just v  -> expect t $ insert k v t
+
+
+-- Section 4.3 Metamorphic properties
+--
+-- TODO: There are more metamorphic properties listed in the paper (Appendix A)
+
+prop_insert_insert :: Property ()
+prop_insert_insert = forAllBST $ \t -> do
+    k  <- gen genKey
+    k' <- gen genKey
+    v  <- gen genValue
+    v' <- gen genValue
+    assertRelatedBy ((==) `on` toList)
+      (                insert k  v  $ insert k' v' $ t)
+      (if k /= k' then insert k' v' $ insert k  v  $ t
+                  else insert k  v  $                t)
+
+prop_insert_insert_weak :: Property ()
+prop_insert_insert_weak = forAllBST $ \t -> do
+    k  <- gen genKey
+    k' <- gen genKey
+    guard $ k /= k'
+    v  <- gen genValue
+    v' <- gen genValue
+    assertRelatedBy equivBST
+      (insert k  v  $ insert k' v' $ t)
+      (insert k' v' $ insert k  v  $ t)
+
+prop_insert_delete :: Property ()
+prop_insert_delete = forAllBST $ \t -> do
+    k  <- gen genKey
+    k' <- gen genKey
+    v  <- gen genValue
+    assertRelatedBy equivBST
+      (                insert k  v $ delete k'  $ t)
+      (if k /= k' then delete k'   $ insert k v $ t
+                  else insert k  v                t)
+
+prop_insert_union :: Property ()
+prop_insert_union = forAllBST $ \t -> forAllBST $ \t' -> do
+    k <- gen genKey
+    v <- gen genValue
+    assertRelatedBy equivBST
+      (insert k v $ union t t')
+      (union (insert k v t) t')
+
+-- TODO: We should have the "bad" example from the QC slides in the paper
+-- (and in this demo)

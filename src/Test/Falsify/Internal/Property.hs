@@ -20,6 +20,8 @@ module Test.Falsify.Internal.Property (
   , assert
   , assertBool
   , expect
+  , assertEqual
+  , assertRelatedBy
   , discard
     -- * Test shrinking
   , testShrinking
@@ -194,6 +196,8 @@ assertBool :: Bool -> Property ()
 assertBool = assert "Failed"
 
 -- | Assert that two values are equal
+--
+-- See also 'assertEqual'.
 expect ::
      (Eq a, Show a)
   => a  -- ^ Expected value
@@ -204,6 +208,20 @@ expect x y
   | otherwise = throwError $ unlines [
         "expected: " ++ show x
       , "but got:  " ++ show y
+      ]
+
+-- | Like 'expect', but without a particular towards an \"expected\" value
+assertEqual :: (Eq a, Show a) => a -> a  -> Property ()
+assertEqual = assertRelatedBy (==)
+
+-- | Generalization of 'assertEqual' to arbitrary binary relation
+assertRelatedBy :: Show a => (a -> a -> Bool) -> a -> a -> Property ()
+assertRelatedBy p x y
+  | p x y     = return ()
+  | otherwise = throwError $ unlines [
+        "Not related"
+      , "  lhs: " ++ show x
+      , "  rhs: " ++ show y
       ]
 
 -- | Discard this test

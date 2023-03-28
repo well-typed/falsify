@@ -12,6 +12,8 @@ module Test.Falsify.Property (
   , assert
   , assertBool
   , expect
+  , assertEqual
+  , assertRelatedBy
   , info
   , discard
     -- * Test shrinking
