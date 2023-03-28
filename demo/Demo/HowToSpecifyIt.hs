@@ -39,9 +39,12 @@ tests = testGroup "Demo.HowToSpecifyIt" [
               testProperty "valid_gen" prop_valid_gen
             ]
         , testGroup "Postconditions" [
-              testProperty "insert" prop_post_insert
-            , testProperty "union"  prop_post_union
+              testProperty "insert"       prop_post_insert
+            , testProperty "union"        prop_post_union
+            , testProperty "find_present" prop_post_find_present
+            , testProperty "find_absent"  prop_post_find_absent
             ]
+        , testProperty "complete_insert_delete" prop_complete_insert_delete
         ]
     ]
 
@@ -267,3 +270,23 @@ prop_post_union = forAllBST $ \t -> forAllBST $ \t' -> do
     info $ "merged: " ++ show (merge (toList t) (toList t'))
     info $ "t'': " ++ showBST t''
     assertEqual expected $ find k t''
+
+prop_post_find_present :: Property ()
+prop_post_find_present = forAllBST $ \t -> do
+    k <- gen genKey
+    v <- gen genValue
+    assertEqual (Just v) $
+      find k (insert k v t)
+
+prop_post_find_absent :: Property ()
+prop_post_find_absent = forAllBST $ \t -> do
+    k <- gen genKey
+    assertEqual Nothing $
+      find k (delete k t)
+
+prop_complete_insert_delete :: Property ()
+prop_complete_insert_delete = forAllBST $ \t -> do
+    k <- gen genKey
+    case find k t of
+      Nothing -> assertEqual t $ delete k   t
+      Just v  -> assertEqual t $ insert k v t
