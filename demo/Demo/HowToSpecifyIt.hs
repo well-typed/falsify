@@ -258,7 +258,7 @@ prop_post_insert = forAllBST $ \t -> do
                      then Just v
                      else find k' t
     info $ "t': " ++ show t'
-    assertEqual expected $ find k' t'
+    expect expected $ find k' t'
 
 prop_post_union :: Property ()
 prop_post_union = forAllBST $ \t -> forAllBST $ \t' -> do
@@ -269,24 +269,24 @@ prop_post_union = forAllBST $ \t -> forAllBST $ \t' -> do
     info $ "toList t': " ++ show (toList t')
     info $ "merged: " ++ show (merge (toList t) (toList t'))
     info $ "t'': " ++ showBST t''
-    assertEqual expected $ find k t''
+    expect expected $ find k t''
 
 prop_post_find_present :: Property ()
 prop_post_find_present = forAllBST $ \t -> do
     k <- gen genKey
     v <- gen genValue
-    assertEqual (Just v) $
+    expect (Just v) $
       find k (insert k v t)
 
 prop_post_find_absent :: Property ()
 prop_post_find_absent = forAllBST $ \t -> do
     k <- gen genKey
-    assertEqual Nothing $
+    expect Nothing $
       find k (delete k t)
 
 prop_complete_insert_delete :: Property ()
 prop_complete_insert_delete = forAllBST $ \t -> do
     k <- gen genKey
     case find k t of
-      Nothing -> assertEqual t $ delete k   t
-      Just v  -> assertEqual t $ insert k v t
+      Nothing -> expect t $ delete k   t
+      Just v  -> expect t $ insert k v t

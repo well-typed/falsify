@@ -12,20 +12,9 @@ module Test.Tasty.Falsify (
   , ExpectFailure(..)
   , testPropertyWith
     -- * Re-exports
+  , module Test.Falsify.Property
     -- ** Generators
   , Gen
-    -- ** Properties
-  , Property -- opaque
-    -- *** Running generators
-  , gen
-  , genWith
-    -- *** Additional 'Property' features
-  , assert
-  , assertBool
-  , assertEqual
-  , info
-    -- *** Testing shrinking
-  , testShrinking
     -- ** Functions
   , pattern Gen.Fn
   , pattern Gen.Fn2
