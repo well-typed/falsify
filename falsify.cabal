@@ -157,6 +157,7 @@ executable demo
       Demo.TestOptions
       Demo.TestShrinking
   build-depends:
+    , containers
     , data-default
     , falsify
     , mtl

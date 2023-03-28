@@ -391,7 +391,7 @@ renderLogEntry :: LogEntry -> String
 renderLogEntry = \case
     Generated stack x -> concat [
         "generated "
-      , show x
+      , x
       , " at "
       , prettyCallStack stack
       ]

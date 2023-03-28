@@ -2,6 +2,7 @@
 -- Functions", John Hughes, 2020, LNCS 12053.
 module Demo.HowToSpecifyIt (tests) where
 
+import Control.Applicative
 import Control.Monad.State
 import Data.Default
 import Data.List (sort)
@@ -10,6 +11,7 @@ import GHC.Generics (Generic)
 import Test.Tasty
 import Test.Tasty.Falsify
 
+import qualified Data.Tree   as Rose
 import qualified Data.Vector as V
 
 import Data.Falsify.Tree (Tree)
@@ -37,7 +39,8 @@ tests = testGroup "Demo.HowToSpecifyIt" [
               testProperty "valid_gen" prop_valid_gen
             ]
         , testGroup "Postconditions" [
-              testProperty "insert_post" prop_insert_post
+              testProperty "insert" prop_post_insert
+            , testProperty "union"  prop_post_union
             ]
         ]
     ]
@@ -66,6 +69,16 @@ prop_reverse_id = forAllLists $ \xs -> do
 
 data BST k v = Leaf | Branch (BST k v) k v (BST k v)
   deriving (Eq, Show, Generic)
+
+showBST :: forall k v. (Show k, Show v) => BST k v -> String
+showBST = ("\n" ++) . Rose.drawTree . toRoseTree
+  where
+    toRoseTree :: BST k v -> Rose.Tree String
+    toRoseTree Leaf             = Rose.Node "*" []
+    toRoseTree (Branch l k v r) = Rose.Node (show (k, v)) [
+          toRoseTree l
+        , toRoseTree r
+        ]
 
 find :: forall k v. Ord k => k -> BST k v -> Maybe v
 find k' = go
@@ -102,14 +115,14 @@ delete k' = go
 
 union :: forall k v. Ord k => BST k v -> BST k v -> BST k v
 union = \l r -> fromAscList $ merge (toList l) (toList r)
-  where
-    merge :: [(k, v)] -> [(k, v)] -> [(k, v)]
-    merge ((k1, v1):xs) ((k2, v2):ys)
-      | k1 == k2   = (k1, v1) : merge           xs            ys -- left biased
-      | k1 <  k2   = (k1, v1) : merge           xs  ((k2, v2):ys)
-      | otherwise  = (k2, v2) : merge ((k1, v2):xs)           ys
-    merge xs []    = xs
-    merge [] ys    = ys
+
+merge :: Ord k => [(k, v)] -> [(k, v)] -> [(k, v)]
+merge ((k1, v1):xs) ((k2, v2):ys)
+  | k1 == k2   = (k1, v1) : merge           xs            ys -- left biased
+  | k1 <  k2   = (k1, v1) : merge           xs  ((k2, v2):ys)
+  | otherwise  = (k2, v2) : merge ((k1, v1):xs)           ys
+merge xs []    = xs
+merge [] ys    = ys
 
 -- | All values in the tree, in ascending order
 toList :: BST k v -> [(k, v)]
@@ -168,7 +181,7 @@ genValue :: Gen Int
 genValue = Gen.integral $ Range.between (0, 100)
 
 forAllBST :: (BST Int Int -> Property a) -> Property a
-forAllBST p = gen (genBST genKey genValue) >>= p
+forAllBST p = genWith (Just . showBST) (genBST genKey genValue) >>= p
 
 {-------------------------------------------------------------------------------
   Section 4: "Approaches to Writing Properties"
@@ -232,8 +245,8 @@ prop_valid_gen = forAllBST $ \t ->
 
 -- Section 4.2 Postconditions
 
-prop_insert_post :: Property ()
-prop_insert_post = forAllBST $ \t -> do
+prop_post_insert :: Property ()
+prop_post_insert = forAllBST $ \t -> do
     k  <- gen genKey
     k' <- gen genKey
     v  <- gen genValue
@@ -243,3 +256,14 @@ prop_insert_post = forAllBST $ \t -> do
                      else find k' t
     info $ "t': " ++ show t'
     assertEqual expected $ find k' t'
+
+prop_post_union :: Property ()
+prop_post_union = forAllBST $ \t -> forAllBST $ \t' -> do
+    k <- gen genKey
+    let t''      = union t t'
+        expected = find k t <|> find k t'
+    info $ "toList t: " ++ show (toList t)
+    info $ "toList t': " ++ show (toList t')
+    info $ "merged: " ++ show (merge (toList t) (toList t'))
+    info $ "t'': " ++ showBST t''
+    assertEqual expected $ find k t''
