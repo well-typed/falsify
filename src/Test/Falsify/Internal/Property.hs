@@ -29,9 +29,11 @@ module Test.Falsify.Internal.Property (
 
 import Prelude hiding (log)
 
+import Control.Applicative
 import Control.Monad.Except
 import Control.Monad.State
 import Data.Foldable (toList)
+import Data.List (intercalate)
 import GHC.Stack
 
 #if !MIN_VERSION_base(4,13,0)
@@ -41,7 +43,6 @@ import Control.Monad.Fail (MonadFail(..))
 import Test.Falsify.Generator (Gen)
 
 import qualified Test.Falsify.Generator as Gen
-import Control.Applicative
 
 {-------------------------------------------------------------------------------
   Definition
@@ -211,7 +212,7 @@ expect x y
       ]
 
 -- | Like 'expect', but without a particular towards an \"expected\" value
-assertEqual :: (Eq a, Show a) => a -> a  -> Property ()
+assertEqual :: (Eq a, Show a) => a -> a -> Property ()
 assertEqual = assertRelatedBy (==)
 
 -- | Generalization of 'assertEqual' to arbitrary binary relation
@@ -258,7 +259,11 @@ testShrinking p prop = do
         appendLog xLog
         info "After shrinking:"
         appendLog yLog
-        throwError $ "Invalid shrink: " ++ show x ++ " ~> " ++ show y
+        throwError $ intercalate "\n" [
+            "Invalid shrink"
+          , "     " ++ show x
+          , "  ~> " ++ show y
+          ]
   where
     findCounterExample ::
          [(Either Aborted a, TestRun)]

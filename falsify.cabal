@@ -114,6 +114,8 @@ library
     , splitmix
     , tagged
     , tasty
+    , transformers
+    , vector
   other-extensions:
     CPP
 
@@ -134,6 +136,7 @@ test-suite test-falsify
       TestSuite.Sanity.Range
       TestSuite.Sanity.Selective
       TestSuite.Sanity.Simple
+      TestSuite.Prop.Generator.Compound
       TestSuite.Prop.Generator.Simple
   build-depends:
     , containers

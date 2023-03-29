@@ -348,3 +348,6 @@ prop_insert_union = forAllBST $ \t -> forAllBST $ \t' -> do
 
 -- TODO: We should have the "bad" example from the QC slides in the paper
 -- (and in this demo)
+
+-- Preservation of equivalence
+

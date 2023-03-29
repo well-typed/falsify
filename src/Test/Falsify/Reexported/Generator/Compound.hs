@@ -5,6 +5,9 @@ module Test.Falsify.Reexported.Generator.Compound (
     -- * Lists
   , list
   , elem
+    -- ** Shuffling
+  , shuffle
+  , permutation
     -- * Trees
     -- ** Binary trees
   , tree
@@ -25,11 +28,12 @@ import Data.Foldable (toList)
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.Maybe (mapMaybe)
 
-import qualified Data.List.NonEmpty as NE
-import qualified Data.Tree          as Rose
+import qualified Data.List.NonEmpty  as NE
+import qualified Data.Tree           as Rose
 
 import Data.Falsify.Marked (Marked(..))
 import Data.Falsify.Tree (Tree(..), Interval(..), Endpoint(..))
+import Data.Falsify.List (Permutation, applyPermutation)
 import Test.Falsify.Generator.Auxiliary
 import Test.Falsify.Internal.Generator
 import Test.Falsify.Range (Range)
@@ -98,9 +102,9 @@ shrinkToNothing g = firstThen Just (const Nothing) <*> g
 
 -- | Mark an element, shrinking towards 'Drop'
 --
--- This is similar to 'shrinkToNothing', except that 'Marked' still has a value in the
--- 'Drop' case: marks are merely hints, that we may or may not use (e.g., see
--- 'Marked.keepAtLeast').
+-- This is similar to 'shrinkToNothing', except that 'Marked' still has a value
+-- in the 'Drop' case: marks are merely hints, that we may or may not use (e.g.,
+-- see 'Marked.keepAtLeast').
 mark :: Gen a -> Gen (Marked a)
 mark g = firstThen Keep Drop <*> g
 
@@ -136,6 +140,46 @@ list len gen = do
 -- Shrinks towards earlier elements.
 elem :: NonEmpty a -> Gen a
 elem xs = (toList xs !!) <$> integral (Range.between (0, length xs - 1))
+
+{-------------------------------------------------------------------------------
+  Shuffling
+-------------------------------------------------------------------------------}
+
+-- | Shuffle list (construct a permutation)
+--
+-- Shrinks..
+--
+-- * .. towards the original list
+-- * .. towards fewer swaps near the end of the list
+--      (i.e., the prefix of the list might be shuffled, but the tail is not)
+-- * .. such that elements are swapped with /closer/ other elements
+shuffle :: [a] -> Gen [a]
+shuffle xs =
+    flip applyPermutation xs <$>
+      permutation (fromIntegral $ length xs)
+
+-- | Generate permutation for a list of length @n@
+--
+-- This is an implementation of Fisher-Yates
+-- <https://en.wikipedia.org/wiki/Fisher–Yates_shuffle>.
+permutation :: Word -> Gen Permutation
+permutation 0 = return []
+permutation 1 = return []
+permutation n = go [] [n - 1, n - 2 .. 1]
+  where
+    -- Fisher-Yates as specified in Wikipedia:
+    --
+    -- > for i from n−1 downto 1 do
+    -- >      j ← random integer such that 0 ≤ j ≤ i
+    -- >      exchange a[j] and a[i]
+    go :: Permutation -> [Word] -> Gen Permutation
+    go acc []     = return (reverse acc)
+    go acc (i:is) = do
+        -- shrink towards i (swap with closer element)
+        j <- integral $ Range.between (i, 0)
+        if i == j
+          then go           acc  is
+          else go ((i, j) : acc) is
 
 {-------------------------------------------------------------------------------
   Binary trees
