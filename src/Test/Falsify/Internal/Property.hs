@@ -18,10 +18,6 @@ module Test.Falsify.Internal.Property (
     -- * Other 'Property' features
   , info
   , assert
-  , assertBool
-  , expect
-  , assertEqual
-  , assertRelatedBy
   , discard
     -- * Test shrinking
   , testShrinking
@@ -33,7 +29,6 @@ import Control.Applicative
 import Control.Monad.Except
 import Control.Monad.State
 import Data.Foldable (toList)
-import Data.List (intercalate)
 import GHC.Stack
 
 #if !MIN_VERSION_base(4,13,0)
@@ -41,8 +36,11 @@ import Control.Monad.Fail (MonadFail(..))
 #endif
 
 import Test.Falsify.Generator (Gen)
+import Test.Falsify.Predicate (Predicate, (.$))
 
 import qualified Test.Falsify.Generator as Gen
+import qualified Test.Falsify.Predicate as Predicate
+import qualified Test.Falsify.Predicate as P
 
 {-------------------------------------------------------------------------------
   Definition
@@ -185,45 +183,12 @@ info msg =
       , run{runLog = Log $ Info msg : log}
       )
 
--- | Assert boolean
---
--- If the property is false, the test fails.
-assert :: String -> Bool -> Property ()
-assert _ True  = return ()
-assert e False = throwError e
-
--- | Like 'assert', but with a standard message.
-assertBool :: Bool -> Property ()
-assertBool = assert "Failed"
-
--- | Assert that two values are equal
---
--- See also 'assertEqual'.
-expect ::
-     (Eq a, Show a)
-  => a  -- ^ Expected value
-  -> a  -- ^ Actual value
-  -> Property ()
-expect x y
-  | x == y    = return ()
-  | otherwise = throwError $ unlines [
-        "expected: " ++ show x
-      , "but got:  " ++ show y
-      ]
-
--- | Like 'expect', but without a particular towards an \"expected\" value
-assertEqual :: (Eq a, Show a) => a -> a -> Property ()
-assertEqual = assertRelatedBy (==)
-
--- | Generalization of 'assertEqual' to arbitrary binary relation
-assertRelatedBy :: Show a => (a -> a -> Bool) -> a -> a -> Property ()
-assertRelatedBy p x y
-  | p x y     = return ()
-  | otherwise = throwError $ unlines [
-        "Not related"
-      , "  lhs: " ++ show x
-      , "  rhs: " ++ show y
-      ]
+-- | Assert predicate
+assert :: Predicate '[] -> Property ()
+assert p =
+    case Predicate.eval p of
+      Left err -> throwError err
+      Right () -> return ()
 
 -- | Discard this test
 discard :: Property a
@@ -243,9 +208,7 @@ appendLog (Log log') = mkProperty $ \run@TestRun{runLog = Log log} -> return (
 --
 -- The property under test is not expected to fail; if it does, the resulting
 -- property fails, also.
-testShrinking :: forall a.
-     Show a
-  => (a -> a -> Bool) -> Property a -> Property ()
+testShrinking :: forall a. Show a => Predicate [a, a] -> Property a -> Property ()
 testShrinking p prop = do
     st <- genWith (const Nothing) $ Gen.toShrinkTree (runProperty prop)
     xs <- genWith (const Nothing) $ Gen.path st
@@ -254,25 +217,22 @@ testShrinking p prop = do
         Property $ throwError e
       Right Nothing ->
         return ()
-      Right (Just ((x, xLog), (y, yLog))) -> do
+      Right (Just (errMsg, logBefore, logAfter)) -> do
         info "Before shrinking:"
-        appendLog xLog
+        appendLog logBefore
         info "After shrinking:"
-        appendLog yLog
-        throwError $ intercalate "\n" [
-            "Invalid shrink"
-          , "     " ++ show x
-          , "  ~> " ++ show y
-          ]
+        appendLog logAfter
+        throwError $ errMsg
   where
     findCounterExample ::
          [(Either Aborted a, TestRun)]
-      -> Either Aborted (Maybe ((a, Log), (a, Log)))
+      -> Either Aborted (Maybe (String, Log, Log))
     findCounterExample = \case
         []                                         -> Right Nothing
         [_]                                        -> Right Nothing
         (Left e, _)     :     _                    -> Left e
         _               :     (Left e, _)     : _  -> Left e
         (Right x, logX) : ys@((Right y, logY) : _) ->
-          if p x y then findCounterExample ys
-                   else Right $ Just ((x, runLog logX), (y, runLog logY))
+          case P.eval $ p .$ ("original", x) .$ ("shrunk", y) of
+            Left err -> Right $ Just (err, runLog logX, runLog logY)
+            Right () -> findCounterExample ys

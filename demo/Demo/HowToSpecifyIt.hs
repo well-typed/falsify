@@ -16,10 +16,12 @@ import qualified Data.Tree   as Rose
 import qualified Data.Vector as V
 
 import Data.Falsify.Tree (Tree)
+import Test.Falsify.Predicate ((.$))
 
 import qualified Data.Falsify.Tree      as Tree
 import qualified Test.Falsify.Generator as Gen
 import qualified Test.Falsify.Range     as Range
+import qualified Test.Falsify.Predicate as P
 
 tests :: TestTree
 tests = testGroup "Demo.HowToSpecifyIt" [
@@ -67,11 +69,13 @@ forAllLists p = do
 
 prop_reverse_reverse :: Property ()
 prop_reverse_reverse = forAllLists $ \xs -> do
-    assert (show xs) $ reverse (reverse xs) == xs
+    assert $ P.eq .$ ("lhs", reverse (reverse xs))
+                  .$ ("rhs", xs)
 
 prop_reverse_id :: Property ()
 prop_reverse_id = forAllLists $ \xs -> do
-    assert (show xs) $ reverse xs == xs
+    assert $ P.eq .$ ("lhs", reverse xs)
+                  .$ ("rhs", xs)
 
 {-------------------------------------------------------------------------------
   Section 3: "Our Running Example: Binary Search Trees"
@@ -214,28 +218,32 @@ valid (Branch l k _ r) = and [
 -- Fig 3: Validity properties
 
 prop_valid_nil :: Property ()
-prop_valid_nil = assert "" $ valid (nil :: BST Int Int)
+prop_valid_nil =
+    assert $ P.satisfies valid "valid" .$ ("nil", nil :: BST Int Int)
 
 prop_valid_insert :: Property ()
 prop_valid_insert = forAllBST $ \t -> do
     k <- gen genKey
     v <- gen genValue
-    assert (show (t, k, v, insert k v t)) $ valid (insert k v t)
+    let t' = insert k v t
+    assert $ P.satisfies valid "valid" .$ ("t'", t')
 
 prop_valid_delete :: Property ()
 prop_valid_delete = forAllBST $ \t -> do
     k <- gen genKey
-    assert (show (t, k, delete k t)) $ valid (delete k t)
+    let t' = delete k t
+    assert $ P.satisfies valid "valid" .$ ("t'", t')
 
 prop_valid_union :: Property ()
-prop_valid_union = forAllBST $ \t -> forAllBST $ \t' ->
-    assert (show (t, t', union t t')) $ valid (union t t')
+prop_valid_union = forAllBST $ \t -> forAllBST $ \t' -> do
+    let t'' = union t t'
+    assert $ P.satisfies valid "valid" .$ ("t''", t'')
 
 -- Test your tests
 
 prop_valid_gen :: Property ()
 prop_valid_gen = forAllBST $ \t ->
-    assert (show t) $ valid t
+    assert $ P.satisfies valid "valid" .$ ("t", t)
 
 -- observation: marking values in the sample tree as shrunk or unshrunk
 -- reintroduces the possibility of having generators that produce valid values
@@ -268,7 +276,7 @@ prop_post_insert = forAllBST $ \t -> do
                      then Just v
                      else find k' t
     info $ "t': " ++ show t'
-    expect expected $ find k' t'
+    assert $ P.expect expected .$ ("actual", find k' t')
 
 prop_post_union :: Property ()
 prop_post_union = forAllBST $ \t -> forAllBST $ \t' -> do
@@ -279,32 +287,32 @@ prop_post_union = forAllBST $ \t -> forAllBST $ \t' -> do
     info $ "toList t': " ++ show (toList t')
     info $ "merged: " ++ show (merge (toList t) (toList t'))
     info $ "t'': " ++ showBST t''
-    expect expected $ find k t''
+    assert $ P.expect expected .$ ("actual", find k t'')
 
 prop_post_find_present :: Property ()
 prop_post_find_present = forAllBST $ \t -> do
     k <- gen genKey
     v <- gen genValue
-    expect (Just v) $
-      find k (insert k v t)
+    assert $ P.expect (Just v) .$ ("actual", find k (insert k v t))
 
 prop_post_find_absent :: Property ()
 prop_post_find_absent = forAllBST $ \t -> do
     k <- gen genKey
-    expect Nothing $
-      find k (delete k t)
+    assert $ P.expect Nothing .$ ("actual", find k (delete k t))
 
 prop_complete_insert_delete :: Property ()
 prop_complete_insert_delete = forAllBST $ \t -> do
     k <- gen genKey
     case find k t of
-      Nothing -> expect t $ delete k   t
-      Just v  -> expect t $ insert k v t
-
+      Nothing -> assert $ P.expect t .$ ("deleted"  , delete k   t)
+      Just v  -> assert $ P.expect t .$ ("inserted" , insert k v t)
 
 -- Section 4.3 Metamorphic properties
 --
 -- TODO: There are more metamorphic properties listed in the paper (Appendix A)
+
+predEquiv :: (Eq k, Eq v) => P.Predicate '[BST k v, BST k v]
+predEquiv = P.relatedBy equivBST "equivBST"
 
 prop_insert_insert :: Property ()
 prop_insert_insert = forAllBST $ \t -> do
@@ -312,39 +320,63 @@ prop_insert_insert = forAllBST $ \t -> do
     k' <- gen genKey
     v  <- gen genValue
     v' <- gen genValue
-    assertRelatedBy ((==) `on` toList)
-      (                insert k  v  $ insert k' v' $ t)
-      (if k /= k' then insert k' v' $ insert k  v  $ t
-                  else insert k  v  $                t)
+
+    let lhs  = insert k  v  $ insert k' v' $ t
+        rhs1 = insert k' v' $ insert k  v  $ t
+        rhs2 = insert k  v  $                t
+
+    assert $
+         P.choose_
+           (predEquiv .$ ("rhs1", rhs1))
+           (predEquiv .$ ("rhs2", rhs2))
+      .$ ("differentKey", k /= k')
+      .$ ("lhs", lhs)
 
 prop_insert_insert_weak :: Property ()
 prop_insert_insert_weak = forAllBST $ \t -> do
     k  <- gen genKey
     k' <- gen genKey
-    guard $ k /= k'
+    guard $ k /= k'      -- this is the line that makes this property "weak"
     v  <- gen genValue
     v' <- gen genValue
-    assertRelatedBy equivBST
-      (insert k  v  $ insert k' v' $ t)
-      (insert k' v' $ insert k  v  $ t)
+
+    let lhs = insert k  v  $ insert k' v' $ t
+        rhs = insert k' v' $ insert k  v  $ t
+
+    assert $
+         predEquiv
+      .$ ("lhs", lhs)
+      .$ ("rhs", rhs)
 
 prop_insert_delete :: Property ()
 prop_insert_delete = forAllBST $ \t -> do
     k  <- gen genKey
     k' <- gen genKey
     v  <- gen genValue
-    assertRelatedBy equivBST
-      (                insert k  v $ delete k'  $ t)
-      (if k /= k' then delete k'   $ insert k v $ t
-                  else insert k  v                t)
+
+    let lhs  = insert k  v $ delete k'  $ t
+        rhs1 = delete k'   $ insert k v $ t
+        rhs2 = insert k  v                t
+
+    assert $
+         P.choose_
+           (predEquiv .$ ("rhs1", rhs1))
+           (predEquiv .$ ("rhs2", rhs2))
+      .$ ("differentKey", k /= k')
+      .$ ("lhs", lhs)
 
 prop_insert_union :: Property ()
 prop_insert_union = forAllBST $ \t -> forAllBST $ \t' -> do
     k <- gen genKey
     v <- gen genValue
-    assertRelatedBy equivBST
-      (insert k v $ union t t')
-      (union (insert k v t) t')
+
+    let lhs = insert k v $ union t t'
+        rhs = union (insert k v t) t'
+
+    assert $
+         predEquiv
+      .$ ("lhs", lhs)
+      .$ ("rhs", rhs)
 
 -- TODO: We should have the "bad" example from the QC slides in the paper
 -- (and in this demo)

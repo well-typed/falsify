@@ -5,6 +5,7 @@ import Test.Tasty
 import qualified TestSuite.Sanity.Auxiliary
 import qualified TestSuite.Sanity.Compound
 import qualified TestSuite.Sanity.Function
+import qualified TestSuite.Sanity.Predicate
 import qualified TestSuite.Sanity.Prim
 import qualified TestSuite.Sanity.Range
 import qualified TestSuite.Sanity.Selective
@@ -23,6 +24,7 @@ main = defaultMain $ testGroup "falsify" [
         , TestSuite.Sanity.Compound.tests
         , TestSuite.Sanity.Selective.tests
         , TestSuite.Sanity.Function.tests
+        , TestSuite.Sanity.Predicate.tests
         ]
     , testGroup "Prop" [
           TestSuite.Prop.Generator.Simple.tests

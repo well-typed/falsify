@@ -333,7 +333,6 @@ testResult verbose expectFailure (initSeed, successes, TotalDiscarded discarded,
                    , countDiscarded
                    ]
                , fst $ NE.last history
-               , ""
                , "Logs for failed test run:"
                , renderLog . runLog . snd $ NE.last history
                ]
@@ -346,7 +345,6 @@ testResult verbose expectFailure (initSeed, successes, TotalDiscarded discarded,
            , testOutput = unlines [
                  "failed after " ++ countryHistory history
                , fst $ NE.last history
-               , ""
                , "Logs for failed test run:"
                , renderLog . runLog . snd $ NE.last history
                , showSeed initSeed
