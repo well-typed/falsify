@@ -15,6 +15,7 @@ module Test.Falsify.Reexported.Generator.Compound (
     -- ** Rose trees
   , RoseTree
   , path
+  , pathAny
     -- * Auxiliary
   , shrinkToNothing
   , mark
@@ -24,12 +25,14 @@ import Prelude hiding (either, elem)
 
 import Control.Monad
 import Control.Selective
+import Data.Either (either)
 import Data.Foldable (toList)
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.Maybe (mapMaybe)
+import Data.Void
 
-import qualified Data.List.NonEmpty  as NE
-import qualified Data.Tree           as Rose
+import qualified Data.List.NonEmpty as NE
+import qualified Data.Tree          as Rose
 
 import Data.Falsify.Marked (Marked(..))
 import Data.Falsify.Tree (Tree(..), Interval(..), Endpoint(..))
@@ -233,12 +236,38 @@ bst gen = go >=> traverse (\a -> (a,) <$> gen a)
 
 type RoseTree = Rose.Tree
 
--- | Generate random path through the tree
+-- | Generate semi-random path through the tree
+--
+-- Will only construct paths that satisfy the given predicate (typically, a
+-- property that is being tested).
 --
 -- Shrinks towards shorter paths, and towards paths that use subtrees that
 -- appear earlier in the list of subtrees at any node in the tree.
-path :: RoseTree a -> Gen (NonEmpty a)
-path (Rose.Node x [])     = pure (x :| [])
-path (Rose.Node x (y:ys)) = choose
-                              (pure $ x :| [])
-                              (elem (y :| ys) >>= fmap (NE.cons x) . path)
+--
+-- See also 'pathAny'.
+path :: forall e a b.
+     (a -> Either e b) -- ^ Predicate
+  -> RoseTree a
+  -> Gen (Either e (NonEmpty b))
+path p = \(Rose.Node a as) ->
+    case p a of
+      Left  e -> pure $ Left e
+      Right b -> Right <$> go b as
+  where
+    go :: b -> [Rose.Tree a] -> Gen (NonEmpty b)
+    go b as =
+        case mapMaybe checkPred as of
+          []   -> pure (b :| [])
+          m:ms -> choose
+                    (pure (b :| []))
+                    (elem (m :| ms) >>= \(b', as') -> NE.cons b <$> go b' as')
+
+    checkPred :: Rose.Tree a -> Maybe (b, [Rose.Tree a])
+    checkPred (Rose.Node a as) =
+       case p a of
+         Left  _ -> Nothing
+         Right b -> Just (b, as)
+
+-- | Variation on 'path' without a predicate.
+pathAny :: RoseTree a -> Gen (NonEmpty a)
+pathAny = fmap (either absurd id) . path Right

@@ -242,7 +242,7 @@ test_rose_path = do
       last $ shrink (not . prop) gen (SampleTree.fromSeed 5)
   where
     gen :: Gen [String]
-    gen = toList <$> Gen.path rose
+    gen = toList <$> Gen.pathAny rose
 
     prop :: [String] -> Bool
     prop xs = length xs < 3
@@ -262,7 +262,7 @@ test_rose_shrinkTree = do
     genToTest = (`mod` 100) <$> Gen.prim
 
     gen :: Gen [Word64]
-    gen = Gen.toShrinkTree genToTest >>= fmap toList . Gen.path
+    gen = Gen.toShrinkTree genToTest >>= fmap toList . Gen.pathAny
 
     prop :: [Word64] -> Bool
     prop = pairwiseAll (>)

@@ -211,7 +211,7 @@ appendLog (Log log') = mkProperty $ \run@TestRun{runLog = Log log} -> return (
 testShrinking :: forall a. Show a => Predicate [a, a] -> Property a -> Property ()
 testShrinking p prop = do
     st <- genWith (const Nothing) $ Gen.toShrinkTree (runProperty prop)
-    xs <- genWith (const Nothing) $ Gen.path st
+    xs <- genWith (const Nothing) $ Gen.pathAny st
     case findCounterExample (toList xs) of
       Left e ->
         Property $ throwError e

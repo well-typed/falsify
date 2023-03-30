@@ -32,6 +32,7 @@ module Test.Falsify.Generator (
     -- *** Rose trees
   , RoseTree
   , path
+  , pathAny
     -- ** Auxiliary
   , shrinkToNothing
   , mark
