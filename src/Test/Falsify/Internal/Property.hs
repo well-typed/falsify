@@ -6,7 +6,7 @@
 module Test.Falsify.Internal.Property (
     -- * Property
     Property -- opaque
-  , Aborted(..)
+  , TestResult(..)
   , runProperty
     -- * State
   , TestRun(..)
@@ -19,13 +19,14 @@ module Test.Falsify.Internal.Property (
   , info
   , assert
   , discard
+  , discardIf
     -- * Test shrinking
+  , genShrinkPath
   , testShrinking
   ) where
 
 import Prelude hiding (log)
 
-import Control.Applicative
 import Control.Monad.Except
 import Control.Monad.State
 import Data.Foldable (toList)
@@ -41,73 +42,10 @@ import Test.Falsify.Predicate (Predicate, (.$))
 import qualified Test.Falsify.Generator as Gen
 import qualified Test.Falsify.Predicate as Predicate
 import qualified Test.Falsify.Predicate as P
+import Data.List.NonEmpty (NonEmpty)
 
 {-------------------------------------------------------------------------------
-  Definition
--------------------------------------------------------------------------------}
-
--- | Property
---
--- A 'Property' is a generator that can fail and keeps a track of some
--- information about the test run.
-newtype Property a = Property {
-    unwrapProperty :: ExceptT (TestResult Void) (StateT TestRun Gen) a
-  }
-  deriving newtype (Functor, Applicative, Monad)
-
--- | Test result
-data TestResult a =
-    -- | Test was successful
-    --
-    -- Typically,
-    TestSuccessful a
-  | TestFailed String
-  | Discarded
-
-{-
-instance MonadFail Property where
-  fail = throwError
-
-instance MonadError String Property where
-  throwError = Property . throwError . TestFailed
-
-  catchError :: forall a. Property a -> (String -> Property a) -> Property a
-  prop `catchError` handler = Property $
-      unwrapProperty prop `catchError` handler'
-    where
-      handler' :: Aborted -> ExceptT Aborted (StateT TestRun Gen) a
-      handler' Discarded      = throwError Discarded
-      handler' (TestFailed e) = unwrapProperty $ handler e
-
--- | The 'Alternative' instance uses 'discard' for 'empty'.
---
--- This means that @<|>@ provides an alternative for /discarded/ tests, not
--- for /failed/ tests.
-instance Alternative Property where
-  empty = discard
-
-  (<|>) :: forall a. Property a -> Property a -> Property a
-  prop <|> handler = Property $
-      unwrapProperty prop `catchError` handler'
-    where
-      handler' :: Aborted -> ExceptT Aborted (StateT TestRun Gen) a
-      handler' Discarded      = unwrapProperty handler
-      handler' (TestFailed e) = throwError (TestFailed e)
-
--- | Construct property
---
--- This is a low-level function for internal use only.
-mkProperty ::
-     (TestRun -> Gen (Either Aborted a, TestRun))
-  -> Property a
-mkProperty = Property . ExceptT . StateT
-
--- | Run property
-runProperty :: Property a -> Gen (Either Aborted a, TestRun)
-runProperty = flip runStateT initTestRun . runExceptT . unwrapProperty
-
-{-------------------------------------------------------------------------------
-  Property state
+  Information about a test run
 -------------------------------------------------------------------------------}
 
 data TestRun = TestRun {
@@ -143,6 +81,115 @@ initTestRun = TestRun {
     }
 
 {-------------------------------------------------------------------------------
+  Test result
+-------------------------------------------------------------------------------}
+
+-- | Test result
+data TestResult a =
+    -- | Test was successful
+    --
+    -- Under normal circumstances @a@ will be @()@.
+    TestPassed a
+
+    -- | Test failed
+  | TestFailed String
+
+    -- | Test was discarded
+    --
+    -- This is neither a failure nor a success, but instead is a request to
+    -- discard this PRNG seed and try a new one.
+  | TestDiscarded
+  deriving (Functor)
+
+instance Applicative TestResult where
+  pure  = TestPassed
+  (<*>) = ap
+
+instance Monad TestResult where
+  return = pure
+  TestPassed x  >>= f = f x
+  TestFailed e  >>= _ = TestFailed e
+  TestDiscarded >>= _ = TestDiscarded
+
+{-------------------------------------------------------------------------------
+  Monad-transformer version of 'TestResult'
+-------------------------------------------------------------------------------}
+
+newtype TestResultT m a = TestResultT {
+      runTestResultT :: m (TestResult a)
+    }
+  deriving (Functor)
+
+instance Monad m => Applicative (TestResultT m) where
+  pure x = TestResultT $ pure (TestPassed x)
+  (<*>)  = ap
+
+instance Monad m => Monad (TestResultT m) where
+  return  = pure
+  x >>= f = TestResultT $ runTestResultT x >>= \case
+              TestPassed a  -> runTestResultT (f a)
+              TestFailed e  -> pure $ TestFailed e
+              TestDiscarded -> pure $ TestDiscarded
+
+{-------------------------------------------------------------------------------
+  Definition
+-------------------------------------------------------------------------------}
+
+-- | Property
+--
+-- A 'Property' is a generator that can fail and keeps a track of some
+-- information about the test run.
+newtype Property a = WrapProperty {
+      unwrapProperty :: TestResultT (StateT TestRun Gen) a
+    }
+  deriving newtype (Functor, Applicative, Monad)
+
+-- | Construct property
+--
+-- This is a low-level function for internal use only.
+mkProperty :: (TestRun -> Gen (TestResult a, TestRun)) -> Property a
+mkProperty = WrapProperty . TestResultT . StateT
+
+-- | Run property
+runProperty :: Property a -> Gen (TestResult a, TestRun)
+runProperty = flip runStateT initTestRun . runTestResultT . unwrapProperty
+
+{-------------------------------------------------------------------------------
+  'Property' features
+-------------------------------------------------------------------------------}
+
+instance MonadFail Property where
+  fail err = mkProperty $ \run -> return (TestFailed err, run)
+
+-- | Discard this test
+discard :: Property a
+discard = mkProperty $ \run -> return (TestDiscarded, run)
+
+-- | Conditionally discard the test
+--
+-- This is just a convenience function around 'discard'
+discardIf :: Bool -> Property ()
+discardIf False = return ()
+discardIf True  = discard
+
+-- | Log some additional information about the test
+--
+-- This will be shown in verbose mode.
+info :: String -> Property ()
+info msg =
+    mkProperty $ \run@TestRun{runLog = Log log} -> return (
+        TestPassed ()
+      , run{runLog = Log $ Info msg : log}
+      )
+
+-- | Assert predicate
+assert :: Predicate '[] -> Property ()
+assert p =
+    case Predicate.eval p of
+      Left err -> fail err
+      Right () -> return ()
+
+{-------------------------------------------------------------------------------
   Running generators
 -------------------------------------------------------------------------------}
 
@@ -164,9 +211,9 @@ genWithCallStack :: forall a.
   -> Gen a -> Property a
 genWithCallStack stack f g = mkProperty $ \run -> aux run <$> g
   where
-    aux :: TestRun -> a -> (Either Aborted a, TestRun)
+    aux :: TestRun -> a -> (TestResult a, TestRun)
     aux run@TestRun{runLog = Log log} x = (
-          Right x
+          TestPassed x
         , run{ runLog = Log $ case f x of
                  Just entry -> Generated stack entry : log
                  Nothing    -> log
@@ -175,70 +222,66 @@ genWithCallStack stack f g = mkProperty $ \run -> aux run <$> g
         )
 
 {-------------------------------------------------------------------------------
-  Other 'Property' features
--------------------------------------------------------------------------------}
-
--- | Log some additional information about the test
---
--- This will be shown in verbose mode.
-info :: String -> Property ()
-info msg =
-    mkProperty $ \run@TestRun{runLog = Log log} -> return (
-        Right ()
-      , run{runLog = Log $ Info msg : log}
-      )
-
--- | Assert predicate
-assert :: Predicate '[] -> Property ()
-assert p =
-    case Predicate.eval p of
-      Left err -> throwError err
-      Right () -> return ()
-
--- | Discard this test
-discard :: Property a
-discard = Property $ throwError Discarded
-
-{-------------------------------------------------------------------------------
   Test shrinking
 -------------------------------------------------------------------------------}
 
+-- | Append log from another test run to the current test run
+--
+-- This is an internal function, used when testing shrinking to include the runs
+-- from an unshrunk test and a shrunk test.
 appendLog :: Log -> Property ()
 appendLog (Log log') = mkProperty $ \run@TestRun{runLog = Log log} -> return (
-      Right ()
+      TestPassed ()
     , run{runLog = Log $ log' ++ log}
     )
 
+-- | Construct random path through the property's shrink tree
+--
+-- If the given 'Property' fails immediately, this generator fails also;
+-- similarly, if the given property is immediately discarded, this generator is
+-- also discarded. Otherwise, only shrink steps are considered that do not lead
+-- to a test failure or a test discard.
+--
+-- Note that this is opposite to how normal shrinking words: normal shrinking
+-- looks for the smallest test that /fails/; here we look for the smallest test
+-- that /succeeds/. The reason for this inversion is that failing tests have
+-- no interesting results, so there is nothing to verify. TODO: We could change
+-- that?
+genShrinkPath :: Property a -> Property (NonEmpty (a, TestRun))
+genShrinkPath prop = do
+    st    <- genWith (const Nothing) $ Gen.toShrinkTree (runProperty prop)
+    mPath <- genWith (const Nothing) $ Gen.path validShrink st
+    case mPath of
+      Left Nothing  -> discard
+      Left (Just e) -> fail e
+      Right path    -> return path
+  where
+    validShrink :: (TestResult a, TestRun) -> Either (Maybe String) (a, TestRun)
+    validShrink (TestPassed a, run) = Right (a, run)
+    validShrink (TestFailed e, _)   = Left (Just e)
+    validShrink (TestDiscarded, _)  = Left Nothing
+
 -- | Test shrinking
 --
--- The property under test is not expected to fail; if it does, the resulting
--- property fails, also.
+-- See 'genPath' for considerations regarding test failures/discards.
 testShrinking :: forall a. Show a => Predicate [a, a] -> Property a -> Property ()
 testShrinking p prop = do
-    st <- genWith (const Nothing) $ Gen.toShrinkTree (runProperty prop)
-    xs <- genWith (const Nothing) $ Gen.pathAny st
-    case findCounterExample (toList xs) of
-      Left e ->
-        Property $ throwError e
-      Right Nothing ->
+    path <- genShrinkPath prop
+    case findCounterExample (toList path) of
+      Nothing ->
         return ()
-      Right (Just (errMsg, logBefore, logAfter)) -> do
+      Just (err, logBefore, logAfter) -> do
         info "Before shrinking:"
         appendLog logBefore
         info "After shrinking:"
         appendLog logAfter
-        throwError $ errMsg
+        fail err
   where
-    findCounterExample ::
-         [(Either Aborted a, TestRun)]
-      -> Either Aborted (Maybe (String, Log, Log))
+    findCounterExample :: [(a, TestRun)] -> Maybe (String, Log, Log)
     findCounterExample = \case
-        []                                         -> Right Nothing
-        [_]                                        -> Right Nothing
-        (Left e, _)     :     _                    -> Left e
-        _               :     (Left e, _)     : _  -> Left e
-        (Right x, logX) : ys@((Right y, logY) : _) ->
+        []  -> Nothing
+        [_] -> Nothing
+        ((x, runX) : rest@((y, runY) : _)) ->
           case P.eval $ p .$ ("original", x) .$ ("shrunk", y) of
-            Left err -> Right $ Just (err, runLog logX, runLog logY)
-            Right () -> findCounterExample ys
--}
+            Left err -> Just (err, runLog runX, runLog runY)
+            Right () -> findCounterExample rest

@@ -336,7 +336,7 @@ prop_insert_insert_weak :: Property ()
 prop_insert_insert_weak = forAllBST $ \t -> do
     k  <- gen genKey
     k' <- gen genKey
-    guard $ k /= k'      -- this is the line that makes this property "weak"
+    discardIf $ k == k'      -- this is the line that makes this property "weak"
     v  <- gen genValue
     v' <- gen genValue
 

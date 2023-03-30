@@ -12,7 +12,9 @@ module Test.Falsify.Property (
   , assert
   , info
   , discard
+  , discardIf
     -- * Test shrinking
+  , genShrinkPath
   , testShrinking
   ) where
 

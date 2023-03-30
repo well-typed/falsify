@@ -55,7 +55,7 @@ instance Default TestOptions where
 instance IsTest Test where
   -- @tasty@ docs (1.4.3) explicitly say to ignore the @reportProgress@ argument
   run opts (Test testOpts prop) _reportProgress =
-      toTastyResult . testResult verbose (expectFailure testOpts) <$>
+      toTastyResult . renderTestResult verbose (expectFailure testOpts) <$>
         falsify driverOpts prop
     where
       verbose :: Verbose
@@ -76,8 +76,8 @@ instance IsTest Test where
       , Tasty.Option $ Proxy @MaxRatio
       ]
 
-toTastyResult :: TestResult -> Tasty.Result
-toTastyResult TestResult{testPassed, testOutput}
+toTastyResult :: RenderedTestResult -> Tasty.Result
+toTastyResult RenderedTestResult{testPassed, testOutput}
   | testPassed = Tasty.testPassed testOutput
   | otherwise  = Tasty.testFailed testOutput
 
