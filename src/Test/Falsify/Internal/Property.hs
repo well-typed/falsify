@@ -51,15 +51,20 @@ import qualified Test.Falsify.Predicate as P
 -- A 'Property' is a generator that can fail and keeps a track of some
 -- information about the test run.
 newtype Property a = Property {
-    unwrapProperty :: ExceptT Aborted (StateT TestRun Gen) a
+    unwrapProperty :: ExceptT (TestResult Void) (StateT TestRun Gen) a
   }
   deriving newtype (Functor, Applicative, Monad)
 
--- | Reason a test was aborted
-data Aborted =
-    TestFailed String
+-- | Test result
+data TestResult a =
+    -- | Test was successful
+    --
+    -- Typically,
+    TestSuccessful a
+  | TestFailed String
   | Discarded
 
+{-
 instance MonadFail Property where
   fail = throwError
 
@@ -236,3 +241,4 @@ testShrinking p prop = do
           case P.eval $ p .$ ("original", x) .$ ("shrunk", y) of
             Left err -> Right $ Just (err, runLog logX, runLog logY)
             Right () -> findCounterExample ys
+-}
