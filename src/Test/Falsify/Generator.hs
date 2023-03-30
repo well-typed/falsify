@@ -22,6 +22,9 @@ module Test.Falsify.Generator (
     -- ** Lists
   , list
   , elem
+    -- *** Shuffling
+  , shuffle
+  , permutation
     -- ** Trees
     -- *** Binary trees
   , tree
@@ -29,6 +32,7 @@ module Test.Falsify.Generator (
     -- *** Rose trees
   , RoseTree
   , path
+  , pathAny
     -- ** Auxiliary
   , shrinkToNothing
   , mark

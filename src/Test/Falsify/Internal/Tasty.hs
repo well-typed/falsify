@@ -69,9 +69,11 @@ instance IsTest Test where
           $ driverOptions opts
 
   testOptions = Tagged [
-        Tasty.Option $ Proxy @Tests
-      , Tasty.Option $ Proxy @Verbose
+        Tasty.Option $ Proxy @Verbose
+      , Tasty.Option $ Proxy @Tests
       , Tasty.Option $ Proxy @MaxShrinks
+      , Tasty.Option $ Proxy @Replay
+      , Tasty.Option $ Proxy @MaxRatio
       ]
 
 toTastyResult :: TestResult -> Tasty.Result
@@ -107,6 +109,8 @@ instance IsOption Verbose where
 
 {-------------------------------------------------------------------------------
   Options
+
+  NOTE: If we add another option here, we must also add it in 'testOptions'.
 -------------------------------------------------------------------------------}
 
 newtype Tests      = Tests      { getTests      :: Word             }

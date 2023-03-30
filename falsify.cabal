@@ -38,6 +38,7 @@ common lang
   default-language:
       Haskell2010
   default-extensions:
+      DataKinds
       DefaultSignatures
       DeriveAnyClass
       DeriveFoldable
@@ -78,6 +79,7 @@ library
       Test.Falsify.Generator
       Test.Falsify.Generator.Auxiliary
       Test.Falsify.Nudge
+      Test.Falsify.Predicate
       Test.Falsify.Property
       Test.Falsify.Range
       Test.Falsify.SampleTree
@@ -111,9 +113,12 @@ library
     , mtl
     , optparse-applicative
     , selective
+    , sop-core
     , splitmix
     , tagged
     , tasty
+    , transformers
+    , vector
   other-extensions:
     CPP
 
@@ -130,10 +135,12 @@ test-suite test-falsify
       TestSuite.Sanity.Auxiliary
       TestSuite.Sanity.Compound
       TestSuite.Sanity.Function
+      TestSuite.Sanity.Predicate
       TestSuite.Sanity.Prim
       TestSuite.Sanity.Range
       TestSuite.Sanity.Selective
       TestSuite.Sanity.Simple
+      TestSuite.Prop.Generator.Compound
       TestSuite.Prop.Generator.Simple
   build-depends:
     , containers
@@ -157,6 +164,7 @@ executable demo
       Demo.TestOptions
       Demo.TestShrinking
   build-depends:
+    , containers
     , data-default
     , falsify
     , mtl

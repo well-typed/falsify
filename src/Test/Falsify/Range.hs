@@ -129,12 +129,14 @@ fromEnum = map conv $ \o -> Offset (conv $ nudgeUp o (toEnum 0 :: a))
 -------------------------------------------------------------------------------}
 
 -- | Anywhere in the range of @a@
-full :: Bounded a => Range a
+full :: (Ord a, Bounded a) => Range a
 full = between (minBound, maxBound)
 
--- | Construct range with given lo and hi bound, shrinking towards lo
-between :: (a, a) -> Range a
-between (lo, hi) = Range{lo, hi, offset = NoOffset, inverted = False}
+-- | Inclusive range @(x, y)@ (or @(y, x)@ if @x > y@), shrinking towards @x@
+between :: Ord a => (a, a) -> Range a
+between (x, y)
+  | x <= y    = Range{lo = x, hi = y, offset = NoOffset, inverted = False}
+  | otherwise = Range{lo = y, hi = x, offset = NoOffset, inverted = True}
 
 -- | Construct numeric range between specified bounds and with the given origin
 --

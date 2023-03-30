@@ -5,7 +5,10 @@ import Data.Word
 import Test.Tasty
 import Test.Tasty.Falsify
 
+import Test.Falsify.Predicate ((.$))
+
 import qualified Test.Falsify.Generator as Gen
+import qualified Test.Falsify.Predicate as P
 
 tests :: TestTree
 tests = testGroup "Demo.Functions" [
@@ -21,6 +24,7 @@ tests = testGroup "Demo.Functions" [
 prop_listToBool :: Property ()
 prop_listToBool = do
     Fn (f :: [Word8] -> Bool) <- gen $ Gen.fun (Gen.bool False)
-    assertBool $ f [3, 1, 4, 2] == f [1, 6, 1, 8]
+    assert $ P.eq .$ ("lhs", f [3, 1, 4, 2])
+                  .$ ("rhs", f [1, 6, 1, 8])
 
 

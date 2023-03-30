@@ -333,7 +333,6 @@ testResult verbose expectFailure (initSeed, successes, TotalDiscarded discarded,
                    , countDiscarded
                    ]
                , fst $ NE.last history
-               , ""
                , "Logs for failed test run:"
                , renderLog . runLog . snd $ NE.last history
                ]
@@ -346,7 +345,6 @@ testResult verbose expectFailure (initSeed, successes, TotalDiscarded discarded,
            , testOutput = unlines [
                  "failed after " ++ countryHistory history
                , fst $ NE.last history
-               , ""
                , "Logs for failed test run:"
                , renderLog . runLog . snd $ NE.last history
                , showSeed initSeed
@@ -375,7 +373,7 @@ testResult verbose expectFailure (initSeed, successes, TotalDiscarded discarded,
         ]
 
     showSeed :: ReplaySeed -> String
-    showSeed seed = "Replay-seed: " ++ show seed
+    showSeed seed = "Use --falsify-replay=" ++ show seed ++ " to replay."
 
 renderSuccess :: (Int, Success) -> String
 renderSuccess (ix, Success{successRun}) =
@@ -391,7 +389,7 @@ renderLogEntry :: LogEntry -> String
 renderLogEntry = \case
     Generated stack x -> concat [
         "generated "
-      , show x
+      , x
       , " at "
       , prettyCallStack stack
       ]

@@ -10,7 +10,6 @@ module Test.Falsify.Property (
   , genWith
     -- * Additional 'Property' features
   , assert
-  , assertBool
   , info
   , discard
     -- * Test shrinking

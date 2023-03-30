@@ -52,7 +52,8 @@ import qualified Test.Falsify.SampleTree as SampleTree
 -- improves on this in a few ways).
 --
 -- NOTE: 'Gen' is /NOT/ an instance of 'Alternative'; this would not be
--- compatible with the generation of infinite data structures.
+-- compatible with the generation of infinite data structures. For the same
+-- reason, we do not have a monad transformer version of Gen either.
 newtype Gen a = Gen { runGen :: SampleTree -> (a, Truncated, [SampleTree]) }
   deriving stock (Functor)
 

@@ -5,8 +5,11 @@ import Data.Default
 import Test.Tasty
 import Test.Tasty.Falsify
 
+import Test.Falsify.Predicate ((.$))
+
 import qualified Test.Falsify.Generator as Gen
 import qualified Test.Falsify.Range     as Range
+import qualified Test.Falsify.Predicate as P
 
 tests :: TestTree
 tests = testGroup "Demo.Simple" [
@@ -51,7 +54,7 @@ tests = testGroup "Demo.Simple" [
 prop_inRange :: Property ()
 prop_inRange = do
     x :: Word <- gen $ Gen.integral $ Range.num (0, 100) 0
-    assert ("not in range: " ++ show x) $ 0 <= x && x <= 100
+    assert $ P.between 0 100 .$ ("x", x)
 
 -- | Invalid property (property that does not hold)
 --
@@ -59,12 +62,12 @@ prop_inRange = do
 prop_even :: Property ()
 prop_even = do
     x :: Word <- gen $ Gen.integral $ Range.num (0, 100) 0
-    assert ("not even: " ++ show x) $ even x
+    assert $ P.even .$ ("x", x)
 
 -- | Like 'prop_even', but discarding tests that fail.
 prop_even_discard :: Property ()
 prop_even_discard = do
     x :: Word <- gen $ Gen.integral $ Range.num (0, 100) 0
     guard $ even x
-    assert ("not even: " ++ show x) $ even x
+    assert $ P.even .$ ("x", x)
 
