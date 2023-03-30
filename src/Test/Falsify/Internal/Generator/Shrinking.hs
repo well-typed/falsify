@@ -32,6 +32,7 @@ data ShrinkExplanation p n = ShrinkExplanation {
       -- | The full shrink history
     , history :: ShrinkHistory p n
     }
+  deriving (Show)
 
 -- | Shrink explanation
 data ShrinkHistory p n =
@@ -49,6 +50,7 @@ data ShrinkHistory p n =
     --
     -- This is used when the number of shrink steps is limited.
   | ShrinkingStopped
+  deriving (Show)
 
 limitShrinkSteps :: Maybe Word -> ShrinkExplanation p n -> ShrinkExplanation p n
 limitShrinkSteps Nothing      = id
@@ -102,6 +104,7 @@ instance Bifunctor ShrinkHistory where
 data IsValidShrink p n =
     ValidShrink p
   | InvalidShrink n
+  deriving stock (Show)
 
 -- | Find smallest value that the generator can produce and still satisfies
 -- the predicate.

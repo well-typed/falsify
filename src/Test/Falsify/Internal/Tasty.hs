@@ -43,6 +43,7 @@ data TestOptions = TestOptions {
       expectFailure      :: ExpectFailure
     , overrideVerbose    :: Maybe Verbose
     , overrideMaxShrinks :: Maybe Word
+    , overrideNumTests   :: Maybe Word
     }
 
 instance Default TestOptions where
@@ -50,6 +51,7 @@ instance Default TestOptions where
         expectFailure      = DontExpectFailure
       , overrideVerbose    = Nothing
       , overrideMaxShrinks = Nothing
+      , overrideNumTests   = Nothing
       }
 
 instance IsTest Test where
@@ -66,6 +68,9 @@ instance IsTest Test where
             maybe id
               (\x o -> o{Driver.maxShrinks = Just x})
               (overrideMaxShrinks testOpts)
+          $ maybe id
+              (\x o -> o{Driver.tests = x})
+              (overrideNumTests testOpts)
           $ driverOptions opts
 
   testOptions = Tagged [

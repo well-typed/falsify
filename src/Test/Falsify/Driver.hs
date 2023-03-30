@@ -73,11 +73,13 @@ data Success = Success {
       successSeed :: ReplaySeed
     , successRun  :: TestRun
     }
+  deriving (Show)
 
 data Failure = Failure {
       failureSeed :: ReplaySeed
     , failureRun  :: ShrinkExplanation (String, TestRun) TestRun
     }
+  deriving (Show)
 
 newtype TotalDiscarded = TotalDiscarded Word
 

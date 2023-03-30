@@ -41,7 +41,10 @@ import GHC.Stack
 import Control.Monad.Fail (MonadFail(..))
 #endif
 
-import Test.Falsify.Generator (Gen, IsValidShrink(..))
+import qualified Data.List.NonEmpty as NE
+
+import Test.Falsify.Generator (Gen)
+import Test.Falsify.Internal.Generator.Shrinking
 import Test.Falsify.Predicate (Predicate, (.$))
 
 import qualified Test.Falsify.Generator as Gen
@@ -60,6 +63,7 @@ data TestRun = TestRun {
       -- different seeds), since the test is deterministic.
     , runDeterministic :: Bool
     }
+  deriving (Show)
 
 data LogEntry =
     -- | Generated a value
@@ -102,7 +106,7 @@ data TestResult e a =
     -- This is neither a failure nor a success, but instead is a request to
     -- discard this PRNG seed and try a new one.
   | TestDiscarded
-  deriving (Functor)
+  deriving stock (Show, Functor)
 
 -- | A test result is a valid shrink step if the test still fails
 resultIsValidShrink ::
@@ -292,13 +296,37 @@ testShrinkingOfGen :: Show a => Predicate [a, a] -> Gen a -> Property' String ()
 testShrinkingOfGen p g = testShrinkingOfProp p $ gen g >>= testFailed
 
 -- | Test the minimum error thrown by the property
-testMinimum :: Show e => Predicate '[e] -> Property' e () -> Property' String ()
+--
+-- If the given property passes, we will discard this test (in that case, there
+-- is nothing to test); this test is also discarded if the given property
+-- discards.
+testMinimum :: forall e.
+     Show e
+  => Predicate '[e]
+  -> Property' e ()
+  -> Property' String ()
 testMinimum p prop = do
-    path <- genShrinkPath prop
-    case reverse path of
-      []         -> return ()
-      (e, run):_ -> case P.eval $ p .$ ("minimum", e) of
-                      Right () -> return ()
-                      Left err -> do
-                        appendLog (runLog run)
-                        testFailed err
+    st <- genWith (const Nothing) $ Gen.captureLocalTree
+    case Gen.runGen (runProperty prop) st of
+      ((TestPassed (), _run), _truncated, _shrunk) ->
+        -- The property passed; nothing to test
+        discard
+      ((TestDiscarded, _run), _truncated, _shrunk) ->
+        -- The property needs to be discarded; discard this one, too
+        discard
+      ((TestFailed e, run), _truncated, shrunk) -> do
+        let explanation :: ShrinkExplanation (e, TestRun) (Maybe (), TestRun)
+            explanation = shrinkFrom
+                            resultIsValidShrink
+                            (runProperty prop)
+                            ((e, run), shrunk)
+
+            minErr :: e
+            minRun :: TestRun
+            (minErr, minRun) = NE.last $ shrinkHistory explanation
+
+        case P.eval $ p .$ ("minimum", minErr) of
+          Right () -> return ()
+          Left err -> do
+            appendLog (runLog minRun)
+            testFailed err
