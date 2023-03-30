@@ -4,18 +4,23 @@
 --
 -- Most users will probably use "Test.Tasty.Falsify" instead of this module.
 module Test.Falsify.Property (
-    Property -- opaque
+    Property' -- opaque
+  , Property
     -- * Run generators
   , gen
   , genWith
-    -- * Additional 'Property' features
+    -- * 'Property' features
+  , testFailed
   , assert
   , info
   , discard
-  , discardIf
     -- * Test shrinking
   , genShrinkPath
-  , testShrinking
+  , testShrinkingOfProp
+  , testShrinkingOfGen
   ) where
 
 import Test.Falsify.Internal.Property
+
+-- | Property that uses strings as errors
+type Property = Property' String

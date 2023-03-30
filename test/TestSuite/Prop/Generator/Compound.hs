@@ -14,7 +14,7 @@ tests :: TestTree
 tests = testGroup "TestSuite.Prop.Generator.Compound" [
       testGroup "Shrinking" [
         testProperty "perm" $
-          testShrinking validPermShrink . gen $
+          testShrinkingOfGen validPermShrink $
             Gen.permutation 10
         ]
     ]

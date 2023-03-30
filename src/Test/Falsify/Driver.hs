@@ -91,7 +91,7 @@ newtype TotalDiscarded = TotalDiscarded Word
 -- * the failed test (if any).
 falsify ::
      Options
-  -> Property ()
+  -> Property' String ()
   -> IO (ReplaySeed, [Success], TotalDiscarded, Maybe Failure)
 falsify opts prop = do
     acc <- initDriverState opts
@@ -135,7 +135,10 @@ falsify opts prop = do
             let explanation :: ShrinkExplanation (String, TestRun) TestRun
                 explanation =
                     limitShrinkSteps (maxShrinks opts) . second snd $
-                      shrinkFrom isValid (runProperty prop) ((e, run), shrunk)
+                      shrinkFrom
+                        resultIsValidShrink
+                        (runProperty prop)
+                        ((e, run), shrunk)
 
                 failure :: Failure
                 failure = Failure {
@@ -152,14 +155,6 @@ falsify opts prop = do
           -- Test discarded; continue.
           ((TestDiscarded, _), _, _) ->
             go $ withDiscard later acc
-
-    -- It's a valid shrink step if the test still fails
-    isValid ::
-         (TestResult a, TestRun)
-      -> IsValidShrink (String, TestRun) (Maybe a, TestRun)
-    isValid (TestFailed e  , run) = ValidShrink   (e       , run)
-    isValid (TestDiscarded , run) = InvalidShrink (Nothing , run)
-    isValid (TestPassed a  , run) = InvalidShrink (Just a  , run)
 
 {-------------------------------------------------------------------------------
   Internal: driver state

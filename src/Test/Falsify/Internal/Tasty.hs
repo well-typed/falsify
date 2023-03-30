@@ -37,7 +37,7 @@ import qualified Test.Tasty.Providers as Tasty
   Tasty integration
 -------------------------------------------------------------------------------}
 
-data Test = Test TestOptions (Property ())
+data Test = Test TestOptions (Property' String ())
 
 data TestOptions = TestOptions {
       expectFailure      :: ExpectFailure
@@ -86,10 +86,10 @@ toTastyResult RenderedTestResult{testPassed, testOutput}
 -------------------------------------------------------------------------------}
 
 -- | Generalization of 'testPropertyWith' using default options
-testProperty :: TestName -> Property () -> TestTree
+testProperty :: TestName -> Property' String () -> TestTree
 testProperty = testPropertyWith def
 
-testPropertyWith :: TestOptions -> TestName -> Property () -> TestTree
+testPropertyWith :: TestOptions -> TestName -> Property' String () -> TestTree
 testPropertyWith testOpts name = Tasty.singleTest name . Test testOpts
 
 {-------------------------------------------------------------------------------

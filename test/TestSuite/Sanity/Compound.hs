@@ -11,7 +11,7 @@ import qualified Data.Tree as Rose
 import Data.Falsify.List (pairwiseAll)
 import Data.Falsify.Tree (Tree(..))
 import Test.Falsify.Debugging
-import Test.Falsify.Generator (Gen, RoseTree)
+import Test.Falsify.Generator (Gen, ShrinkTree)
 
 import qualified Data.Falsify.Tree       as Tree
 import qualified Test.Falsify.Generator  as Gen
@@ -31,9 +31,9 @@ tests = testGroup "TestSuite.Sanity.Compound" [
         , testCase "towardsOrigin1"  test_tree_towardsOrigin1
         , testCase "towardsOrigin2"  test_tree_towardsOrigin2
         ]
-    , testGroup "rose" [
-          testCase "path"       test_rose_path
-        , testCase "shrinkTree" test_rose_shrinkTree
+    , testGroup "shrinkTree" [
+          testCase "path"         test_shrinkTree_path
+        , testCase "toShrinkTree" test_toShrinkTree
         ]
     ]
 
@@ -236,23 +236,23 @@ test_tree_towardsOrigin2 = do
   Rose trees
 -------------------------------------------------------------------------------}
 
-test_rose_path :: Assertion
-test_rose_path = do
+test_shrinkTree_path :: Assertion
+test_shrinkTree_path = do
     assertEqual "" ["", "a", "aa"] $
       last $ shrink (not . prop) gen (SampleTree.fromSeed 5)
   where
     gen :: Gen [String]
-    gen = toList <$> Gen.pathAny rose
+    gen = toList <$> Gen.pathAny st
 
     prop :: [String] -> Bool
     prop xs = length xs < 3
 
-    -- Infinite rose tree containing all strings containing lowercase letters
-    rose :: RoseTree String
-    rose = Rose.unfoldTree (\xs -> (xs, map (:xs) ['a' .. 'z'])) ""
+    -- Infinite ShrinkTree containing all strings containing lowercase letters
+    st :: ShrinkTree String
+    st = Rose.unfoldTree (\xs -> (xs, map (:xs) ['a' .. 'z'])) ""
 
-test_rose_shrinkTree :: Assertion
-test_rose_shrinkTree = do
+test_toShrinkTree :: Assertion
+test_toShrinkTree = do
     -- Should be any kind of path in which the last two pairs of numbers are
     -- NOT decreasing.
     assertEqual "" [16, 8, 54] $
