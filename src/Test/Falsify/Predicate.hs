@@ -286,19 +286,16 @@ binary p msg =
 -------------------------------------------------------------------------------}
 
 -- | Specialization of 'unary' for unary relations
-satisfies :: (a -> Bool) -> Var -> Predicate '[a]
-satisfies p e =
+satisfies :: (Var, a -> Bool) -> Predicate '[a]
+satisfies (n, p) =
     unary p $ \x ->
-      prettyExpr $ Var "not" `App` (Var e `App` x)
+      prettyExpr $ Var "not" `App` (Var n `App` x)
 
 -- | Specialization of 'binary' for relations
-relatedBy ::
-     (a -> b -> Bool) -- ^ Predicate proper
-  -> Var              -- ^ Name of the relation
-  -> Predicate [a, b]
-relatedBy p e =
+relatedBy :: (Var, a -> b -> Bool) -> Predicate [a, b]
+relatedBy (n, p) =
     binary p $ \x y ->
-      prettyExpr $ Var "not" `App` (Var e `App` x `App` y)
+      prettyExpr $ Var "not" `App` (Var n `App` x `App` y)
 
 {-------------------------------------------------------------------------------
   Combinators
@@ -494,5 +491,5 @@ between lo hi = mconcat [
     ]
 
 even, odd :: Integral a => Predicate '[a]
-even = satisfies Prelude.even "even"
-odd  = satisfies Prelude.odd  "odd"
+even = satisfies ("even", Prelude.even)
+odd  = satisfies ("odd ", Prelude.odd)

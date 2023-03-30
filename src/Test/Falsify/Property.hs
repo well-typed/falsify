@@ -18,6 +18,7 @@ module Test.Falsify.Property (
   , genShrinkPath
   , testShrinkingOfProp
   , testShrinkingOfGen
+  , testMinimum
   ) where
 
 import Test.Falsify.Internal.Property

@@ -26,6 +26,7 @@ module Test.Falsify.Internal.Property (
   , genShrinkPath
   , testShrinkingOfProp
   , testShrinkingOfGen
+  , testMinimum
   ) where
 
 import Prelude hiding (log)
@@ -289,3 +290,15 @@ testShrinkingOfProp p prop = do
 -- shrink step that the generator can make.
 testShrinkingOfGen :: Show a => Predicate [a, a] -> Gen a -> Property' String ()
 testShrinkingOfGen p g = testShrinkingOfProp p $ gen g >>= testFailed
+
+-- | Test the minimum error thrown by the property
+testMinimum :: Show e => Predicate '[e] -> Property' e () -> Property' String ()
+testMinimum p prop = do
+    path <- genShrinkPath prop
+    case reverse path of
+      []         -> return ()
+      (e, run):_ -> case P.eval $ p .$ ("minimum", e) of
+                      Right () -> return ()
+                      Left err -> do
+                        appendLog (runLog run)
+                        testFailed err
