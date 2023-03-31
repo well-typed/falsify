@@ -57,6 +57,15 @@ tests = testGroup "Demo.HowToSpecifyIt" [
         , testGroup "PreserveEquiv" [
               testProperty "insert" prop_preserveEquiv_insert
             ]
+        , testGroup "Inductive" [
+              testProperty "union_nil"    prop_union_nil
+            , testProperty "union_insert" prop_union_insert
+            , testGroup "Completeness" [
+                  testProperty "insert" prop_complete_insert
+                , testProperty "delete" prop_complete_delete
+                , testProperty "union"  prop_complete_union
+                ]
+            ]
         ]
     ]
 
@@ -406,4 +415,47 @@ prop_preserveEquiv_insert = forAllEquivPair $ \t1 t2 -> do
 {-------------------------------------------------------------------------------
   4.4 Inductive Testing
 -------------------------------------------------------------------------------}
+
+prop_union_nil :: Property ()
+prop_union_nil = forAllBST $ \t ->
+    assert $ predEquiv
+      .$ ("lhs", union nil t)
+      .$ ("rhs", t)
+
+prop_union_insert :: Property ()
+prop_union_insert = forAllBST $ \t -> forAllBST $ \t' -> do
+    k <- gen genKey
+    v <- gen genValue
+
+    let lhs = union (insert k v t) t'
+        rhs = insert k v (union t t')
+
+    assert $ predEquiv
+      .$ ("lhs", lhs)
+      .$ ("rhs", rhs)
+
+insertions :: BST k v -> [(k, v)]
+insertions Leaf = []
+insertions (Branch l k v r) = (k, v) : insertions l ++ insertions r
+
+prop_complete ::
+     (Show k, Show v, Ord k, Ord v)
+  => BST k v -> Property' String ()
+prop_complete t =
+    assert $ P.eq -- we really want equality here, not equivalence
+      .$ ("lhs", t)
+      .$ ("rhs", foldl (flip $ uncurry insert) nil (insertions t))
+
+prop_complete_insert :: Property ()
+prop_complete_insert = forAllBST $ \t -> do
+    prop_complete t
+
+prop_complete_delete :: Property ()
+prop_complete_delete = forAllBST $ \t -> do
+    k <- gen genKey
+    prop_complete (delete k t)
+
+prop_complete_union :: Property ()
+prop_complete_union = forAllBST $ \t -> forAllBST $ \t' -> do
+    prop_complete (union t t')
 
