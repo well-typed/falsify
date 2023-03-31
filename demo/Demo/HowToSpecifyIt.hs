@@ -22,14 +22,13 @@ import qualified Data.Falsify.Tree      as Tree
 import qualified Test.Falsify.Generator as Gen
 import qualified Test.Falsify.Range     as Range
 import qualified Test.Falsify.Predicate as P
+import qualified Data.List as L
 
 tests :: TestTree
 tests = testGroup "Demo.HowToSpecifyIt" [
       testGroup "Section2" [
-          testProperty
-            "reverse_reverse" prop_reverse_reverse
-        , testPropertyWith (def { expectFailure = ExpectFailure })
-            "reverse_id"      prop_reverse_id
+          testProperty                   "reverse_reverse" prop_reverse_reverse
+        , testPropertyWith expectFailure "reverse_id"      prop_reverse_id
         ]
     , testGroup "Section4" [
           testGroup "Validity" [
@@ -66,8 +65,19 @@ tests = testGroup "Demo.HowToSpecifyIt" [
                 , testProperty "union"  prop_complete_union
                 ]
             ]
+        , testGroup "Model" [
+              testProperty                   "nil"          prop_model_nil
+            , testProperty                   "insert"       prop_model_insert
+            , testPropertyWith expectFailure "insert_wrong" prop_model_insert_wrong
+            ]
         ]
     ]
+  where
+    expectFailure :: TestOptions
+    expectFailure = def {
+          expectFailure    = ExpectFailure
+        , overrideNumTests = Just 1000
+        }
 
 {-------------------------------------------------------------------------------
   Section 2: "A Primer in Property-Based Testing"
@@ -459,3 +469,33 @@ prop_complete_union :: Property ()
 prop_complete_union = forAllBST $ \t -> forAllBST $ \t' -> do
     prop_complete (union t t')
 
+{-------------------------------------------------------------------------------
+  Section 4.5 Model-based properties
+
+  TODO: There a a few more properties listed in the paper.
+-------------------------------------------------------------------------------}
+
+deleteKey :: Eq k => k -> [(k, b)] -> [(k, b)]
+deleteKey k = filter ((/= k) . fst)
+
+prop_model_nil :: Property ()
+prop_model_nil =
+    assert $ P.eq
+      .$ ("lhs", toList (nil :: BST Int Int))
+      .$ ("rhs", [])
+
+prop_model_insert :: Property ()
+prop_model_insert = forAllBST $ \t -> do
+    k <- gen genKey
+    v <- gen genValue
+    assert $ P.eq
+      .$ ("lhs", toList (insert k v t))
+      .$ ("rhs", L.insert (k, v) (deleteKey k $ toList t))
+
+prop_model_insert_wrong :: Property ()
+prop_model_insert_wrong = forAllBST $ \t -> do
+    k <- gen genKey
+    v <- gen genValue
+    assert $ P.eq
+      .$ ("lhs", toList (insert k v t))
+      .$ ("rhs", L.insert (k, v) (toList t))
