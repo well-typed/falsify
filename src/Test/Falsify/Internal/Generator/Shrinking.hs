@@ -7,6 +7,7 @@ module Test.Falsify.Internal.Generator.Shrinking (
   , IsValidShrink(..)
   , limitShrinkSteps
   , shrinkHistory
+  , shrinkOutcome
   ) where
 
 import Data.Bifunctor
@@ -32,6 +33,7 @@ data ShrinkExplanation p n = ShrinkExplanation {
       -- | The full shrink history
     , history :: ShrinkHistory p n
     }
+  deriving (Show)
 
 -- | Shrink explanation
 data ShrinkHistory p n =
@@ -49,6 +51,7 @@ data ShrinkHistory p n =
     --
     -- This is used when the number of shrink steps is limited.
   | ShrinkingStopped
+  deriving (Show)
 
 limitShrinkSteps :: Maybe Word -> ShrinkExplanation p n -> ShrinkExplanation p n
 limitShrinkSteps Nothing      = id
@@ -67,13 +70,30 @@ limitShrinkSteps (Just limit) = \case
 
 -- | Simplify the shrink explanation to keep only the shrink history
 shrinkHistory :: ShrinkExplanation p n -> NonEmpty p
-shrinkHistory (ShrinkExplanation unshrunk shrunk) =
+shrinkHistory = \(ShrinkExplanation unshrunk shrunk) ->
     unshrunk :| go shrunk
   where
     go :: ShrinkHistory p n -> [p]
     go (ShrunkTo x xs)   = x : go xs
     go (ShrinkingDone _) = []
     go ShrinkingStopped  = []
+
+-- | The final shrunk value, as well as all rejected /next/ shrunk steps
+--
+-- The list of rejected next steps is
+--
+-- * @Nothing@ if shrinking was terminated early ('limitShrinkSteps')
+-- * @Just []@ if the final value truly is minimal (typically, it is only
+--   minimal wrt to a particular properly, but not the minimal value that a
+--   generator can produce).
+shrinkOutcome :: forall p n. ShrinkExplanation p n -> (p, Maybe [n])
+shrinkOutcome = \ShrinkExplanation{initial, history} ->
+    go initial history
+  where
+    go :: p -> ShrinkHistory p n -> (p, Maybe [n])
+    go _ (ShrunkTo p h)     = go p h
+    go p (ShrinkingDone ns) = (p, Just ns)
+    go p  ShrinkingStopped  = (p, Nothing)
 
 {-------------------------------------------------------------------------------
   Mapping
@@ -102,6 +122,7 @@ instance Bifunctor ShrinkHistory where
 data IsValidShrink p n =
     ValidShrink p
   | InvalidShrink n
+  deriving stock (Show)
 
 -- | Find smallest value that the generator can produce and still satisfies
 -- the predicate.

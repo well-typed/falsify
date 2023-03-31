@@ -215,35 +215,38 @@ valid (Branch l k _ r) = and [
     , all (> k) (keys r)
     ]
 
+predValid :: Ord k => P.Predicate '[BST k v]
+predValid = P.satisfies ("valid", valid)
+
 -- Fig 3: Validity properties
 
 prop_valid_nil :: Property ()
 prop_valid_nil =
-    assert $ P.satisfies valid "valid" .$ ("nil", nil :: BST Int Int)
+    assert $ predValid .$ ("nil", nil :: BST Int Int)
 
 prop_valid_insert :: Property ()
 prop_valid_insert = forAllBST $ \t -> do
     k <- gen genKey
     v <- gen genValue
     let t' = insert k v t
-    assert $ P.satisfies valid "valid" .$ ("t'", t')
+    assert $ predValid .$ ("t'", t')
 
 prop_valid_delete :: Property ()
 prop_valid_delete = forAllBST $ \t -> do
     k <- gen genKey
     let t' = delete k t
-    assert $ P.satisfies valid "valid" .$ ("t'", t')
+    assert $ predValid .$ ("t'", t')
 
 prop_valid_union :: Property ()
 prop_valid_union = forAllBST $ \t -> forAllBST $ \t' -> do
     let t'' = union t t'
-    assert $ P.satisfies valid "valid" .$ ("t''", t'')
+    assert $ predValid .$ ("t''", t'')
 
 -- Test your tests
 
 prop_valid_gen :: Property ()
 prop_valid_gen = forAllBST $ \t ->
-    assert $ P.satisfies valid "valid" .$ ("t", t)
+    assert $ predValid .$ ("t", t)
 
 -- observation: marking values in the sample tree as shrunk or unshrunk
 -- reintroduces the possibility of having generators that produce valid values
@@ -312,7 +315,7 @@ prop_complete_insert_delete = forAllBST $ \t -> do
 -- TODO: There are more metamorphic properties listed in the paper (Appendix A)
 
 predEquiv :: (Eq k, Eq v) => P.Predicate '[BST k v, BST k v]
-predEquiv = P.relatedBy equivBST "equivBST"
+predEquiv = P.relatedBy ("equivBST", equivBST)
 
 prop_insert_insert :: Property ()
 prop_insert_insert = forAllBST $ \t -> do
@@ -336,7 +339,7 @@ prop_insert_insert_weak :: Property ()
 prop_insert_insert_weak = forAllBST $ \t -> do
     k  <- gen genKey
     k' <- gen genKey
-    guard $ k /= k'      -- this is the line that makes this property "weak"
+    when (k == k') discard -- this is the line that makes this property "weak"
     v  <- gen genValue
     v' <- gen genValue
 

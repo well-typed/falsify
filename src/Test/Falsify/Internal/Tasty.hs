@@ -37,12 +37,13 @@ import qualified Test.Tasty.Providers as Tasty
   Tasty integration
 -------------------------------------------------------------------------------}
 
-data Test = Test TestOptions (Property ())
+data Test = Test TestOptions (Property' String ())
 
 data TestOptions = TestOptions {
       expectFailure      :: ExpectFailure
     , overrideVerbose    :: Maybe Verbose
     , overrideMaxShrinks :: Maybe Word
+    , overrideNumTests   :: Maybe Word
     }
 
 instance Default TestOptions where
@@ -50,12 +51,13 @@ instance Default TestOptions where
         expectFailure      = DontExpectFailure
       , overrideVerbose    = Nothing
       , overrideMaxShrinks = Nothing
+      , overrideNumTests   = Nothing
       }
 
 instance IsTest Test where
   -- @tasty@ docs (1.4.3) explicitly say to ignore the @reportProgress@ argument
   run opts (Test testOpts prop) _reportProgress =
-      toTastyResult . testResult verbose (expectFailure testOpts) <$>
+      toTastyResult . renderTestResult verbose (expectFailure testOpts) <$>
         falsify driverOpts prop
     where
       verbose :: Verbose
@@ -66,6 +68,9 @@ instance IsTest Test where
             maybe id
               (\x o -> o{Driver.maxShrinks = Just x})
               (overrideMaxShrinks testOpts)
+          $ maybe id
+              (\x o -> o{Driver.tests = x})
+              (overrideNumTests testOpts)
           $ driverOptions opts
 
   testOptions = Tagged [
@@ -76,8 +81,8 @@ instance IsTest Test where
       , Tasty.Option $ Proxy @MaxRatio
       ]
 
-toTastyResult :: TestResult -> Tasty.Result
-toTastyResult TestResult{testPassed, testOutput}
+toTastyResult :: RenderedTestResult -> Tasty.Result
+toTastyResult RenderedTestResult{testPassed, testOutput}
   | testPassed = Tasty.testPassed testOutput
   | otherwise  = Tasty.testFailed testOutput
 
@@ -86,10 +91,10 @@ toTastyResult TestResult{testPassed, testOutput}
 -------------------------------------------------------------------------------}
 
 -- | Generalization of 'testPropertyWith' using default options
-testProperty :: TestName -> Property () -> TestTree
+testProperty :: TestName -> Property' String () -> TestTree
 testProperty = testPropertyWith def
 
-testPropertyWith :: TestOptions -> TestName -> Property () -> TestTree
+testPropertyWith :: TestOptions -> TestName -> Property' String () -> TestTree
 testPropertyWith testOpts name = Tasty.singleTest name . Test testOpts
 
 {-------------------------------------------------------------------------------

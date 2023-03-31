@@ -53,4 +53,3 @@ applyPermutation p xs =
 
     conv :: (Word, Word) -> (Int, Int)
     conv (i, j) = (fromIntegral i, fromIntegral j)
-

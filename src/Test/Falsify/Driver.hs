@@ -15,8 +15,8 @@ module Test.Falsify.Driver (
     -- * Process results
   , Verbose(..)
   , ExpectFailure(..)
-  , TestResult(..)
-  , testResult
+  , RenderedTestResult(..)
+  , renderTestResult
   ) where
 
 import Prelude hiding (log)
@@ -73,11 +73,13 @@ data Success = Success {
       successSeed :: ReplaySeed
     , successRun  :: TestRun
     }
+  deriving (Show)
 
 data Failure = Failure {
       failureSeed :: ReplaySeed
     , failureRun  :: ShrinkExplanation (String, TestRun) TestRun
     }
+  deriving (Show)
 
 newtype TotalDiscarded = TotalDiscarded Word
 
@@ -91,7 +93,7 @@ newtype TotalDiscarded = TotalDiscarded Word
 -- * the failed test (if any).
 falsify ::
      Options
-  -> Property ()
+  -> Property' String ()
   -> IO (ReplaySeed, [Success], TotalDiscarded, Maybe Failure)
 falsify opts prop = do
     acc <- initDriverState opts
@@ -114,7 +116,7 @@ falsify opts prop = do
 
         case runGen (runProperty prop) st of
           -- Test passed
-          ((Right (), run), _truncated, _shrunk) -> do
+          ((TestPassed (), run), _truncated, _shrunk) -> do
             let success :: Success
                 success = Success {
                     successSeed = splitmixReplaySeed now
@@ -131,11 +133,14 @@ falsify opts prop = do
           --
           -- We ignore the failure message here, because this is the failure
           -- message before shrinking, which we are typically not interested in.
-          ((Left (TestFailed e), run), _truncated, shrunk) -> do
+          ((TestFailed e, run), _truncated, shrunk) -> do
             let explanation :: ShrinkExplanation (String, TestRun) TestRun
                 explanation =
                     limitShrinkSteps (maxShrinks opts) . second snd $
-                      shrinkFrom isValid (runProperty prop) ((e, run), shrunk)
+                      shrinkFrom
+                        resultIsValidShrink
+                        (runProperty prop)
+                        ((e, run), shrunk)
 
                 failure :: Failure
                 failure = Failure {
@@ -146,20 +151,12 @@ falsify opts prop = do
             return (successes acc, discardedTotal acc, Just failure)
 
           -- Test discarded, but reached maximum already
-          ((Left Discarded, _), _, _) | discardedForTest acc == maxRatio opts ->
+          ((TestDiscarded, _), _, _) | discardedForTest acc == maxRatio opts ->
             return (successes acc, discardedTotal acc, Nothing)
 
           -- Test discarded; continue.
-          ((Left Discarded, _), _, _) ->
+          ((TestDiscarded, _), _, _) ->
             go $ withDiscard later acc
-
-    -- It's a valid shrink step if the test still fails
-    isValid ::
-         (Either Aborted a, TestRun)
-      -> IsValidShrink (String, TestRun) (Maybe a, TestRun)
-    isValid (Left (TestFailed e) , run) = ValidShrink   (e       , run)
-    isValid (Left Discarded      , run) = InvalidShrink (Nothing , run)
-    isValid (Right a             , run) = InvalidShrink (Just a  , run)
 
 {-------------------------------------------------------------------------------
   Internal: driver state
@@ -181,7 +178,6 @@ data DriverState = DriverState {
       -- | Number of tests we discarded (in total)
     , discardedTotal :: Word
     }
-
 
 initDriverState :: Options -> IO DriverState
 initDriverState opts = do
@@ -216,8 +212,6 @@ withDiscard next acc = DriverState {
     , discardedTotal   = succ $ discardedTotal acc
     }
 
-
-
 {-------------------------------------------------------------------------------
   Process results
 -------------------------------------------------------------------------------}
@@ -237,17 +231,20 @@ data Verbose = Verbose | NotVerbose
 data ExpectFailure = ExpectFailure | DontExpectFailure
 
 -- | Test result as it should be shown to the user
-data TestResult = TestResult {
+data RenderedTestResult = RenderedTestResult {
       testPassed :: Bool
     , testOutput :: String
     }
 
-testResult ::
+renderTestResult ::
      Verbose
   -> ExpectFailure
   -> (ReplaySeed, [Success], TotalDiscarded, Maybe Failure)
-  -> TestResult
-testResult verbose expectFailure (initSeed, successes, TotalDiscarded discarded, mFailure) =
+  -> RenderedTestResult
+renderTestResult
+      verbose
+      expectFailure
+      (initSeed, successes, TotalDiscarded discarded, mFailure) =
     case (verbose, expectFailure, mFailure) of
 
       --
@@ -257,7 +254,7 @@ testResult verbose expectFailure (initSeed, successes, TotalDiscarded discarded,
       -- succeed.
       --
 
-      (NotVerbose, DontExpectFailure, Nothing) -> TestResult {
+      (NotVerbose, DontExpectFailure, Nothing) -> RenderedTestResult {
              testPassed = True
            , testOutput = unlines [
                  concat [
@@ -267,7 +264,7 @@ testResult verbose expectFailure (initSeed, successes, TotalDiscarded discarded,
                ]
            }
 
-      (Verbose, DontExpectFailure, Nothing) -> TestResult {
+      (Verbose, DontExpectFailure, Nothing) -> RenderedTestResult {
              testPassed = True
            , testOutput = unlines [
                  concat [
@@ -281,7 +278,7 @@ testResult verbose expectFailure (initSeed, successes, TotalDiscarded discarded,
                ]
            }
 
-      (NotVerbose, ExpectFailure, Nothing) -> TestResult {
+      (NotVerbose, ExpectFailure, Nothing) -> RenderedTestResult {
              testPassed = False
            , testOutput = unlines [
                  "Expected failure, but " ++ countAll ++ " passed"
@@ -289,7 +286,7 @@ testResult verbose expectFailure (initSeed, successes, TotalDiscarded discarded,
                ]
            }
 
-      (Verbose, ExpectFailure, Nothing) -> TestResult {
+      (Verbose, ExpectFailure, Nothing) -> RenderedTestResult {
              testPassed = False
            , testOutput = unlines [
                  "Expected failure, but " ++ countAll ++ " passed"
@@ -310,12 +307,12 @@ testResult verbose expectFailure (initSeed, successes, TotalDiscarded discarded,
       -- logs independent of verbosity.
       --
 
-      (NotVerbose, ExpectFailure, Just e) -> TestResult {
+      (NotVerbose, ExpectFailure, Just e) -> RenderedTestResult {
              testPassed = True
            , testOutput = unlines [
                  concat [
                      "expected failure after "
-                   , countryHistory history
+                   , countHistory history
                    , countDiscarded
                    ]
                , fst $ NE.last history
@@ -324,12 +321,12 @@ testResult verbose expectFailure (initSeed, successes, TotalDiscarded discarded,
          where
            history = shrinkHistory (failureRun e)
 
-      (Verbose, ExpectFailure, Just e) -> TestResult {
+      (Verbose, ExpectFailure, Just e) -> RenderedTestResult {
              testPassed = True
            , testOutput = unlines [
                  concat [
                      "expected failure after "
-                   , countryHistory history
+                   , countHistory history
                    , countDiscarded
                    ]
                , fst $ NE.last history
@@ -340,10 +337,10 @@ testResult verbose expectFailure (initSeed, successes, TotalDiscarded discarded,
          where
            history = shrinkHistory (failureRun e)
 
-      (_, DontExpectFailure, Just e) -> TestResult {
+      (_, DontExpectFailure, Just e) -> RenderedTestResult {
              testPassed = False
            , testOutput = unlines [
-                 "failed after " ++ countryHistory history
+                 "failed after " ++ countHistory history
                , fst $ NE.last history
                , "Logs for failed test run:"
                , renderLog . runLog . snd $ NE.last history
@@ -364,12 +361,14 @@ testResult verbose expectFailure (initSeed, successes, TotalDiscarded discarded,
       | length successes == 1 = "the test"
       | otherwise             = "all " ++ show (length successes) ++ " tests"
 
-    countryHistory :: NonEmpty (String, TestRun) -> [Char]
-    countryHistory history = concat [
+    -- The history includes the original value, so the number of shrink steps
+    -- is the length of the history minus 1.
+    countHistory :: NonEmpty (String, TestRun) -> [Char]
+    countHistory history = concat [
           if | length successes == 0 -> ""
              | otherwise             -> countSuccess ++ " and "
-        , if | length history   == 1 -> "1 shrink"
-             | otherwise             -> show (length history) ++ " shrinks"
+        , if | length history   == 2 -> "1 shrink"
+             | otherwise             -> show (length history - 1) ++ " shrinks"
         ]
 
     showSeed :: ReplaySeed -> String

@@ -68,6 +68,6 @@ prop_even = do
 prop_even_discard :: Property ()
 prop_even_discard = do
     x :: Word <- gen $ Gen.integral $ Range.num (0, 100) 0
-    guard $ even x
+    when (odd x) discard
     assert $ P.even .$ ("x", x)
 

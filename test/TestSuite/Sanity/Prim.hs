@@ -25,6 +25,8 @@ tests = testGroup "TestSuite.Sanity.Prim" [
     , testCase "maybe_towardsJust"    test_maybe_towardsJust
     , testCase "either"               test_either
     , testCase "stream"               test_stream
+    , testCase "captureLocalTree"     test_captureLocalTree
+    , testCase "captureLocalTreeBind" test_captureLocalTreeBind
     ]
 
 test_pair_word_word :: Assertion
@@ -284,6 +286,29 @@ test_stream = do
         aux xs = pairwiseAll (\x y -> y == succ x) xs
               || pairwiseAny (==)                  xs
               || any (== 0)                        xs
+
+{-------------------------------------------------------------------------------
+  captureLocalTree
+-------------------------------------------------------------------------------}
+
+test_captureLocalTree :: Assertion
+test_captureLocalTree =
+    assertEqual "cannot shrink" 1 $
+      length $ shrink (const True) gen (SampleTree.fromSeed 0)
+  where
+    gen :: Gen SampleTree
+    gen = Gen.captureLocalTree
+
+test_captureLocalTreeBind :: Assertion
+test_captureLocalTreeBind =
+    assertEqual "cannot shrink" 1 $
+      length $ shrink (const True) gen (SampleTree.fromSeed 0)
+  where
+    gen :: Gen (SampleTree, SampleTree)
+    gen = do
+        t1 <- Gen.captureLocalTree
+        t2 <- Gen.captureLocalTree
+        return (t1, t2)
 
 {-------------------------------------------------------------------------------
   Auxiliary: infinite streams

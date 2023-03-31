@@ -30,7 +30,8 @@ module Test.Falsify.Generator (
   , tree
   , bst
     -- *** Rose trees
-  , RoseTree
+  , ShrinkTree
+  , IsValidShrink(..)
   , path
   , pathAny
     -- ** Auxiliary
