@@ -152,12 +152,15 @@ elem xs = (toList xs !!) <$> integral (Range.between (0, length xs - 1))
 
 -- | Shuffle list (construct a permutation)
 --
--- Shrinks..
+-- Shrinking behaviour: 'shuffle' is defined in terms of 'permutation', which
+-- provides some guarantees: it shrinks towards making changes near the /start/
+-- of the list, and towards swapping /fewer/ elements of the list.
 --
--- * .. towards the original list
--- * .. towards fewer swaps near the end of the list
---      (i.e., the prefix of the list might be shuffled, but the tail is not)
--- * .. such that elements are swapped with /closer/ other elements
+-- It is difficult to define precisely how this affects the resulting list, but
+-- we /can/ say that if for a particular counter-example it suffices if two
+-- lists are different in /one/ element, then the shuffled list will in fact
+-- only be different in /one/ place from the original, and that one element will
+-- have been swapped with an immediate neighbour.
 shuffle :: [a] -> Gen [a]
 shuffle xs =
     flip applyPermutation xs <$>
@@ -165,26 +168,29 @@ shuffle xs =
 
 -- | Generate permutation for a list of length @n@
 --
--- This is an implementation of Fisher-Yates
--- <https://en.wikipedia.org/wiki/Fisher–Yates_shuffle>.
+-- This is essentially an implemention of Fisher-Yates, in that we generate a
+-- series of swaps (i, j), with 1 <= i <= n - 1 and @0 <= j <= i@, except that
+--
+-- * We can shrink a choice of @i@ (towards 1).
+-- * We can drop arbitrary swaps.
+--
+-- This ensures that we shrink towards making swaps nearer the /start/ of the
+-- list, as well as towards /fewer/ swaps.
+--
+-- We make no attempt to make the permutation canonical; doing so makes it
+-- extremely difficult to get predicable shrinking behaviour.
 permutation :: Word -> Gen Permutation
 permutation 0 = return []
 permutation 1 = return []
-permutation n = go [] [n - 1, n - 2 .. 1]
+permutation n =
+    mapMaybe Marked.shouldKeep <$>
+      traverse (mark . genSwap) [n - 1, n - 2 .. 1]
   where
-    -- Fisher-Yates as specified in Wikipedia:
-    --
-    -- > for i from n−1 downto 1 do
-    -- >      j ← random integer such that 0 ≤ j ≤ i
-    -- >      exchange a[j] and a[i]
-    go :: Permutation -> [Word] -> Gen Permutation
-    go acc []     = return (reverse acc)
-    go acc (i:is) = do
-        -- shrink towards i (swap with closer element)
-        j <- integral $ Range.between (i, 0)
-        if i == j
-          then go           acc  is
-          else go ((i, j) : acc) is
+    genSwap :: Word -> Gen (Word, Word)
+    genSwap i = do
+        i' <- integral $ Range.between (1, i)
+        j  <- integral $ Range.between (i, 0)
+        return (i', min i' j)
 
 {-------------------------------------------------------------------------------
   Binary trees

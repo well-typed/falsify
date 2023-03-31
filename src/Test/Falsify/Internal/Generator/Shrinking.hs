@@ -7,6 +7,7 @@ module Test.Falsify.Internal.Generator.Shrinking (
   , IsValidShrink(..)
   , limitShrinkSteps
   , shrinkHistory
+  , shrinkOutcome
   ) where
 
 import Data.Bifunctor
@@ -69,13 +70,30 @@ limitShrinkSteps (Just limit) = \case
 
 -- | Simplify the shrink explanation to keep only the shrink history
 shrinkHistory :: ShrinkExplanation p n -> NonEmpty p
-shrinkHistory (ShrinkExplanation unshrunk shrunk) =
+shrinkHistory = \(ShrinkExplanation unshrunk shrunk) ->
     unshrunk :| go shrunk
   where
     go :: ShrinkHistory p n -> [p]
     go (ShrunkTo x xs)   = x : go xs
     go (ShrinkingDone _) = []
     go ShrinkingStopped  = []
+
+-- | The final shrunk value, as well as all rejected /next/ shrunk steps
+--
+-- The list of rejected next steps is
+--
+-- * @Nothing@ if shrinking was terminated early ('limitShrinkSteps')
+-- * @Just []@ if the final value truly is minimal (typically, it is only
+--   minimal wrt to a particular properly, but not the minimal value that a
+--   generator can produce).
+shrinkOutcome :: forall p n. ShrinkExplanation p n -> (p, Maybe [n])
+shrinkOutcome = \ShrinkExplanation{initial, history} ->
+    go initial history
+  where
+    go :: p -> ShrinkHistory p n -> (p, Maybe [n])
+    go _ (ShrunkTo p h)     = go p h
+    go p (ShrinkingDone ns) = (p, Just ns)
+    go p  ShrinkingStopped  = (p, Nothing)
 
 {-------------------------------------------------------------------------------
   Mapping

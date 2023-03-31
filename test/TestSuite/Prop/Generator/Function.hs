@@ -30,6 +30,8 @@ tests = testGroup "TestSuite.Prop.Generator.Function" [
 
 {-------------------------------------------------------------------------------
   Functions @Bool -> Bool@
+
+  TODO: Should we define these in terms of the concrete functions instead?
 -------------------------------------------------------------------------------}
 
 prop_BoolToBool_notConstant :: Property ()

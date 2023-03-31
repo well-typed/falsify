@@ -4,7 +4,7 @@ import Control.Monad
 import Test.Tasty
 import Test.Tasty.Falsify
 
-import Data.Falsify.List (Permutation)
+import Data.Falsify.List (Permutation, applyPermutation)
 import Test.Falsify.Predicate (Predicate)
 
 import qualified Test.Falsify.Generator as Gen
@@ -12,15 +12,17 @@ import qualified Test.Falsify.Predicate as P
 
 tests :: TestTree
 tests = testGroup "TestSuite.Prop.Generator.Compound" [
-      testProperty "perm_shrinking"  prop_perm_shrinking
-    , testGroup "shuffle_minimum" [
-          testProperty (show n) $ prop_shuffle_minimum n
-        | n <- [0 .. 9]
+      testGroup "perm" [
+          testProperty "shrinking" prop_perm_shrinking
+        , testGroup "minimum" [
+              testProperty (show n) $ prop_perm_minimum n
+            | n <- [0 .. 9]
+            ]
         ]
     ]
 
 {-------------------------------------------------------------------------------
-  Shuffling
+  Permutations (and shuffling)
 -------------------------------------------------------------------------------}
 
 validPermShrink :: Predicate [Permutation, Permutation]
@@ -30,25 +32,27 @@ validPermShrink = mconcat [
     ]
   where
     distance :: Permutation -> Word
-    distance = sum . map between
+    distance = sum . map weighted
 
-    between :: (Word, Word) -> Word
-    between (i, j)
-      | i < j     = j - i
-      | otherwise = i - j
+    weighted :: (Word, Word) -> Word
+    weighted (i, j)
+      | i < j     = error "unexpected swap"
+      | otherwise = (10 ^ i) * (i - j)
 
 prop_perm_shrinking :: Property ()
 prop_perm_shrinking =
     testShrinkingOfGen validPermShrink $
        Gen.permutation 10
 
-prop_shuffle_minimum :: Int -> Property ()
-prop_shuffle_minimum n =
+prop_perm_minimum :: Word -> Property ()
+prop_perm_minimum n =
     testMinimum (P.satisfies ("suffixIsUnchanged", suffixIsUnchanged)) $ do
-      perm <- gen $ Gen.shuffle [0 .. 9]
-      when (perm !! n /= n) $ testFailed perm
+      perm <- gen $ Gen.permutation 10
+      let shuffled = applyPermutation perm [0 .. 9]
+      when (shuffled !! fromIntegral n /= n) $ testFailed perm
   where
-    suffixIsUnchanged :: [Int] -> Bool
-    suffixIsUnchanged perm = drop n perm == drop n [0 .. 9]
-
-
+    suffixIsUnchanged :: Permutation -> Bool
+    suffixIsUnchanged perm =
+        case perm of
+          [(i, j)]   -> i == j + 1 && (i == n || j == n)
+          _otherwise -> False

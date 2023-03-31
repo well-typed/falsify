@@ -41,8 +41,6 @@ import GHC.Stack
 import Control.Monad.Fail (MonadFail(..))
 #endif
 
-import qualified Data.List.NonEmpty as NE
-
 import Test.Falsify.Generator (Gen)
 import Test.Falsify.Internal.Generator.Shrinking
 import Test.Falsify.Predicate (Predicate, (.$))
@@ -321,12 +319,22 @@ testMinimum p prop = do
                             (runProperty prop)
                             ((e, run), shrunk)
 
-            minErr :: e
-            minRun :: TestRun
-            (minErr, minRun) = NE.last $ shrinkHistory explanation
+
+            minErr    :: e
+            minRun    :: TestRun
+            mRejected :: Maybe [(Maybe (), TestRun)]
+            ((minErr, minRun), mRejected) = shrinkOutcome explanation
+
+            rejected :: [TestRun]
+            rejected  = maybe [] (map snd) mRejected
 
         case P.eval $ p .$ ("minimum", minErr) of
           Right () -> return ()
           Left err -> do
             appendLog (runLog minRun)
+            unless (null rejected) $ do
+              info "\nLogs for rejected potential next shrinks:"
+              forM_ (zip [0 :: Word ..] rejected) $ \(i, rej) -> do
+                info $ "\n** Rejected run " ++ show i
+                appendLog $ runLog rej
             testFailed err

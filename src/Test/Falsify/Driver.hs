@@ -312,7 +312,7 @@ renderTestResult
            , testOutput = unlines [
                  concat [
                      "expected failure after "
-                   , countryHistory history
+                   , countHistory history
                    , countDiscarded
                    ]
                , fst $ NE.last history
@@ -326,7 +326,7 @@ renderTestResult
            , testOutput = unlines [
                  concat [
                      "expected failure after "
-                   , countryHistory history
+                   , countHistory history
                    , countDiscarded
                    ]
                , fst $ NE.last history
@@ -340,7 +340,7 @@ renderTestResult
       (_, DontExpectFailure, Just e) -> RenderedTestResult {
              testPassed = False
            , testOutput = unlines [
-                 "failed after " ++ countryHistory history
+                 "failed after " ++ countHistory history
                , fst $ NE.last history
                , "Logs for failed test run:"
                , renderLog . runLog . snd $ NE.last history
@@ -361,12 +361,14 @@ renderTestResult
       | length successes == 1 = "the test"
       | otherwise             = "all " ++ show (length successes) ++ " tests"
 
-    countryHistory :: NonEmpty (String, TestRun) -> [Char]
-    countryHistory history = concat [
+    -- The history includes the original value, so the number of shrink steps
+    -- is the length of the history minus 1.
+    countHistory :: NonEmpty (String, TestRun) -> [Char]
+    countHistory history = concat [
           if | length successes == 0 -> ""
              | otherwise             -> countSuccess ++ " and "
-        , if | length history   == 1 -> "1 shrink"
-             | otherwise             -> show (length history) ++ " shrinks"
+        , if | length history   == 2 -> "1 shrink"
+             | otherwise             -> show (length history - 1) ++ " shrinks"
         ]
 
     showSeed :: ReplaySeed -> String
