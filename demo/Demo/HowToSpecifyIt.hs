@@ -54,6 +54,9 @@ tests = testGroup "Demo.HowToSpecifyIt" [
             , testProperty "insert_delete"      prop_insert_delete
             , testProperty "insert_union"       prop_insert_union
             ]
+        , testGroup "PreserveEquiv" [
+              testProperty "insert" prop_preserveEquiv_insert
+            ]
         ]
     ]
 
@@ -149,6 +152,9 @@ toList = go
     go Leaf             = []
     go (Branch l k v r) = go l ++ [(k, v)] ++ go r
 
+fromList :: Ord k => [(k, v)] -> BST k v
+fromList = foldr (uncurry insert) nil
+
 keys :: BST k v -> [k]
 keys = map fst . toList
 
@@ -202,9 +208,9 @@ forAllBST p = genWith (Just . showBST) (genBST genKey genValue) >>= p
 
 {-------------------------------------------------------------------------------
   Section 4: "Approaches to Writing Properties"
--------------------------------------------------------------------------------}
 
--- Section 4.1: "Validity Testing"
+  Section 4.1: "Validity Testing"
+-------------------------------------------------------------------------------}
 
 valid :: forall k v. Ord k => BST k v -> Bool
 valid Leaf             = True
@@ -218,7 +224,9 @@ valid (Branch l k _ r) = and [
 predValid :: Ord k => P.Predicate '[BST k v]
 predValid = P.satisfies ("valid", valid)
 
--- Fig 3: Validity properties
+{-------------------------------------------------------------------------------
+  Fig 3: Validity properties
+-------------------------------------------------------------------------------}
 
 prop_valid_nil :: Property ()
 prop_valid_nil =
@@ -248,26 +256,9 @@ prop_valid_gen :: Property ()
 prop_valid_gen = forAllBST $ \t ->
     assert $ predValid .$ ("t", t)
 
--- observation: marking values in the sample tree as shrunk or unshrunk
--- reintroduces the possibility of having generators that produce valid values
--- but shrink to invalid ones; without that, every shrunk value also corresponds
--- to a value that _could_ have been produced by a generator.
--- (testing that shrinking actually /shrinks/ is different, and should be
--- tested even with just baseline "hypothesis style" testing)
-
--- observation: shrinking "invalid shrink steps" is tricky, because they
--- typically happen at specific boundaries, so it's entirely plausible that
--- a valid shrunk step is not one binary search step away from the counter
--- example that was found.
-
--- observation: "The problem here is that, even though QuickCheck initially
--- found a valid tree with an invalid shrink, it shrunk the test case before
--- reporting it using the invalid shrink function, resulting in an invalid tree
--- with invalid shrinks." (from "How to specify it"). This cannot happen with
--- our approach to shrinking: we generate _pairs_ of a value and its shrunk
--- value, and they can be shrunk /together/.
-
--- Section 4.2 Postconditions
+{-------------------------------------------------------------------------------
+  Section 4.2 Postconditions
+-------------------------------------------------------------------------------}
 
 prop_post_insert :: Property ()
 prop_post_insert = forAllBST $ \t -> do
@@ -310,9 +301,11 @@ prop_complete_insert_delete = forAllBST $ \t -> do
       Nothing -> assert $ P.expect t .$ ("deleted"  , delete k   t)
       Just v  -> assert $ P.expect t .$ ("inserted" , insert k v t)
 
--- Section 4.3 Metamorphic properties
---
--- TODO: There are more metamorphic properties listed in the paper (Appendix A)
+{-------------------------------------------------------------------------------
+  Section 4.3 Metamorphic properties
+
+  TODO: There are more metamorphic properties listed in the paper (Appendix A)
+-------------------------------------------------------------------------------}
 
 predEquiv :: (Eq k, Eq v) => P.Predicate '[BST k v, BST k v]
 predEquiv = P.relatedBy ("equivBST", equivBST)
@@ -381,8 +374,36 @@ prop_insert_union = forAllBST $ \t -> forAllBST $ \t' -> do
       .$ ("lhs", lhs)
       .$ ("rhs", rhs)
 
--- TODO: We should have the "bad" example from the QC slides in the paper
--- (and in this demo)
-
 -- Preservation of equivalence
+--
+-- TODO: There are more of these properties listed in the paper.
+
+genEquivPair :: Gen (BST Int Int, BST Int Int)
+genEquivPair = do
+    t1  <- genBST genKey genValue
+    kvs <- Gen.shuffle (toList t1)
+    return (t1, fromList kvs)
+
+forAllEquivPair :: (BST Int Int -> BST Int Int -> Property a) -> Property a
+forAllEquivPair f = genWith (Just . uncurry showPair) genEquivPair >>= uncurry f
+  where
+    showPair :: BST Int Int -> BST Int Int -> String
+    showPair t1 t2 = unlines [
+        "tree 1:"
+      , showBST t1
+      , "tree 2:"
+      , showBST t2
+      ]
+prop_preserveEquiv_insert :: Property ()
+prop_preserveEquiv_insert = forAllEquivPair $ \t1 t2 -> do
+    k <- gen genKey
+    v <- gen genValue
+    assert $
+         predEquiv
+      .$ ("lhs", insert k v t1)
+      .$ ("rhs", insert k v t2)
+
+{-------------------------------------------------------------------------------
+  4.4 Inductive Testing
+-------------------------------------------------------------------------------}
 
