@@ -36,7 +36,8 @@ tests = testGroup "TestSuite.Prop.Generator.Compound" [
     , testGroup "perm" [
           testProperty "shrinking" prop_perm_shrinking
         , testGroup "minimum" [
-              testProperty (show n) $ prop_perm_minimum n
+              testPropertyWith def{overrideMaxRatio = Just 1000}
+                (show n) $ prop_perm_minimum n
             | n <- [0 .. 9]
             ]
         ]
