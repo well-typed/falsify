@@ -49,15 +49,12 @@ test_tree_towardsOrigin1 = do
     expected =
         Branch 0
           (Branch 0
-             Leaf
-             (Branch 0
-                (Branch 0 Leaf Leaf)
-                (Branch 0 Leaf Leaf)
-             )
+            (Branch 0 Leaf Leaf)
+            (Branch 0 Leaf (Branch 0 Leaf Leaf))
           )
           (Branch 0
-             (Branch 0 Leaf (Branch 0 Leaf Leaf))
-             (Branch 0 Leaf (Branch 0 Leaf Leaf))
+            (Branch 0 Leaf (Branch 0 Leaf (Branch 0 Leaf Leaf)))
+            (Branch 0 Leaf Leaf)
           )
 
     gen :: Gen (Tree Word8)
@@ -78,17 +75,14 @@ test_tree_towardsOrigin2 = do
     expected :: Tree Word8
     expected =
         Branch 0
-          (Branch 0
-             (Branch 0 Leaf Leaf)
-             (Branch 0 Leaf (Branch 0 Leaf Leaf))
-          )
           -- This is the unbalanced subtree:
           (Branch 0
-             Leaf
-             (Branch 0
-                (Branch 0 Leaf Leaf)
-                (Branch 0 Leaf (Branch 0 Leaf Leaf))
-             )
+            Leaf
+            (Branch 0 (Branch 0 Leaf Leaf) (Branch 0 Leaf Leaf))
+          )
+          (Branch 0
+            (Branch 0 Leaf (Branch 0 Leaf Leaf))
+            (Branch 0 Leaf (Branch 0 Leaf Leaf))
           )
 
     gen :: Gen (Tree Word8)

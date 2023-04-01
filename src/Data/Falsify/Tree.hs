@@ -11,7 +11,7 @@ module Data.Falsify.Tree (
   , isHeightBalanced
     -- * Dealing with marks
   , propagate
-  , truncate
+  , genKept
   , keepAtLeast
     -- * Binary search trees
   , Interval(..)
@@ -22,16 +22,15 @@ module Data.Falsify.Tree (
   , draw
   ) where
 
-import Prelude hiding (drop, truncate, lookup)
+import Prelude hiding (drop, lookup)
 
+import Control.Selective (Selective, ifS)
 import Control.Monad.State
 import GHC.Show
 
 import qualified Data.Tree as Rose
 
-import Data.Falsify.Marked (Marked(..))
-
-import qualified Data.Falsify.Marked as Marked
+import Data.Falsify.Marked
 
 {-------------------------------------------------------------------------------
   Definition
@@ -174,61 +173,59 @@ checkBalanceCondition p = go
 
 -- | Propagate 'Drop' marker down the tree
 --
--- This is useful in conjunction with 'truncate', which truncates entire
+-- This is useful in conjunction with 'genKept', which truncates entire
 -- subtrees.
 propagate :: Tree (Marked a) -> Tree (Marked a)
 propagate = keep
   where
     keep :: Tree (Marked a) -> Tree (Marked a)
-    keep Leaf                  = Leaf
-    keep (Branch (Keep x) l r) = Branch (Keep x) (keep l) (keep r)
-    keep (Branch (Drop x) l r) = Branch (Drop x) (drop l) (drop r)
+    keep Leaf                         = Leaf
+    keep (Branch (Marked Keep x) l r) = Branch (Marked Keep x) (keep l) (keep r)
+    keep (Branch (Marked Drop x) l r) = Branch (Marked Drop x) (drop l) (drop r)
 
     drop :: Tree (Marked a) -> Tree (Marked a)
-    drop = fmap (Drop . Marked.forget)
+    drop = fmap $ \(Marked _ x) -> Marked Drop x
 
--- | Truncate tree
+-- | Generate those values we want to keep
 --
 -- Whenever we meet an element marked 'Drop', that entire subtree is dropped.
-truncate :: Tree (Marked a) -> Tree a
-truncate = go
+genKept :: forall f a. Selective f => Tree (Marked (f a)) -> f (Tree a)
+genKept = go
   where
-    go :: Tree (Marked a) -> Tree a
-    go Leaf                  = Leaf
-    go (Branch (Drop _) _ _) = Leaf
-    go (Branch (Keep x) l r) = Branch x (go l) (go r)
+    go :: Tree (Marked (f a)) -> f (Tree a)
+    go Leaf                      = pure Leaf
+    go (Branch (Marked m g) l r) = ifS (pure $ m == Keep)
+                                     (Branch <$> g <*> go l <*> go r)
+                                     (pure Leaf)
 
 -- | Change enough nodes currently marked as 'Drop' to 'Keep' to ensure at
 -- least @n@ nodes are marked 'Keep'.
 --
--- This function is different from 'Data.Falsify.Marked.keepAtLeast':
---
--- * It /requires/ as precondition that any 'Drop' marks must have been
---   propagated; see 'propagate'.
--- * It /guarantees/ as postcondition that this property is preserved.
+-- Precondition: any 'Drop' marks must have been propagated; see 'propagate'.
+-- Postcondition: this property is preserved.
 keepAtLeast :: Word -> Tree (Marked a) -> Tree (Marked a)
 keepAtLeast = \n t ->
-    let kept = Marked.countKept t
+    let kept = countKept t
     in if kept >= n
          then t
          else evalState (go t) (n - kept)
   where
     go :: Tree (Marked a) -> State Word (Tree (Marked a))
-    go   Leaf                  = return Leaf
-    go   (Branch (Keep x) l r) = Branch (Keep x) <$> go l <*> go r
-    go t@(Branch (Drop x) l r) = get >>= \case
+    go   Leaf                         = return Leaf
+    go   (Branch (Marked Keep x) l r) = Branch (Marked Keep x) <$> go l <*> go r
+    go t@(Branch (Marked Drop x) l r) = get >>= \case
          0 ->
            -- Nothing left to drop
            return t
          n | size t <= n -> do
-          -- We can delete the entire subtree
+          -- We can keep the entire subtree
           put $ n - size t
-          return $ fmap (Keep . Marked.forget) t
+          return $ fmap (Marked Keep . unmark) t
          n ->  do
           -- We cannot delete the entire subtree. In order to preserve the
           -- "drop property", we /must/ mark this node as 'Keep'
           put $ n - 1
-          Branch (Keep x) <$> go l <*> go r
+          Branch (Marked Keep x) <$> go l <*> go r
 
 {-------------------------------------------------------------------------------
   BST

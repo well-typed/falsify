@@ -378,7 +378,9 @@ testShrinkingOfProp p prop = do
 --
 -- Since a generator doesn't have a concept of \"failing\", we just /any/
 -- shrink step that the generator can make.
-testShrinkingOfGen :: Show a => Predicate [a, a] -> Gen a -> Property' String ()
+testShrinkingOfGen ::
+     (HasCallStack, Show a)
+  => Predicate [a, a] -> Gen a -> Property' String ()
 testShrinkingOfGen p g = testShrinkingOfProp p $ gen g >>= testFailed
 
 -- | Test the minimum error thrown by the property

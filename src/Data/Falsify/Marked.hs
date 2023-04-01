@@ -1,14 +1,17 @@
 -- | Marked elements
 --
--- Intended for qualified import.
+-- Intended for unqualified import.
 module Data.Falsify.Marked (
-    Marked(..)
+    Mark(..)
+  , Marked(..)
+    -- * Generation
+  , selectKept
     -- * Queries
-  , forget
-  , shouldKeep
   , countKept
+  , shouldKeep
   ) where
 
+import Control.Selective
 import Data.Foldable (toList)
 import Data.Maybe (mapMaybe)
 
@@ -16,20 +19,32 @@ import Data.Maybe (mapMaybe)
   Definition
 -------------------------------------------------------------------------------}
 
-data Marked a = Keep a | Drop a
-  deriving stock (Show, Eq, Functor)
+data Mark = Keep | Drop
+  deriving stock (Show, Eq, Ord)
+
+data Marked a = Marked {
+      getMark :: Mark
+    , unmark  :: a
+    }
+  deriving stock (Show, Eq, Ord)
+
+{-------------------------------------------------------------------------------
+  Generation
+-------------------------------------------------------------------------------}
+
+selectKept :: Selective f => Marked (f a) -> f (Maybe a)
+selectKept (Marked mark gen) =
+    ifS (pure $ mark == Keep)
+        (Just <$> gen)
+        (pure Nothing)
 
 {-------------------------------------------------------------------------------
   Queries
 -------------------------------------------------------------------------------}
 
-forget :: Marked a -> a
-forget (Keep x) = x
-forget (Drop x) = x
-
-shouldKeep :: Marked a -> Maybe a
-shouldKeep (Keep a) = Just a
-shouldKeep (Drop _) = Nothing
-
 countKept :: Foldable t => t (Marked a) -> Word
 countKept = fromIntegral . length . mapMaybe shouldKeep . toList
+
+shouldKeep :: Marked a -> Maybe a
+shouldKeep (Marked Keep x) = Just x
+shouldKeep (Marked Drop _) = Nothing

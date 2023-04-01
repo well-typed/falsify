@@ -30,14 +30,13 @@ import Control.Selective
 import Data.Either (either)
 import Data.Foldable (toList)
 import Data.List.NonEmpty (NonEmpty(..))
-import Data.Maybe (mapMaybe, catMaybes)
 import Data.Void
 
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Tree          as Rose
 
 import Data.Falsify.List (Permutation, applyPermutation)
-import Data.Falsify.Marked (Marked(..))
+import Data.Falsify.Marked
 import Data.Falsify.Tree (Tree(..), Interval(..), Endpoint(..))
 import Test.Falsify.Generator.Auxiliary
 import Test.Falsify.Internal.Generator
@@ -45,9 +44,9 @@ import Test.Falsify.Internal.Generator.Shrinking (IsValidShrink(..))
 import Test.Falsify.Range (Range)
 import Test.Falsify.Reexported.Generator.Simple
 
-import qualified Data.Falsify.Marked as Marked
-import qualified Data.Falsify.Tree   as Tree
-import qualified Test.Falsify.Range  as Range
+import qualified Data.Falsify.List  as List
+import qualified Data.Falsify.Tree  as Tree
+import qualified Test.Falsify.Range as Range
 
 {-------------------------------------------------------------------------------
   Taking advantage of 'Selective'
@@ -111,8 +110,8 @@ shrinkToNothing g = firstThen Just (const Nothing) <*> g
 -- This is similar to 'shrinkToNothing', except that 'Marked' still has a value
 -- in the 'Drop' case: marks are merely hints, that we may or may not use (e.g.,
 -- see 'Marked.keepAtLeast').
-mark :: Gen a -> Gen (Marked a)
-mark g = firstThen Keep Drop <*> g
+mark :: a -> Gen (Marked a)
+mark x = flip Marked x <$> firstThen Keep Drop
 
 {-------------------------------------------------------------------------------
   Lists
@@ -151,30 +150,17 @@ list len gen = do
     -- samples" as it shrinks.
     n <- integral len
 
-    -- | Generate @n@ marks, indicating for each element if we want to keep that
+    -- Generate @n@ marks, indicating for each element if we want to keep that
     -- element or not, so that we can drop elements from the middle of the list.
     --
     -- Due to the left-biased nature of shrinking, this will shrink towards
     -- dropped elements (@False@ values) near the start, but we want them near
     -- the /end/, so we reverse the list.
-    marks <- fmap reverse $ replicateM (fromIntegral n) $ firstThen True False
+    marks <- fmap (List.keepAtLeast (Range.origin len) . reverse) $
+               replicateM (fromIntegral n) $ mark gen
 
-    -- Dropping elements from the list will of course only /decrease/ the
-    -- length of the generated list. However, we don't want to get further
-    -- away from the target list length (@origin@).
-    let kept   = fromIntegral $ length $ filter id marks
-    let marks' = if kept >= Range.origin len
-                   then marks
-                   else remark (Range.origin len - kept) marks
-
-    fmap catMaybes $ forM marks' $ \m ->
-      ifS (pure m) (Just <$> gen) (pure Nothing)
-  where
-    remark :: Word -> [Bool] -> [Bool]
-    remark _ []         = []
-    remark 0 xs         = xs
-    remark n (True:xs)  = True : remark  n      xs
-    remark n (False:xs) = True : remark (n - 1) xs
+    -- Finally, generate the elements we want to keep
+    List.genKept marks
 
 -- | Choose random element
 --
@@ -231,9 +217,9 @@ shuffle xs =
 permutation :: Word -> Gen Permutation
 permutation 0 = return []
 permutation 1 = return []
-permutation n =
-    mapMaybe Marked.shouldKeep <$>
-      traverse (mark . genSwap) [n - 1, n - 2 .. 1]
+permutation n = do
+    swaps <- mapM (mark . genSwap) [n - 1, n - 2 .. 1]
+    List.genKept swaps
   where
     genSwap :: Word -> Gen (Word, Word)
     genSwap i = do
@@ -249,10 +235,10 @@ permutation n =
 tree :: forall a. Range Word -> Gen a -> Gen (Tree a)
 tree size gen = do
     n <- integral size
-    Tree.truncate . Tree.keepAtLeast (Range.origin size) . Tree.propagate <$>
-      go n
+    t <- Tree.keepAtLeast (Range.origin size) . Tree.propagate <$> go n
+    Tree.genKept t
   where
-    go :: Word -> Gen (Tree (Marked a))
+    go :: Word -> Gen (Tree (Marked (Gen a)))
     go 0 = return Leaf
     go n = do
         -- Generate element at the root
