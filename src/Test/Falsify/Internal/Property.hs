@@ -122,9 +122,11 @@ data TestResult e a =
 resultIsValidShrink ::
      (TestResult e a, TestRun)
   -> IsValidShrink (e, TestRun) (Maybe a, TestRun)
-resultIsValidShrink (TestFailed e  , run) = ValidShrink   (e       , run)
-resultIsValidShrink (TestDiscarded , run) = InvalidShrink (Nothing , run)
-resultIsValidShrink (TestPassed a  , run) = InvalidShrink (Just a  , run)
+resultIsValidShrink (result, run) =
+    case result of
+      TestFailed e  -> ValidShrink   (e       , run)
+      TestDiscarded -> InvalidShrink (Nothing , run)
+      TestPassed a  -> InvalidShrink (Just a  , run)
 
 {-------------------------------------------------------------------------------
   Monad-transformer version of 'TestResult'

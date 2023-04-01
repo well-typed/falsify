@@ -20,7 +20,7 @@ data Range a =
     -- | Generate value in any of the specified ranges, then choose the one
     -- that is closest to the specified origin
   | Towards a [Range a]
-  deriving (Functor)
+  deriving stock (Show, Functor)
 
 {-------------------------------------------------------------------------------
   Constructing ranges

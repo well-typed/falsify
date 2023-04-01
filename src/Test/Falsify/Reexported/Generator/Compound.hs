@@ -5,6 +5,7 @@ module Test.Falsify.Reexported.Generator.Compound (
     -- * Lists
   , list
   , elem
+  , pick
     -- ** Shuffling
   , shuffle
   , permutation
@@ -144,7 +145,20 @@ list len gen = do
 --
 -- Shrinks towards earlier elements.
 elem :: NonEmpty a -> Gen a
-elem xs = (toList xs !!) <$> integral (Range.between (0, length xs - 1))
+elem = fmap (\(_before, x, _after) -> x) . pick
+
+-- | Choose random element from a list
+--
+-- Also returns the elements from the list before and after the chosen element.
+pick :: NonEmpty a -> Gen ([a], a, [a])
+pick = \xs ->
+    aux [] (toList xs) <$>
+      integral (Range.between (0, length xs - 1))
+  where
+     aux :: [a] -> [a] -> Int -> ([a], a, [a])
+     aux _    []     _ = error "pick: impossible"
+     aux prev (x:xs) 0 = (reverse prev, x, xs)
+     aux prev (x:xs) i = aux (x:prev) xs (i - 1)
 
 {-------------------------------------------------------------------------------
   Shuffling
@@ -262,13 +276,26 @@ path validShrink = \(Rose.Node a as) ->
       InvalidShrink n -> pure $ Left n
       ValidShrink   p -> Right <$> go p as
   where
+    -- We only want to pick a shrunk value that matches the predicate, but we
+    -- potentially waste a /lot/ of work if we first evaluate the predicate for
+    -- /all/ potential shrunk values and then choose. So, instead we choose
+    -- first, evaluate the predicate, and if it fails, choose again.
     go :: p -> [Rose.Tree a] -> Gen (NonEmpty p)
-    go b as =
-        case mapMaybe checkPred as of
-          []   -> pure (b :| [])
-          m:ms -> choose
-                    (pure (b :| []))
-                    (elem (m :| ms) >>= \(b', as') -> NE.cons b <$> go b' as')
+    go p []     = pure (p :| [])
+    go p (a:as) = do
+        (before, a', after) <- pick (a :| as)
+        case checkPred a' of
+          Nothing ->
+            -- Not a valid shrink step. Pick a different one.
+            go p (before ++ after)
+          Just (p', as') ->
+            -- Found a valid shrink step.
+            --
+            -- We only call @choose@ once we found a valid shrink step,
+            -- otherwise we would skew very heavily towards shorter paths.
+            choose
+              (pure (p :| []))
+              (NE.cons p <$> go p' as')
 
     checkPred :: Rose.Tree a -> Maybe (p, [Rose.Tree a])
     checkPred (Rose.Node a as) =
