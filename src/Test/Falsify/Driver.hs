@@ -25,10 +25,13 @@ import Data.Bifunctor
 import Data.Default
 import Data.List (intercalate)
 import Data.List.NonEmpty (NonEmpty)
+import Data.Set (Set)
 import GHC.Exception
 import System.Random.SplitMix
 
 import qualified Data.List.NonEmpty as NE
+import qualified Data.Map           as Map
+import qualified Data.Set           as Set
 
 import Test.Falsify.Driver.ReplaySeed
 import Test.Falsify.Internal.Generator
@@ -37,6 +40,8 @@ import Test.Falsify.Internal.Property
 import Test.Falsify.SampleTree (SampleTree)
 
 import qualified Test.Falsify.SampleTree as SampleTree
+import Data.Map (Map)
+import Text.Printf
 
 {-------------------------------------------------------------------------------
   Options
@@ -261,6 +266,7 @@ renderTestResult
                      countSuccess
                    , countDiscarded
                    ]
+               , showLabels
                ]
            }
 
@@ -373,6 +379,56 @@ renderTestResult
 
     showSeed :: ReplaySeed -> String
     showSeed seed = "Use --falsify-replay=" ++ show seed ++ " to replay."
+
+    showLabels :: String
+    showLabels = intercalate "\n" [
+          intercalate "\n" $ ("\nLabel " ++ show l ++ ":") : [
+              asPct n ++ " " ++ v
+            | v <- Set.toList (Map.findWithDefault Set.empty l allValues)
+            , let n = Map.findWithDefault 0         v
+                    $ Map.findWithDefault Map.empty l
+                    $ perTest
+            ]
+        | l <- Set.toList allLabels
+        ]
+      where
+        -- Absolute number of tests as a percentage of total successes
+        asPct :: Int -> String
+        asPct n =
+           printf "  %8.4f%%" pct
+          where
+            pct :: Double
+            pct = fromIntegral n / fromIntegral (length successes) * 100
+
+        -- All labels across all tests
+        allLabels :: Set String
+        allLabels = Map.keysSet allValues
+
+        -- For each label, all values reported across all tests
+        allValues :: Map String (Set String)
+        allValues =
+            Map.unionsWith Set.union $
+              map (runLabels . successRun) successes
+
+        -- For each label and each value, the corresponding number of tests
+        perTest :: Map String (Map String Int)
+        perTest =
+            Map.fromList [
+                (l, Map.fromList [
+                    (v, length $ filter (labelHasValue l v) successes)
+                  | v <- Set.toList $
+                             Map.findWithDefault Set.empty l allValues
+                  ])
+              | l <- Set.toList allLabels
+              ]
+
+        -- Check if in particular test run label @l@ has value @v@
+        labelHasValue :: String -> String -> Success -> Bool
+        labelHasValue l v =
+              Set.member v
+            . Map.findWithDefault Set.empty l
+            . runLabels
+            . successRun
 
 renderSuccess :: (Int, Success) -> String
 renderSuccess (ix, Success{successRun}) =

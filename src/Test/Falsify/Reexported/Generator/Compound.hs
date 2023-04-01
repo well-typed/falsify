@@ -213,7 +213,7 @@ tree size gen = do
         --
         -- This ranges from none (right-biased) to all (left-biased), shrinking
         -- towards half the number of elements: hence, towards a balanced tree.
-        inLeft <- integral $ Range.num (0, n - 1) ((n - 1) `div` 2)
+        inLeft <- integral $ Range.linear (0, n - 1) ((n - 1) `div` 2)
         let inRight = (n - 1) - inLeft
         Branch x <$> go inLeft <*> go inRight
 

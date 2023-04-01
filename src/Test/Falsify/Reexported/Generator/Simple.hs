@@ -13,10 +13,8 @@ import Data.Bits
 
 import Test.Falsify.Generator.Auxiliary
 import Test.Falsify.Internal.Generator
-import Test.Falsify.Range (Range(..), origin)
+import Test.Falsify.Range (Range(..))
 import Test.Falsify.SampleTree (Sample(..), sampleValue)
-
-import qualified Test.Falsify.Range as Range
 
 {-------------------------------------------------------------------------------
   Auxiliary
@@ -84,7 +82,7 @@ integral :: forall a. (Integral a, FiniteBits a) => Range a -> Gen a
 integral r = fromIntegral <$>
     integerWithPrecision
       (precisionRequiredToRepresent $ hi r)
-      (Range.fromIntegral r)
+      (fromIntegral <$> r)
 
 -- | Uniform selection of random value in the specified range
 --
@@ -94,4 +92,4 @@ enum :: forall a. Enum a => Range a -> Gen a
 enum r = toEnum . fromIntegral <$>
     integerWithPrecision
       (precisionRequiredToRepresent $ fromEnum $ hi r)
-      (Range.fromEnum r)
+      (fromIntegral . fromEnum <$> r)

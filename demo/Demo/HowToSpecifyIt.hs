@@ -22,14 +22,13 @@ import qualified Data.Falsify.Tree      as Tree
 import qualified Test.Falsify.Generator as Gen
 import qualified Test.Falsify.Range     as Range
 import qualified Test.Falsify.Predicate as P
+import qualified Data.List as L
 
 tests :: TestTree
 tests = testGroup "Demo.HowToSpecifyIt" [
       testGroup "Section2" [
-          testProperty
-            "reverse_reverse" prop_reverse_reverse
-        , testPropertyWith (def { expectFailure = ExpectFailure })
-            "reverse_id"      prop_reverse_id
+          testProperty                   "reverse_reverse" prop_reverse_reverse
+        , testPropertyWith expectFailure "reverse_id"      prop_reverse_id
         ]
     , testGroup "Section4" [
           testGroup "Validity" [
@@ -54,8 +53,35 @@ tests = testGroup "Demo.HowToSpecifyIt" [
             , testProperty "insert_delete"      prop_insert_delete
             , testProperty "insert_union"       prop_insert_union
             ]
+        , testGroup "PreserveEquiv" [
+              testProperty "insert" prop_preserveEquiv_insert
+            ]
+        , testGroup "Inductive" [
+              testProperty "union_nil"    prop_union_nil
+            , testProperty "union_insert" prop_union_insert
+            , testGroup "Completeness" [
+                  testProperty "insert" prop_complete_insert
+                , testProperty "delete" prop_complete_delete
+                , testProperty "union"  prop_complete_union
+                ]
+            ]
+        , testGroup "Model" [
+              testProperty                   "nil"          prop_model_nil
+            , testProperty                   "insert"       prop_model_insert
+            , testPropertyWith expectFailure "insert_wrong" prop_model_insert_wrong
+            ]
+        , testGroup "Generation" [
+              testPropertyWith (def { overrideNumTests = Just 10_000 })
+                "measure" prop_measure
+            ]
         ]
     ]
+  where
+    expectFailure :: TestOptions
+    expectFailure = def {
+          expectFailure    = ExpectFailure
+        , overrideNumTests = Just 1000
+        }
 
 {-------------------------------------------------------------------------------
   Section 2: "A Primer in Property-Based Testing"
@@ -149,6 +175,9 @@ toList = go
     go Leaf             = []
     go (Branch l k v r) = go l ++ [(k, v)] ++ go r
 
+fromList :: Ord k => [(k, v)] -> BST k v
+fromList = foldr (uncurry insert) nil
+
 keys :: BST k v -> [k]
 keys = map fst . toList
 
@@ -202,9 +231,9 @@ forAllBST p = genWith (Just . showBST) (genBST genKey genValue) >>= p
 
 {-------------------------------------------------------------------------------
   Section 4: "Approaches to Writing Properties"
--------------------------------------------------------------------------------}
 
--- Section 4.1: "Validity Testing"
+  Section 4.1: "Validity Testing"
+-------------------------------------------------------------------------------}
 
 valid :: forall k v. Ord k => BST k v -> Bool
 valid Leaf             = True
@@ -218,7 +247,9 @@ valid (Branch l k _ r) = and [
 predValid :: Ord k => P.Predicate '[BST k v]
 predValid = P.satisfies ("valid", valid)
 
--- Fig 3: Validity properties
+{-------------------------------------------------------------------------------
+  Fig 3: Validity properties
+-------------------------------------------------------------------------------}
 
 prop_valid_nil :: Property ()
 prop_valid_nil =
@@ -248,26 +279,9 @@ prop_valid_gen :: Property ()
 prop_valid_gen = forAllBST $ \t ->
     assert $ predValid .$ ("t", t)
 
--- observation: marking values in the sample tree as shrunk or unshrunk
--- reintroduces the possibility of having generators that produce valid values
--- but shrink to invalid ones; without that, every shrunk value also corresponds
--- to a value that _could_ have been produced by a generator.
--- (testing that shrinking actually /shrinks/ is different, and should be
--- tested even with just baseline "hypothesis style" testing)
-
--- observation: shrinking "invalid shrink steps" is tricky, because they
--- typically happen at specific boundaries, so it's entirely plausible that
--- a valid shrunk step is not one binary search step away from the counter
--- example that was found.
-
--- observation: "The problem here is that, even though QuickCheck initially
--- found a valid tree with an invalid shrink, it shrunk the test case before
--- reporting it using the invalid shrink function, resulting in an invalid tree
--- with invalid shrinks." (from "How to specify it"). This cannot happen with
--- our approach to shrinking: we generate _pairs_ of a value and its shrunk
--- value, and they can be shrunk /together/.
-
--- Section 4.2 Postconditions
+{-------------------------------------------------------------------------------
+  Section 4.2 Postconditions
+-------------------------------------------------------------------------------}
 
 prop_post_insert :: Property ()
 prop_post_insert = forAllBST $ \t -> do
@@ -310,9 +324,11 @@ prop_complete_insert_delete = forAllBST $ \t -> do
       Nothing -> assert $ P.expect t .$ ("deleted"  , delete k   t)
       Just v  -> assert $ P.expect t .$ ("inserted" , insert k v t)
 
--- Section 4.3 Metamorphic properties
---
--- TODO: There are more metamorphic properties listed in the paper (Appendix A)
+{-------------------------------------------------------------------------------
+  Section 4.3 Metamorphic properties
+
+  TODO: There are more metamorphic properties listed in the paper (Appendix A)
+-------------------------------------------------------------------------------}
 
 predEquiv :: (Eq k, Eq v) => P.Predicate '[BST k v, BST k v]
 predEquiv = P.relatedBy ("equivBST", equivBST)
@@ -381,8 +397,125 @@ prop_insert_union = forAllBST $ \t -> forAllBST $ \t' -> do
       .$ ("lhs", lhs)
       .$ ("rhs", rhs)
 
--- TODO: We should have the "bad" example from the QC slides in the paper
--- (and in this demo)
-
 -- Preservation of equivalence
+--
+-- TODO: There are more of these properties listed in the paper.
+
+genEquivPair :: Gen (BST Int Int, BST Int Int)
+genEquivPair = do
+    t1  <- genBST genKey genValue
+    kvs <- Gen.shuffle (toList t1)
+    return (t1, fromList kvs)
+
+forAllEquivPair :: (BST Int Int -> BST Int Int -> Property a) -> Property a
+forAllEquivPair f = genWith (Just . uncurry showPair) genEquivPair >>= uncurry f
+  where
+    showPair :: BST Int Int -> BST Int Int -> String
+    showPair t1 t2 = unlines [
+        "tree 1:"
+      , showBST t1
+      , "tree 2:"
+      , showBST t2
+      ]
+prop_preserveEquiv_insert :: Property ()
+prop_preserveEquiv_insert = forAllEquivPair $ \t1 t2 -> do
+    k <- gen genKey
+    v <- gen genValue
+    assert $
+         predEquiv
+      .$ ("lhs", insert k v t1)
+      .$ ("rhs", insert k v t2)
+
+{-------------------------------------------------------------------------------
+  4.4 Inductive Testing
+-------------------------------------------------------------------------------}
+
+prop_union_nil :: Property ()
+prop_union_nil = forAllBST $ \t ->
+    assert $ predEquiv
+      .$ ("lhs", union nil t)
+      .$ ("rhs", t)
+
+prop_union_insert :: Property ()
+prop_union_insert = forAllBST $ \t -> forAllBST $ \t' -> do
+    k <- gen genKey
+    v <- gen genValue
+
+    let lhs = union (insert k v t) t'
+        rhs = insert k v (union t t')
+
+    assert $ predEquiv
+      .$ ("lhs", lhs)
+      .$ ("rhs", rhs)
+
+insertions :: BST k v -> [(k, v)]
+insertions Leaf = []
+insertions (Branch l k v r) = (k, v) : insertions l ++ insertions r
+
+prop_complete ::
+     (Show k, Show v, Ord k, Ord v)
+  => BST k v -> Property' String ()
+prop_complete t =
+    assert $ P.eq -- we really want equality here, not equivalence
+      .$ ("lhs", t)
+      .$ ("rhs", foldl (flip $ uncurry insert) nil (insertions t))
+
+prop_complete_insert :: Property ()
+prop_complete_insert = forAllBST $ \t -> do
+    prop_complete t
+
+prop_complete_delete :: Property ()
+prop_complete_delete = forAllBST $ \t -> do
+    k <- gen genKey
+    prop_complete (delete k t)
+
+prop_complete_union :: Property ()
+prop_complete_union = forAllBST $ \t -> forAllBST $ \t' -> do
+    prop_complete (union t t')
+
+{-------------------------------------------------------------------------------
+  Section 4.5 Model-based properties
+
+  TODO: There a a few more properties listed in the paper.
+-------------------------------------------------------------------------------}
+
+deleteKey :: Eq k => k -> [(k, b)] -> [(k, b)]
+deleteKey k = filter ((/= k) . fst)
+
+prop_model_nil :: Property ()
+prop_model_nil =
+    assert $ P.eq
+      .$ ("lhs", toList (nil :: BST Int Int))
+      .$ ("rhs", [])
+
+prop_model_insert :: Property ()
+prop_model_insert = forAllBST $ \t -> do
+    k <- gen genKey
+    v <- gen genValue
+    assert $ P.eq
+      .$ ("lhs", toList (insert k v t))
+      .$ ("rhs", L.insert (k, v) (deleteKey k $ toList t))
+
+prop_model_insert_wrong :: Property ()
+prop_model_insert_wrong = forAllBST $ \t -> do
+    k <- gen genKey
+    v <- gen genValue
+    assert $ P.eq
+      .$ ("lhs", toList (insert k v t))
+      .$ ("rhs", L.insert (k, v) (toList t))
+
+{-------------------------------------------------------------------------------
+  Section 4.6 A Note on Generation
+-------------------------------------------------------------------------------}
+
+prop_measure :: Property ()
+prop_measure = forAllBST $ \t -> do
+    k <- gen genKey
+    collect "present" [k `elem` keys t]
+    collect "where" $ if
+      | t == nil            -> ["empty"]
+      | keys t == [k]       -> ["just k"]
+      | all (>= k) (keys t) -> ["at start"]
+      | all (<= k) (keys t) -> ["at end"]
+      | otherwise           -> ["middle"]
 

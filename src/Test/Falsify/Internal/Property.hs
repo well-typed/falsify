@@ -22,6 +22,8 @@ module Test.Falsify.Internal.Property (
   , info
   , assert
   , discard
+  , label
+  , collect
     -- * Test shrinking
   , genShrinkPath
   , testShrinkingOfProp
@@ -35,7 +37,13 @@ import Control.Monad.Except
 import Control.Monad.State
 import Data.Foldable (toList)
 import Data.List.NonEmpty (NonEmpty)
+import Data.Map (Map)
+import Data.Maybe (fromMaybe)
+import Data.Set (Set)
 import GHC.Stack
+
+import qualified Data.Map as Map
+import qualified Data.Set as Set
 
 #if !MIN_VERSION_base(4,13,0)
 import Control.Monad.Fail (MonadFail(..))
@@ -60,6 +68,9 @@ data TestRun = TestRun {
       -- If not, there is no point running the test more than once (with
       -- different seeds), since the test is deterministic.
     , runDeterministic :: Bool
+
+      -- | Labels
+    , runLabels :: Map String (Set String)
     }
   deriving (Show)
 
@@ -83,6 +94,7 @@ initTestRun :: TestRun
 initTestRun = TestRun {
       runLog           = Log []
     , runDeterministic = True
+    , runLabels        = Map.empty
     }
 
 {-------------------------------------------------------------------------------
@@ -188,6 +200,80 @@ assert p =
     case P.eval p of
       Left err -> testFailed err
       Right () -> return ()
+
+-- | Variation on 'collect' that does not rely on 'Show'
+--
+-- See 'collect' for detailed discussion.
+label :: String -> [String] -> Property' e ()
+label lbl vals =
+    mkProperty $ \run@TestRun{runLabels} -> return (
+        TestPassed ()
+      , run{runLabels = Map.alter addValues lbl runLabels}
+      )
+  where
+    addValues :: Maybe (Set String) -> Maybe (Set String)
+    addValues = Just . Set.union (Set.fromList vals) . fromMaybe Set.empty
+
+-- | Label this test
+--
+-- See also 'label', which does not rely on 'Show'.
+--
+-- # Motivation
+--
+-- Labelling is instrumental in understanding the distribution of test data. For
+-- example, consider testing a binary tree type, and we want to test some
+-- properties of an @insert@ operation (example from "How to specify it!" by
+-- John Hughes):
+--
+-- > prop_insert_insert :: Property ()
+-- > prop_insert_insert = do
+-- >   tree     <- gen $ ..
+-- >   (k1, v1) <- gen $ ..
+-- >   (k2, v2) <- gen $ ..
+-- >   assert $ .. (insert k1 v1 $ insert k2 v2 $ tree) ..
+--
+-- We might want to know in what percentage of tests @k1 == k2@:
+--
+-- > collect "sameKey" [k1 == k2]
+--
+-- When we do, @falsify@ will report in which percentage of tests the key
+-- are the same, and in which percentage of tests they are not.
+--
+-- # Labels with multiple values
+--
+-- In general, a particular label can have multiple values in any given test
+-- run. Given a test of @n@ test runs, for each value @v@ reported, @falsify@
+-- will report what percentage of the @n@ runs are labelled with @v@. That means
+-- that these percentages /may/ not add up to 100%; indeed, if we had
+--
+-- > collect "sameKey" [True]
+-- > ..
+-- > collect "sameKey" [False]
+--
+-- or, equivalently,
+--
+-- > collect "sameKey" [True, False]
+--
+-- then /every/ test would have been reported as labelled with @True@ (100%@)
+-- /as well as/ with @False@ (also 100%). Of course, if we do (like above)
+--
+-- > collect "sameKey" [k1 == k2]
+--
+-- each test will be labelled with /either/ @True@ /or/ @False@, and the
+-- percentages /will/ add up to 100%.
+--
+-- # Difference from QuickCheck
+--
+-- Since you can call @collect@ anywhere in a property, it is natural that the
+-- same label can have /multiple/ values in any given test run. In this regard,
+-- @collect@ is closer to QuickCheck's @tabulate@. However, the statistics of
+-- @tabulate@ can be difficult to interpret; QuickCheck reports the frequency of
+-- a value as a percentage of the /total number of values collected/; the
+-- frequency reported by @falsify@ here is always in terms of number of test
+-- runs, like @collect@ does in QuickCheck. We therefore opted to use the name
+-- @collect@ rather than @tabulate@.
+collect :: Show a => String -> [a] -> Property' e ()
+collect l = label l . map show
 
 instance MonadFail (Property' String) where
   fail = testFailed

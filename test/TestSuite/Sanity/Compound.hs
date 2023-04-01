@@ -68,7 +68,7 @@ test_list_towardsShorter = do
     gen :: Gen [Word8]
     gen = fmap (filter even) $
             Gen.list (Range.between (10, 20)) $
-              Gen.integral $ Range.num (0, 10) 5
+              Gen.integral $ Range.linear (0, 10) 5
 
     prop :: [Word8] -> Bool
     prop = pairwiseAll (<=)
@@ -88,7 +88,7 @@ test_list_towardsLonger = do
       nub $ shrink (not . prop) gen (SampleTree.fromSeed 3)
   where
     gen :: Gen [Word8]
-    gen = Gen.list (Range.invert $ Range.between (0, 10)) $
+    gen = Gen.list (Range.between (10, 0)) $
             Gen.integral $ Range.between (0, 1)
 
     prop :: [Word8] -> Bool
@@ -107,7 +107,7 @@ test_list_towardsOrigin = do
       nub $ shrink (not . prop) gen (SampleTree.fromSeed 14)
   where
     gen :: Gen [Word8]
-    gen = Gen.list (Range.num (0, 10) 5) $
+    gen = Gen.list (Range.linear (0, 10) 5) $
             Gen.integral $ Range.between (0, 10)
 
     prop :: [Word8] -> Bool
@@ -191,7 +191,7 @@ test_tree_towardsOrigin1 = do
           )
 
     gen :: Gen (Tree Word8)
-    gen = Gen.tree (Range.num (0, 100) 10) $
+    gen = Gen.tree (Range.linear (0, 100) 10) $
             Gen.integral $ Range.between (0, 1)
 
     prop :: Tree Word8 -> Bool
@@ -226,7 +226,7 @@ test_tree_towardsOrigin2 = do
            )
 
     gen :: Gen (Tree Word8)
-    gen = Gen.tree (Range.num (0, 100) 10) $
+    gen = Gen.tree (Range.linear (0, 100) 10) $
             Gen.integral $ Range.between (0, 1)
 
     prop :: Tree Word8 -> Bool

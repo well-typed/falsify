@@ -14,6 +14,8 @@ module Test.Falsify.Property (
   , assert
   , info
   , discard
+  , label
+  , collect
     -- * Test shrinking
   , genShrinkPath
   , testShrinkingOfProp
