@@ -253,6 +253,23 @@ renderTestResult
     case (verbose, expectFailure, mFailure) of
 
       --
+      -- All tests discarded
+      --
+      -- TODO: Verbose mode here does nothing currently (we get no logs for
+      -- discarded tests).
+      --
+
+      (_, DontExpectFailure, Nothing) | null successes -> RenderedTestResult {
+            testPassed = False
+          , testOutput = unlines [
+                concat [
+                    "All tests discarded"
+                  , countDiscarded
+                  ]
+              ]
+          }
+
+      --
       -- Test succeeded
       --
       -- This may still be a failure, if we were expecting the test not to

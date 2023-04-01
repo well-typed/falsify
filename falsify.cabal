@@ -138,9 +138,10 @@ test-suite test-falsify
       TestSuite.Sanity.Predicate
       TestSuite.Sanity.Prim
       TestSuite.Sanity.Selective
-      TestSuite.Sanity.Simple
+      TestSuite.Prop.Generator.Auxiliary
       TestSuite.Prop.Generator.Compound
       TestSuite.Prop.Generator.Function
+      TestSuite.Prop.Generator.Prim
       TestSuite.Prop.Generator.Simple
   build-depends:
     , containers

@@ -2,59 +2,19 @@
 module Test.Falsify.Reexported.Generator.Simple (
     bool
   , integral
+  , int
   , enum
-    -- * Auxiliary
-  , integerWithPrecision
-  , integerFromFraction
   ) where
 
-import Data.Word
 import Data.Bits
+import Data.List (minimumBy)
+import Data.Ord
+import Data.Word
 
 import Test.Falsify.Generator.Auxiliary
 import Test.Falsify.Internal.Generator
 import Test.Falsify.Range (Range(..))
 import Test.Falsify.SampleTree (Sample(..), sampleValue)
-
-{-------------------------------------------------------------------------------
-  Auxiliary
--------------------------------------------------------------------------------}
-
-integerWithPrecision :: Precision -> Range Integer -> Gen Integer
-integerWithPrecision p r = integerFromFraction r <$> signedFraction p
-
-integerFromFraction :: Range Integer -> Signed Fraction -> Integer
-integerFromFraction r = \f -> if
-  | origin r == lo r
-  -> round $ lo' + getFraction (forgetSign f) * (hi' - lo')
-
-  | origin r == hi r
-  -> round $ hi' - getFraction (forgetSign f) * (hi' - lo')
-
-  -- The shrinking behaviour of the general case is perhaps a little
-  -- counter-intuitive. The property is that we will get closer to the origin
-  -- /as a fraction of each half of the range/. However, if the sizes of the
-  -- two ranges are wildly different, this might yield some strange results.
-  -- For example, if we have a range such as
-  --
-  -- > 0     10                                 90
-  -- > [     *                                   ]
-  --
-  -- then we could can from 50% of the left range (== 5) to any percentage
-  -- less than 50% of the right range (== 50); for example, we might "shrink"
-  -- from 5 to 45. This might seem a little strange, but it's unclear what a
-  -- better definition is without introducing a bias between the two halves.
-  | otherwise
-  -> fromOrigin f
-  where
-    lo', hi', origin' :: Double
-    lo'     = fromInteger $ lo     r
-    hi'     = fromInteger $ hi     r
-    origin' = fromInteger $ origin r
-
-    fromOrigin :: Signed Fraction -> Integer
-    fromOrigin (Neg (Fraction f)) = round $ origin' - f * (origin' - lo')
-    fromOrigin (Pos (Fraction f)) = round $ origin' + f * (hi' - origin')
 
 {-------------------------------------------------------------------------------
   Simple generators
@@ -77,19 +37,56 @@ bool target = aux . sampleValue <$> primWith shrinker
     shrinker (Shrunk 0) = []
     shrinker _          = [0]
 
--- | Uniform selection of random value in the specified range
-integral :: forall a. (Integral a, FiniteBits a) => Range a -> Gen a
-integral r = fromIntegral <$>
-    integerWithPrecision
-      (precisionRequiredToRepresent $ hi r)
-      (fromIntegral <$> r)
+{-------------------------------------------------------------------------------
+  Integral ranges
+-------------------------------------------------------------------------------}
 
--- | Uniform selection of random value in the specified range
+between :: forall a. (FiniteBits a, Integral a) => a -> a -> Gen a
+between x y | x == y = return x
+between x y =
+    fromFraction <$> fraction (precisionRequiredToRepresent distance)
+  where
+    -- Distance between the bounds
+    distance :: a
+    distance
+      | x <= y    = y - x
+      | otherwise = x - y
+
+    -- Shrink towards x
+    fromFraction :: Fraction -> a
+    fromFraction (Fraction f)
+      | x <= y    = round $ x' + f * distance'
+      | otherwise = round $ x' - f * distance'
+      where
+        x', distance' :: Double
+        x'        = fromIntegral x
+        distance' = fromIntegral distance
+
+towards :: forall a. (Ord a, Num a) => a -> [Gen a] -> Gen a
+towards origin gens =
+    pick <$> sequence gens
+  where
+    pick :: [a] -> a
+    pick [] = origin
+    pick as = minimumBy (comparing distanceToOrigin) as
+
+    distanceToOrigin :: a -> a
+    distanceToOrigin x
+      | x >= origin = x - origin
+      | otherwise   = origin - x
+
+-- | Generate value of integral type
+integral :: (FiniteBits a, Integral a) => Range a -> Gen a
+integral (Between x y)  = between x y
+integral (Towards o rs) = towards o (map integral rs)
+
+-- | Type-specialization of 'integral'
+int :: Range Int -> Gen Int
+int = integral
+
+-- | Generate value of enumerable type
 --
 -- For most types 'integral' is preferred; the 'Enum' class goes through 'Int',
 -- and is therefore also limited by the range of 'Int'.
 enum :: forall a. Enum a => Range a -> Gen a
-enum r = toEnum . fromIntegral <$>
-    integerWithPrecision
-      (precisionRequiredToRepresent $ fromEnum $ hi r)
-      (fromIntegral . fromEnum <$> r)
+enum r = toEnum <$> integral (fromEnum <$> r)

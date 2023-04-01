@@ -111,6 +111,8 @@ pattern Branch x l r <- (viewBranch -> Just (x, l, r))
   'Show' instance that depends on the pattern synonyms
 -------------------------------------------------------------------------------}
 
+-- deriving instance Show a => Show (Tree a)
+
 instance Show a => Show (Tree a) where
   showsPrec _ Leaf           = showString "Leaf"
   showsPrec a (Branch x l r) = showParen (a > appPrec) $
@@ -152,8 +154,8 @@ isHeightBalanced = checkBalanceCondition isBalanced
   where
     isBalanced :: Tree a -> Tree a -> Bool
     isBalanced a b = or [
-          height a <= height b && height b - height a <= 1
-        , height b <= height a && height b - height a <= 1
+          (height a <= height b) && (height b - height a <= 1)
+        , (height b <= height a) && (height a - height b <= 1)
         ]
 
 -- | Internal auxiliary: check given tree balance condition

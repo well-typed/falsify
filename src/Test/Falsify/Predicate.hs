@@ -37,13 +37,15 @@ module Test.Falsify.Predicate (
   , le
   , gt
   , ge
+  , towards
   , expect
   , between
   , even
   , odd
+  , elem
   ) where
 
-import Prelude hiding (all, flip, even, odd)
+import Prelude hiding (all, flip, even, odd, pred, elem)
 import qualified Prelude
 
 import Data.Bifunctor
@@ -111,12 +113,12 @@ data Fn a b =
   | Transparent (a -> b)
 
 -- | Default constructor for a function
-fn :: Show b => Var -> (a -> b) -> Fn a b
-fn n = fnWith n show
+fn :: Show b => (Var, a -> b) -> Fn a b
+fn (n, f) = fnWith (n, show, f)
 
 -- | Generalization of 'fn' that does not depend on 'Show'
-fnWith :: Var -> (b -> String) -> (a -> b) -> Fn a b
-fnWith = Visible
+fnWith :: (Var, b -> String, a -> b) -> Fn a b
+fnWith (n, r, f) = Visible n r f
 
 -- | Function that should not be visible in any rendered failure
 --
@@ -215,6 +217,9 @@ data Predicate :: [Type] -> Type where
 
   -- | Conjunction
   Both :: Predicate xs -> Predicate xs -> Predicate xs
+
+  -- | Abstraction
+  Lam :: (x -> Predicate xs) -> Predicate (x ': xs)
 
   -- | Partial application
   At :: Predicate (x : xs) -> Input x -> Predicate xs
@@ -386,6 +391,15 @@ evalPrim p err xs
                           SOP.hmap (\i -> K (inputExpr i, inputRendered i)) xs
       }
 
+evalLam ::
+     SListI xs
+  => (x -> Predicate xs)
+  -> NP Input (x : xs)
+  -> Either Failure ()
+evalLam f (x :* xs) =
+    first (addInputs [(inputExpr x, inputRendered x)]) $
+      evalAt (f $ inputValue x) xs
+
 evalDot ::
      SListI xs
   => Predicate (x : xs)
@@ -427,6 +441,7 @@ evalAt :: SListI xs => Predicate xs -> NP Input xs -> Either Failure ()
 evalAt (Prim p err) xs = evalPrim p err xs
 evalAt Pass         _  = return ()
 evalAt (Both p1 p2) xs = evalAt p1 xs >> evalAt p2 xs
+evalAt (Lam f)      xs = evalLam f xs
 evalAt (p `At` x)   xs = evalAt p (x :* xs)
 evalAt (p `Dot` f)  xs = evalDot p f xs
 evalAt (p `On` f)   xs = evalOn  p f xs
@@ -468,7 +483,7 @@ p `at` (n, r, x) = p `At` (Input (Var n) r x)
 -- This is an internal auxiliary.
 binaryInfix ::
      Var  -- ^ Infix operator corresponding to the relation /NOT/ holding
-  -> (a -> a -> Bool) -> Predicate [a, a]
+  -> (a -> b -> Bool) -> Predicate [a, b]
 binaryInfix op f = binary f $ \x y -> prettyExpr (Infix op x y)
 
 eq, ne :: Eq a => Predicate [a, a]
@@ -480,6 +495,18 @@ lt = binaryInfix ">=" (<)
 le = binaryInfix ">"  (<=)
 gt = binaryInfix "<=" (>)
 ge = binaryInfix "<"  (>=)
+
+-- | Check that values get closed to the specified target
+towards :: forall a. (Show a, Ord a, Num a) => a -> Predicate [a, a]
+towards = \target -> pred .$ ("target", target)
+  where
+    pred :: Predicate [a, a, a]
+    pred = Lam (\target -> ge `on` fn ("distanceToTarget", distanceTo target))
+
+    distanceTo :: a -> a -> a
+    distanceTo target x
+      | x <= target = target - x
+      | otherwise   = x - target
 
 expect :: (Show a, Eq a) => a -> Predicate '[a]
 expect x = eq .$ ("expected", x)
@@ -493,3 +520,6 @@ between lo hi = mconcat [
 even, odd :: Integral a => Predicate '[a]
 even = satisfies ("even", Prelude.even)
 odd  = satisfies ("odd ", Prelude.odd)
+
+elem :: Eq a => Predicate '[[a], a]
+elem = flip $ binaryInfix ("`notElem`") Prelude.elem
