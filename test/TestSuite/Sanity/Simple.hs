@@ -72,9 +72,9 @@ test_integral = do
   where
     gen :: Gen (Word, Word, Word)
     gen = (,,)
-        <$> Gen.integral (Range.num (0, 6) 0)
-        <*> Gen.integral (Range.num (0, 6) 6)
-        <*> Gen.integral (Range.num (0, 6) 3)
+        <$> Gen.integral (Range.linear (0, 6) 0)
+        <*> Gen.integral (Range.linear (0, 6) 6)
+        <*> Gen.integral (Range.linear (0, 6) 3)
 
     tree :: Word64 -> SampleTree
     tree x = expandTruncated $
