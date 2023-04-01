@@ -18,8 +18,8 @@ test_on = do
     assertEqual "err2" (Left err2) $ P.eval $ p2 .$ ("x", 'a') .$ ("y", 'b')
   where
     p1, p2 :: Predicate '[Char, Char]
-    p1 = P.eq `P.on` (P.fn "ord"    ord)
-    p2 = P.eq `P.on` (P.transparent ord)
+    p1 = P.eq `P.on` P.fn ("ord", ord)
+    p2 = P.eq `P.on` P.transparent ord
 
     err1, err2 :: String
     err1 = unlines [

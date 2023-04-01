@@ -122,9 +122,11 @@ data TestResult e a =
 resultIsValidShrink ::
      (TestResult e a, TestRun)
   -> IsValidShrink (e, TestRun) (Maybe a, TestRun)
-resultIsValidShrink (TestFailed e  , run) = ValidShrink   (e       , run)
-resultIsValidShrink (TestDiscarded , run) = InvalidShrink (Nothing , run)
-resultIsValidShrink (TestPassed a  , run) = InvalidShrink (Just a  , run)
+resultIsValidShrink (result, run) =
+    case result of
+      TestFailed e  -> ValidShrink   (e       , run)
+      TestDiscarded -> InvalidShrink (Nothing , run)
+      TestPassed a  -> InvalidShrink (Just a  , run)
 
 {-------------------------------------------------------------------------------
   Monad-transformer version of 'TestResult'
@@ -376,7 +378,9 @@ testShrinkingOfProp p prop = do
 --
 -- Since a generator doesn't have a concept of \"failing\", we just /any/
 -- shrink step that the generator can make.
-testShrinkingOfGen :: Show a => Predicate [a, a] -> Gen a -> Property' String ()
+testShrinkingOfGen ::
+     (HasCallStack, Show a)
+  => Predicate [a, a] -> Gen a -> Property' String ()
 testShrinkingOfGen p g = testShrinkingOfProp p $ gen g >>= testFailed
 
 -- | Test the minimum error thrown by the property
@@ -384,6 +388,11 @@ testShrinkingOfGen p g = testShrinkingOfProp p $ gen g >>= testFailed
 -- If the given property passes, we will discard this test (in that case, there
 -- is nothing to test); this test is also discarded if the given property
 -- discards.
+--
+-- NOTE: When testing a particular generator, you might still want to test with
+-- some particular property in mind. Otherwise, the minimum value will always
+-- simply be the value that the generator produces when given the @Minimal@
+-- sample tree.
 testMinimum :: forall e.
      Show e
   => Predicate '[e]
@@ -398,13 +407,12 @@ testMinimum p prop = do
       ((TestDiscarded, _run), _truncated, _shrunk) ->
         -- The property needs to be discarded; discard this one, too
         discard
-      ((TestFailed e, run), _truncated, shrunk) -> do
+      ((TestFailed initErr, initRun), _truncated, shrunk) -> do
         let explanation :: ShrinkExplanation (e, TestRun) (Maybe (), TestRun)
             explanation = shrinkFrom
                             resultIsValidShrink
                             (runProperty prop)
-                            ((e, run), shrunk)
-
+                            ((initErr, initRun), shrunk)
 
             minErr    :: e
             minRun    :: TestRun
@@ -415,7 +423,13 @@ testMinimum p prop = do
             rejected  = maybe [] (map snd) mRejected
 
         case P.eval $ p .$ ("minimum", minErr) of
-          Right () -> return ()
+          Right () -> do
+            -- For a successful test, we add the full shrink history as info
+            -- This means that users can use verbose mode to see precisely
+            -- how the minimum value is reached, if they wish.
+            info "Shrink history:"
+            forM_ (shrinkHistory explanation) $ \(e, _run) ->
+              info $ show e
           Left err -> do
             appendLog (runLog minRun)
             unless (null rejected) $ do

@@ -11,111 +11,22 @@ import Data.Falsify.List (pairwiseAll)
 import Test.Falsify.Debugging
 import Test.Falsify.Generator (Gen)
 import Test.Falsify.Generator.Auxiliary
-import Test.Falsify.SampleTree (SampleTree, Sample (..))
 
 import qualified Test.Falsify.Generator  as Gen
 import qualified Test.Falsify.SampleTree as SampleTree
 
 tests :: TestTree
 tests = testGroup "TestSuite.Sanity.Auxiliary" [
-      testCase "fraction"       test_fraction
-    , testCase "signedWordN"    test_signedWordN
-    , testCase "signedFraction" test_signedFraction
-    , testCase "shrinkTo"       test_shrinkTo
+      testCase "shrinkTo"       test_shrinkTo
     , testCase "firstThen"      test_firstThen
     , testGroup "shrinkWith" [
           testCase "word" test_shrinkWith_word
         , testGroup "list" [
                 testCase (show i) $ test_shrinkWith_list i
-              | i <- [   0,  20,  40,  60,  80
-                     , 100, 120, 140, 160, 180
---                     , 200
---                     , 300
---                     , 400
---                     , 500
-                     ]
+              | i <- [0,  20,  40,  60,  80, 100, 120, 140, 160, 180]
               ]
         ]
     ]
-
-{-------------------------------------------------------------------------------
-  Fractions
--------------------------------------------------------------------------------}
-
-test_fraction :: Assertion
-test_fraction = do
-    assertEqual "run minBound" (Fraction 0) $
-      run gen (tree minBound)
-    assertEqual "run maxBound" (Fraction 1) $
-      run gen (tree maxBound)
-
-    let expectedHistory = [100,52,26,13,10]
-    assertEqual "shrink" expectedHistory $
-      fmap pct $ shrink (not . prop) gen (tree maxBound)
-  where
-    gen :: Gen Fraction
-    gen = fraction 5
-
-    tree :: Word64 -> SampleTree
-    tree x = expandTruncated $ S (NotShrunk x)
-
-    prop :: Fraction -> Bool
-    prop f = pct f < 10
-
-    pct :: Fraction -> Word
-    pct (Fraction f) = round (f * 100)
-
-test_signedWordN :: Assertion
-test_signedWordN = do
-    assertEqual "run minBound" (Pos $ WordN 4 0) $
-      run gen $ tree 0
-    assertEqual "run minBound+1" (Neg $ WordN 4 0) $
-      run gen $ tree 1
-    assertEqual "run minBound+2" (Pos $ WordN 4 1) $
-      run gen $ tree 2
-    assertEqual "run minBound+3" (Neg $ WordN 4 1) $
-      run gen $ tree 3
-
-    assertEqual "run maxBound" (Neg $ WordN 4 15) $
-      run gen $ tree 31 -- need 5 bits of precision for signed 4-bit number
-    assertEqual "run maxBound+1" (Neg $ WordN 4 15) $
-      run gen $ tree 31
-    assertEqual "run maxBound-1" (Pos $ WordN 4 15) $
-      run gen $ tree 30
-    assertEqual "run maxBound-2" (Neg $ WordN 4 14) $
-      run gen $ tree 29
-    assertEqual "run maxBound-3" (Pos $ WordN 4 14) $
-      run gen $ tree 28
-  where
-    gen :: Gen (Signed WordN)
-    gen = signedWordN 4
-
-    tree :: Word64 -> SampleTree
-    tree x = expandTruncated $ S (NotShrunk x)
-
-test_signedFraction :: Assertion
-test_signedFraction = do
-    assertEqual "run minBound" 0 $
-      run gen (tree minBound)
-    assertEqual "run maxBound" (-100) $
-      run gen (tree maxBound)
-
-    let expectedHistory = [-100,52,-26,13,-10,10]
-    assertEqual "shrink" expectedHistory $
-      shrink (not . prop) gen (tree maxBound)
-  where
-    gen :: Gen Int
-    gen = toPercentage <$> signedFraction 5
-
-    tree :: Word64 -> SampleTree
-    tree x = expandTruncated $ S (NotShrunk x)
-
-    prop :: Int -> Bool
-    prop pct = abs pct < 10
-
-    toPercentage :: Signed Fraction -> Int
-    toPercentage (Pos (Fraction f)) = round (f * 100)
-    toPercentage (Neg (Fraction f)) = negate $ round (f * 100)
 
 {-------------------------------------------------------------------------------
   User-specified shrinking

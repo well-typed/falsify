@@ -11,11 +11,8 @@ module Test.Falsify.Generator (
     -- * Simple (non-compound) generators
   , bool
   , integral
+  , int
   , enum
-    -- ** Auxiliary
-  , Precision(..)
-  , integerWithPrecision
-  , integerFromFraction
     -- * Compound generators
     -- ** Taking advantage of 'Selective'
   , choose

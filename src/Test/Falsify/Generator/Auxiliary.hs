@@ -22,10 +22,8 @@ module Test.Falsify.Generator.Auxiliary (
     -- * Generators
     -- ** @n@-bit words
   , unsignedWordN
-  , signedWordN
     -- ** Fractions
   , fraction
-  , signedFraction
     -- * User-specified shrinking
   , shrinkToOneOf
   , firstThen
@@ -37,6 +35,7 @@ module Test.Falsify.Generator.Auxiliary (
 
 import Data.Bits
 import Data.Word
+import GHC.Stack
 
 import qualified Data.Tree as Rose
 
@@ -134,48 +133,13 @@ unsignedWordN p =
       . truncateAt p
       . sampleValue
 
--- | Uniform selection of signed @n-bit@ word, shrinking towards 0
---
--- Shrinking will decrease the /magnitude/ (distance to 0), but may randomly
--- fluctuate the /sign/: there is no bias towards negative or positive.
---
--- Maximum precision available is @n == 63@.
-signedWordN :: Precision -> Gen (Signed WordN)
-signedWordN = \p ->
-    -- We will use the LSB to determine the sign of the value, so we must ask
-    -- for one more bit of precision.
-    let p' = succ p
-    in fmap (aux . truncateAt p' . sampleValue) . primWith $
-            binarySearchNoParityBias
-          . forgetPrecision
-          . truncateAt p'
-          . sampleValue
-  where
-    -- As @x@ tends towards 0, the LSB of @x@ (i.e., whether @x@ is even or not)
-    -- will fluctuate randomly. Thus, we can use this to determine whether we
-    -- want a positive or negative number, and then can use the remaining bits
-    -- (shifted appropriately) for the magnitude.
-    --
-    -- This is quite different from simply reinterpreting the unsigned number as
-    -- a signed number; in this case, it would be the /most/ significant bit
-    -- that determines whether the number is negative or positive, and would
-    -- therefore introduce a heavy bias towards positive numbers (and the
-    -- direction of shrinking would be reversed due to two's complement).
-    aux :: WordN -> Signed WordN
-    aux (WordN p x) =
-        (if even x then Pos else Neg) $
-          WordN (pred p) (x `div` 2)
-
 -- | Uniform selection of fraction, shrinking towards 0
-fraction :: Precision -> Gen Fraction
-fraction p = mkFraction <$> unsignedWordN p
-
--- | Uniform selection of signed fraction, shrinking towards 0
 --
--- There is no bias towards positive or negative fractions. See 'signedWordN'
--- for more detailed discussion.
-signedFraction :: Precision -> Gen (Signed Fraction)
-signedFraction p = fmap mkFraction <$> signedWordN p
+-- Precondition: precision must be at least 1 bit (a zero-bit number is constant
+-- 0; it is meaningless to have a fraction in a point range).
+fraction :: HasCallStack => Precision -> Gen Fraction
+fraction (Precision 0) = error "fraction: 0 precision"
+fraction p             = mkFraction <$> unsignedWordN p
 
 {-------------------------------------------------------------------------------
   Specialized shrinking behaviour

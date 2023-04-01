@@ -147,9 +147,13 @@ falsify opts prop = do
                         (runProperty prop)
                         ((e, run), shrunk)
 
+                -- We have to be careful here: if the user specifies a seed, we
+                -- will first /split/ it to run the test (call to splitSMGen,
+                -- above). This means that the seed we should provide for the
+                -- test is the seed /before/ splitting.
                 failure :: Failure
                 failure = Failure {
-                      failureSeed = splitmixReplaySeed now
+                      failureSeed = splitmixReplaySeed (prng acc)
                     , failureRun  = explanation
                     }
 
@@ -253,6 +257,23 @@ renderTestResult
     case (verbose, expectFailure, mFailure) of
 
       --
+      -- All tests discarded
+      --
+      -- TODO: Verbose mode here does nothing currently (we get no logs for
+      -- discarded tests).
+      --
+
+      (_, DontExpectFailure, Nothing) | null successes -> RenderedTestResult {
+            testPassed = False
+          , testOutput = unlines [
+                concat [
+                    "All tests discarded"
+                  , countDiscarded
+                  ]
+              ]
+          }
+
+      --
       -- Test succeeded
       --
       -- This may still be a failure, if we were expecting the test not to
@@ -350,7 +371,7 @@ renderTestResult
                , fst $ NE.last history
                , "Logs for failed test run:"
                , renderLog . runLog . snd $ NE.last history
-               , showSeed initSeed
+               , showSeed $ failureSeed e
                ]
            }
          where
