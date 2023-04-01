@@ -147,9 +147,13 @@ falsify opts prop = do
                         (runProperty prop)
                         ((e, run), shrunk)
 
+                -- We have to be careful here: if the user specifies a seed, we
+                -- will first /split/ it to run the test (call to splitSMGen,
+                -- above). This means that the seed we should provide for the
+                -- test is the seed /before/ splitting.
                 failure :: Failure
                 failure = Failure {
-                      failureSeed = splitmixReplaySeed now
+                      failureSeed = splitmixReplaySeed (prng acc)
                     , failureRun  = explanation
                     }
 
@@ -367,7 +371,7 @@ renderTestResult
                , fst $ NE.last history
                , "Logs for failed test run:"
                , renderLog . runLog . snd $ NE.last history
-               , showSeed initSeed
+               , showSeed $ failureSeed e
                ]
            }
          where
