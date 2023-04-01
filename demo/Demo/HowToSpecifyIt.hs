@@ -70,6 +70,10 @@ tests = testGroup "Demo.HowToSpecifyIt" [
             , testProperty                   "insert"       prop_model_insert
             , testPropertyWith expectFailure "insert_wrong" prop_model_insert_wrong
             ]
+        , testGroup "Generation" [
+              testPropertyWith (def { overrideNumTests = Just 10_000 })
+                "measure" prop_measure
+            ]
         ]
     ]
   where
@@ -499,3 +503,19 @@ prop_model_insert_wrong = forAllBST $ \t -> do
     assert $ P.eq
       .$ ("lhs", toList (insert k v t))
       .$ ("rhs", L.insert (k, v) (toList t))
+
+{-------------------------------------------------------------------------------
+  Section 4.6 A Note on Generation
+-------------------------------------------------------------------------------}
+
+prop_measure :: Property ()
+prop_measure = forAllBST $ \t -> do
+    k <- gen genKey
+    collect "present" [k `elem` keys t]
+    collect "where" $ if
+      | t == nil            -> ["empty"]
+      | keys t == [k]       -> ["just k"]
+      | all (>= k) (keys t) -> ["at start"]
+      | all (<= k) (keys t) -> ["at end"]
+      | otherwise           -> ["middle"]
+
