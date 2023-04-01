@@ -30,8 +30,7 @@ tests = testGroup "TestSuite.Prop.Generator.Compound" [
             , testProperty "minimum"   prop_list_towardsLonger_minimum
             ]
         , testGroup "towardsOrigin" [
-              testProperty "shrinking" prop_list_towardsOrigin_shrinking
-            , testProperty "minimum"   prop_list_towardsOrigin_minimum
+              testProperty "minimum" prop_list_towardsOrigin_minimum
             ]
         ]
     , testGroup "perm" [
@@ -105,12 +104,6 @@ prop_list_towardsLonger_minimum =
       xs <- gen $ Gen.list (Range.between (10, 0)) $
                     Gen.int $ Range.between (0, 1)
       unless (pairwiseAll (<=) xs) $ testFailed xs
-
-prop_list_towardsOrigin_shrinking :: Property ()
-prop_list_towardsOrigin_shrinking =
-    testShrinkingOfGen (P.towards 5 `P.on` P.fn ("length", length)) $
-       Gen.list (Range.withOrigin (0, 10) 5) $
-         Gen.int $ Range.between (0, 1)
 
 prop_list_towardsOrigin_minimum :: Property ()
 prop_list_towardsOrigin_minimum =

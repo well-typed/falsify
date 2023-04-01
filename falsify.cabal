@@ -38,6 +38,7 @@ common lang
   default-language:
       Haskell2010
   default-extensions:
+      BangPatterns
       DataKinds
       DefaultSignatures
       DeriveAnyClass

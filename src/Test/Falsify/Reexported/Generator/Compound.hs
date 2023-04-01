@@ -30,7 +30,7 @@ import Control.Selective
 import Data.Either (either)
 import Data.Foldable (toList)
 import Data.List.NonEmpty (NonEmpty(..))
-import Data.Maybe (mapMaybe)
+import Data.Maybe (mapMaybe, catMaybes)
 import Data.Void
 
 import qualified Data.List.NonEmpty as NE
@@ -119,6 +119,24 @@ mark g = firstThen Keep Drop <*> g
 -------------------------------------------------------------------------------}
 
 -- | Generate list of specified length
+--
+-- Shrinking behaviour:
+--
+-- * The length of the list will shrink as specified by the given range.
+-- * We can drop random elements from the list, but prefer to drop them
+--   from near the /end/ of the list.
+--
+-- Note on shrinking predictability: in the case that the specified 'Range' has
+-- an origin which is neither the lower bound nor the upper bound (and only in
+-- that case), 'list' can have confusing shrinking behaviour. For example,
+-- suppose we have a range @(0, 10)@ with origin 5. Then we could start by
+-- generating an intermediate list of length of 10 and then subsequently drop 5
+-- elements from that, resulting in an optimal list length. However, we can now
+-- shrink that length from 10 to 2 (which is closer to 5, after all), but now we
+-- only have 2 elements to work with, and hence the generated list will now drop
+-- from 5 elements to 2. This is not necessarily a problem, because that length
+-- 2 can now subsequently shrink further towards closer to the origin (5), but
+-- nonetheless it might result in confusing intermediate shrinking steps.
 list :: Range Word -> Gen a -> Gen [a]
 list len gen = do
     -- We do /NOT/ mark this call to 'integral' as 'withoutShrinking': it could
@@ -131,15 +149,32 @@ list len gen = do
     -- lists will be shrunk independently from each other due to the branching
     -- point above them. Hence, it doesn't matter if first generator uses "fewer
     -- samples" as it shrinks.
-    --
-    -- After we have a list of @n@ elements, we can then drop arbitrary elements
-    -- from that list, but of course doing so well only /decrease/ the list
-    -- length: if @Range.origin len > n@, then we should not drop anything (in
-    -- that case, the only way we can get more elements is by "shrinking" @n@
-    -- towards a larger number).
     n <- integral len
-    mapMaybe Marked.shouldKeep . Marked.keepAtLeast (Range.origin len) <$>
-      replicateM (fromIntegral n) (mark gen)
+
+    -- | Generate @n@ marks, indicating for each element if we want to keep that
+    -- element or not, so that we can drop elements from the middle of the list.
+    --
+    -- Due to the left-biased nature of shrinking, this will shrink towards
+    -- dropped elements (@False@ values) near the start, but we want them near
+    -- the /end/, so we reverse the list.
+    marks <- fmap reverse $ replicateM (fromIntegral n) $ firstThen True False
+
+    -- Dropping elements from the list will of course only /decrease/ the
+    -- length of the generated list. However, we don't want to get further
+    -- away from the target list length (@origin@).
+    let kept   = fromIntegral $ length $ filter id marks
+    let marks' = if kept >= Range.origin len
+                   then marks
+                   else remark (Range.origin len - kept) marks
+
+    fmap catMaybes $ forM marks' $ \m ->
+      ifS (pure m) (Just <$> gen) (pure Nothing)
+  where
+    remark :: Word -> [Bool] -> [Bool]
+    remark _ []         = []
+    remark 0 xs         = xs
+    remark n (True:xs)  = True : remark  n      xs
+    remark n (False:xs) = True : remark (n - 1) xs
 
 -- | Choose random element
 --

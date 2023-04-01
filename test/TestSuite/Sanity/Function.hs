@@ -26,7 +26,7 @@ test_IntToInt_mapFilter = do
       show . last $ shrink (not . prop) gen (SampleTree.fromSeed 1)
   where
     expected :: String
-    expected = "({_->0},{98->True, _->False},[98])"
+    expected = "({_->0},{93->True, _->False},[93])"
 
     gen :: Gen (Fun Int Int, Fun Int Bool, [Int])
     gen =
