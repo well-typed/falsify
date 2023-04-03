@@ -42,6 +42,7 @@ import qualified Data.Tree as Rose
 import Test.Falsify.Internal.Generator
 import Test.Falsify.Internal.Generator.Truncated (Truncated)
 import Test.Falsify.Internal.Search
+import Test.Falsify.Internal.Range
 import Test.Falsify.SampleTree (Sample(..), sampleValue, SampleTree)
 
 {-------------------------------------------------------------------------------
@@ -111,10 +112,6 @@ truncateAt desiredPrecision x =
 {-------------------------------------------------------------------------------
   Auxiliary type: fractions
 -------------------------------------------------------------------------------}
-
--- | Value in the range [0 .. 1]
-newtype Fraction = Fraction { getFraction :: Double }
-  deriving stock (Show, Eq, Ord)
 
 -- | Compute fraction from @n@-bit word
 mkFraction :: WordN -> Fraction
