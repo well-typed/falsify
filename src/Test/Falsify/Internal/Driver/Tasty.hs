@@ -3,7 +3,7 @@
 --
 -- This are the internal guts of the integration. Publicly visible API lives in
 -- "Test.Tasty.Falsify".
-module Test.Falsify.Internal.Tasty (
+module Test.Falsify.Internal.Driver.Tasty (
     -- * Test property
     testProperty
     -- * Configure test behaviour
@@ -25,12 +25,11 @@ import Test.Tasty.Providers (IsTest(..))
 
 import qualified Test.Tasty.Options as Tasty
 
-import Test.Falsify.Driver
-import Test.Falsify.Driver.ReplaySeed
+import Test.Falsify.Internal.Driver
+import Test.Falsify.Internal.Driver.ReplaySeed
 import Test.Falsify.Internal.Property
 
 import qualified Options.Applicative  as Opts
-import qualified Test.Falsify.Driver  as Driver
 import qualified Test.Tasty.Providers as Tasty
 
 {-------------------------------------------------------------------------------
@@ -65,16 +64,16 @@ instance IsTest Test where
       verbose :: Verbose
       verbose = fromMaybe (Tasty.lookupOption opts) (overrideVerbose testOpts)
 
-      driverOpts :: Driver.Options
+      driverOpts :: Options
       driverOpts =
             maybe id
-              (\x o -> o{Driver.maxShrinks = Just x})
+              (\x o -> o{maxShrinks = Just x})
               (overrideMaxShrinks testOpts)
           $ maybe id
-              (\x o -> o{Driver.tests = x})
+              (\x o -> o{tests = x})
               (overrideNumTests testOpts)
           $ maybe id
-              (\x o -> o{Driver.maxRatio = x})
+              (\x o -> o{maxRatio = x})
               (overrideMaxRatio testOpts)
           $ driverOptions opts
 
@@ -129,19 +128,19 @@ newtype Replay     = Replay     { getReplay     :: Maybe ReplaySeed }
 newtype MaxRatio   = MaxRatio   { getMaxRatio   :: Word             }
 
 instance IsOption Tests where
-  defaultValue   = Tests (Driver.tests def)
+  defaultValue   = Tests (tests def)
   parseValue     = fmap Tests . Tasty.safeRead . filter (/= '_')
   optionName     = Tagged "falsify-tests"
   optionHelp     = Tagged "Number of test cases to generate"
 
 instance IsOption MaxShrinks where
-  defaultValue   = MaxShrinks (Driver.maxShrinks def)
+  defaultValue   = MaxShrinks (maxShrinks def)
   parseValue     = fmap (MaxShrinks . Just) . Tasty.safeRead
   optionName     = Tagged "falsify-shrinks"
   optionHelp     = Tagged "Random seed to use for replaying a previous test run"
 
 instance IsOption Replay where
-  defaultValue   = Replay (Driver.replay def)
+  defaultValue   = Replay (replay def)
   parseValue     = fmap (Replay . Just) . safeReadReplaySeed
   optionName     = Tagged "falsify-replay"
   optionHelp     = Tagged "Random seed to use for replaying test"
@@ -154,13 +153,13 @@ instance IsOption Replay where
       readReplaySeed = Opts.str >>= fmap (Replay . Just) . parseReplaySeed
 
 instance IsOption MaxRatio where
-  defaultValue   = MaxRatio (Driver.maxRatio def)
+  defaultValue   = MaxRatio (maxRatio def)
   parseValue     = fmap MaxRatio . Tasty.safeRead . filter (/= '_')
   optionName     = Tagged "falsify-max-ratio"
   optionHelp     = Tagged "Maximum number of discarded tests per successful test"
 
-driverOptions :: OptionSet -> Driver.Options
-driverOptions opts = Driver.Options {
+driverOptions :: OptionSet -> Options
+driverOptions opts = Options {
       tests         = getTests      $ Tasty.lookupOption opts
     , maxShrinks    = getMaxShrinks $ Tasty.lookupOption opts
     , replay        = getReplay     $ Tasty.lookupOption opts

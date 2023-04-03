@@ -75,10 +75,9 @@ library
       lang
   exposed-modules:
       Test.Falsify.Debugging
-      Test.Falsify.Driver
-      Test.Falsify.Driver.ReplaySeed
       Test.Falsify.Generator
       Test.Falsify.Generator.Auxiliary
+      Test.Falsify.Interactive
       Test.Falsify.Nudge
       Test.Falsify.Predicate
       Test.Falsify.Property
@@ -93,6 +92,9 @@ library
       -- in the @Test.Tasty.*@ hiearchy instead of @Test.Falsify.*@.
       Test.Tasty.Falsify
   other-modules:
+      Test.Falsify.Internal.Driver
+      Test.Falsify.Internal.Driver.ReplaySeed
+      Test.Falsify.Internal.Driver.Tasty
       Test.Falsify.Internal.Generator
       Test.Falsify.Internal.Generator.Definition
       Test.Falsify.Internal.Generator.Shrinking
@@ -100,7 +102,6 @@ library
       Test.Falsify.Internal.Property
       Test.Falsify.Internal.Range
       Test.Falsify.Internal.Search
-      Test.Falsify.Internal.Tasty
       Test.Falsify.Reexported.Generator.Compound
       Test.Falsify.Reexported.Generator.Function
       Test.Falsify.Reexported.Generator.Simple

@@ -4,7 +4,7 @@
 --
 -- > import Test.Falsify.Driver (Success, Failure, falsify)
 -- > import qualified Test.Falsify.Driver as Driver
-module Test.Falsify.Driver (
+module Test.Falsify.Internal.Driver (
     -- * Options
     Options(..)
     -- * Results
@@ -25,23 +25,23 @@ import Data.Bifunctor
 import Data.Default
 import Data.List (intercalate)
 import Data.List.NonEmpty (NonEmpty)
+import Data.Map (Map)
 import Data.Set (Set)
 import GHC.Exception
 import System.Random.SplitMix
+import Text.Printf
 
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map           as Map
 import qualified Data.Set           as Set
 
-import Test.Falsify.Driver.ReplaySeed
+import Test.Falsify.Internal.Driver.ReplaySeed
 import Test.Falsify.Internal.Generator
 import Test.Falsify.Internal.Generator.Shrinking
 import Test.Falsify.Internal.Property
 import Test.Falsify.SampleTree (SampleTree)
 
 import qualified Test.Falsify.SampleTree as SampleTree
-import Data.Map (Map)
-import Text.Printf
 
 {-------------------------------------------------------------------------------
   Options
