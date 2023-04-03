@@ -12,17 +12,15 @@ import GHC.Generics (Generic)
 import Test.Tasty
 import Test.Tasty.Falsify
 
+import qualified Data.List   as L
 import qualified Data.Tree   as Rose
 import qualified Data.Vector as V
 
-import Data.Falsify.Tree (Tree)
 import Test.Falsify.Predicate ((.$))
 
-import qualified Data.Falsify.Tree      as Tree
 import qualified Test.Falsify.Generator as Gen
 import qualified Test.Falsify.Range     as Range
 import qualified Test.Falsify.Predicate as P
-import qualified Data.List as L
 
 tests :: TestTree
 tests = testGroup "Demo.HowToSpecifyIt" [
@@ -73,6 +71,8 @@ tests = testGroup "Demo.HowToSpecifyIt" [
         , testGroup "Generation" [
               testPropertyWith (def { overrideNumTests = Just 10_000 })
                 "measure" prop_measure
+            , testPropertyWith (def { overrideNumTests = Just 10_000 })
+                "measure_small" prop_measure_small
             ]
         ]
     ]
@@ -205,29 +205,18 @@ fromAscList = \xs ->
 
 {-------------------------------------------------------------------------------
   Generator
+
+  TODO: We should try to write a generator that shrinks more efficiently.
 -------------------------------------------------------------------------------}
 
-genBST :: forall k v. Num k => Gen k -> Gen v -> Gen (BST k v)
-genBST = \k v ->
-    flip evalState 0 . fromTree <$>
-      Gen.tree (Range.between (0, 100)) ((,) <$> k <*> v)
-  where
-    fromTree :: Tree (k, v) -> State k (BST k v)
-    fromTree Tree.Leaf = return Leaf
-    fromTree (Tree.Branch (k, v) l r) = do
-        l' <- fromTree l
-        k' <- state $ \maxSoFar -> let k' = maxSoFar + k + 1 in (k', k')
-        r' <- fromTree r
-        return $ Branch l' k' v r'
+genBST :: forall k v. Ord k => Gen k -> Gen v -> Gen (BST k v)
+genBST k v = fromList <$> Gen.list (Range.between (0, 100)) ((,) <$> k <*> v)
 
 genKey :: Gen Int
 genKey = Gen.integral $ Range.between (0, 100)
 
 genValue :: Gen Int
 genValue = Gen.integral $ Range.between (0, 100)
-
-forAllBST :: (BST Int Int -> Property a) -> Property a
-forAllBST p = genWith (Just . showBST) (genBST genKey genValue) >>= p
 
 {-------------------------------------------------------------------------------
   Section 4: "Approaches to Writing Properties"
@@ -256,27 +245,32 @@ prop_valid_nil =
     assert $ predValid .$ ("nil", nil :: BST Int Int)
 
 prop_valid_insert :: Property ()
-prop_valid_insert = forAllBST $ \t -> do
+prop_valid_insert = do
+    t <- genWith (Just . showBST) $ genBST genKey genValue
     k <- gen genKey
     v <- gen genValue
     let t' = insert k v t
     assert $ predValid .$ ("t'", t')
 
 prop_valid_delete :: Property ()
-prop_valid_delete = forAllBST $ \t -> do
+prop_valid_delete = do
+    t <- genWith (Just . showBST) $ genBST genKey genValue
     k <- gen genKey
     let t' = delete k t
     assert $ predValid .$ ("t'", t')
 
 prop_valid_union :: Property ()
-prop_valid_union = forAllBST $ \t -> forAllBST $ \t' -> do
+prop_valid_union = do
+    t  <- genWith (Just . showBST) $ genBST genKey genValue
+    t' <- genWith (Just . showBST) $ genBST genKey genValue
     let t'' = union t t'
     assert $ predValid .$ ("t''", t'')
 
 -- Test your tests
 
 prop_valid_gen :: Property ()
-prop_valid_gen = forAllBST $ \t ->
+prop_valid_gen = do
+    t <- genWith (Just . showBST) $ genBST genKey genValue
     assert $ predValid .$ ("t", t)
 
 {-------------------------------------------------------------------------------
@@ -284,7 +278,8 @@ prop_valid_gen = forAllBST $ \t ->
 -------------------------------------------------------------------------------}
 
 prop_post_insert :: Property ()
-prop_post_insert = forAllBST $ \t -> do
+prop_post_insert = do
+    t <- genWith (Just . showBST) $ genBST genKey genValue
     k  <- gen genKey
     k' <- gen genKey
     v  <- gen genValue
@@ -296,8 +291,10 @@ prop_post_insert = forAllBST $ \t -> do
     assert $ P.expect expected .$ ("actual", find k' t')
 
 prop_post_union :: Property ()
-prop_post_union = forAllBST $ \t -> forAllBST $ \t' -> do
-    k <- gen genKey
+prop_post_union = do
+    t  <- genWith (Just . showBST) $ genBST genKey genValue
+    t' <- genWith (Just . showBST) $ genBST genKey genValue
+    k  <- gen genKey
     let t''      = union t t'
         expected = find k t <|> find k t'
     info $ "toList t: " ++ show (toList t)
@@ -307,18 +304,21 @@ prop_post_union = forAllBST $ \t -> forAllBST $ \t' -> do
     assert $ P.expect expected .$ ("actual", find k t'')
 
 prop_post_find_present :: Property ()
-prop_post_find_present = forAllBST $ \t -> do
+prop_post_find_present = do
+    t <- genWith (Just . showBST) $ genBST genKey genValue
     k <- gen genKey
     v <- gen genValue
     assert $ P.expect (Just v) .$ ("actual", find k (insert k v t))
 
 prop_post_find_absent :: Property ()
-prop_post_find_absent = forAllBST $ \t -> do
+prop_post_find_absent = do
+    t <- genWith (Just . showBST) $ genBST genKey genValue
     k <- gen genKey
     assert $ P.expect Nothing .$ ("actual", find k (delete k t))
 
 prop_complete_insert_delete :: Property ()
-prop_complete_insert_delete = forAllBST $ \t -> do
+prop_complete_insert_delete = do
+    t <- genWith (Just . showBST) $ genBST genKey genValue
     k <- gen genKey
     case find k t of
       Nothing -> assert $ P.expect t .$ ("deleted"  , delete k   t)
@@ -334,7 +334,8 @@ predEquiv :: (Eq k, Eq v) => P.Predicate '[BST k v, BST k v]
 predEquiv = P.relatedBy ("equivBST", equivBST)
 
 prop_insert_insert :: Property ()
-prop_insert_insert = forAllBST $ \t -> do
+prop_insert_insert = do
+    t  <- genWith (Just . showBST) $ genBST genKey genValue
     k  <- gen genKey
     k' <- gen genKey
     v  <- gen genValue
@@ -352,7 +353,8 @@ prop_insert_insert = forAllBST $ \t -> do
       .$ ("lhs", lhs)
 
 prop_insert_insert_weak :: Property ()
-prop_insert_insert_weak = forAllBST $ \t -> do
+prop_insert_insert_weak = do
+    t  <- genWith (Just . showBST) $ genBST genKey genValue
     k  <- gen genKey
     k' <- gen genKey
     when (k == k') discard -- this is the line that makes this property "weak"
@@ -368,7 +370,8 @@ prop_insert_insert_weak = forAllBST $ \t -> do
       .$ ("rhs", rhs)
 
 prop_insert_delete :: Property ()
-prop_insert_delete = forAllBST $ \t -> do
+prop_insert_delete = do
+    t  <- genWith (Just . showBST) $ genBST genKey genValue
     k  <- gen genKey
     k' <- gen genKey
     v  <- gen genValue
@@ -385,9 +388,11 @@ prop_insert_delete = forAllBST $ \t -> do
       .$ ("lhs", lhs)
 
 prop_insert_union :: Property ()
-prop_insert_union = forAllBST $ \t -> forAllBST $ \t' -> do
-    k <- gen genKey
-    v <- gen genValue
+prop_insert_union = do
+    t  <- genWith (Just . showBST) $ genBST genKey genValue
+    t' <- genWith (Just . showBST) $ genBST genKey genValue
+    k  <- gen genKey
+    v  <- gen genValue
 
     let lhs = insert k v $ union t t'
         rhs = union (insert k v t) t'
@@ -407,18 +412,17 @@ genEquivPair = do
     kvs <- Gen.shuffle (toList t1)
     return (t1, fromList kvs)
 
-forAllEquivPair :: (BST Int Int -> BST Int Int -> Property a) -> Property a
-forAllEquivPair f = genWith (Just . uncurry showPair) genEquivPair >>= uncurry f
-  where
-    showPair :: BST Int Int -> BST Int Int -> String
-    showPair t1 t2 = unlines [
-        "tree 1:"
-      , showBST t1
-      , "tree 2:"
-      , showBST t2
-      ]
+showPair :: (BST Int Int, BST Int Int) -> String
+showPair (t1, t2) = unlines [
+      "tree 1:"
+    , showBST t1
+    , "tree 2:"
+    , showBST t2
+    ]
+
 prop_preserveEquiv_insert :: Property ()
-prop_preserveEquiv_insert = forAllEquivPair $ \t1 t2 -> do
+prop_preserveEquiv_insert = do
+    (t1, t2) <- genWith (Just . showPair) genEquivPair
     k <- gen genKey
     v <- gen genValue
     assert $
@@ -431,15 +435,18 @@ prop_preserveEquiv_insert = forAllEquivPair $ \t1 t2 -> do
 -------------------------------------------------------------------------------}
 
 prop_union_nil :: Property ()
-prop_union_nil = forAllBST $ \t ->
+prop_union_nil = do
+    t <- genWith (Just . showBST) $ genBST genKey genValue
     assert $ predEquiv
       .$ ("lhs", union nil t)
       .$ ("rhs", t)
 
 prop_union_insert :: Property ()
-prop_union_insert = forAllBST $ \t -> forAllBST $ \t' -> do
-    k <- gen genKey
-    v <- gen genValue
+prop_union_insert = do
+    t  <- genWith (Just . showBST) $ genBST genKey genValue
+    t' <- genWith (Just . showBST) $ genBST genKey genValue
+    k  <- gen genKey
+    v  <- gen genValue
 
     let lhs = union (insert k v t) t'
         rhs = insert k v (union t t')
@@ -461,16 +468,20 @@ prop_complete t =
       .$ ("rhs", foldl (flip $ uncurry insert) nil (insertions t))
 
 prop_complete_insert :: Property ()
-prop_complete_insert = forAllBST $ \t -> do
+prop_complete_insert = do
+    t <- genWith (Just . showBST) $ genBST genKey genValue
     prop_complete t
 
 prop_complete_delete :: Property ()
-prop_complete_delete = forAllBST $ \t -> do
+prop_complete_delete = do
+    t <- genWith (Just . showBST) $ genBST genKey genValue
     k <- gen genKey
     prop_complete (delete k t)
 
 prop_complete_union :: Property ()
-prop_complete_union = forAllBST $ \t -> forAllBST $ \t' -> do
+prop_complete_union = do
+    t  <- genWith (Just . showBST) $ genBST genKey genValue
+    t' <- genWith (Just . showBST) $ genBST genKey genValue
     prop_complete (union t t')
 
 {-------------------------------------------------------------------------------
@@ -489,7 +500,8 @@ prop_model_nil =
       .$ ("rhs", [])
 
 prop_model_insert :: Property ()
-prop_model_insert = forAllBST $ \t -> do
+prop_model_insert = do
+    t <- genWith (Just . showBST) $ genBST genKey genValue
     k <- gen genKey
     v <- gen genValue
     assert $ P.eq
@@ -497,7 +509,8 @@ prop_model_insert = forAllBST $ \t -> do
       .$ ("rhs", L.insert (k, v) (deleteKey k $ toList t))
 
 prop_model_insert_wrong :: Property ()
-prop_model_insert_wrong = forAllBST $ \t -> do
+prop_model_insert_wrong = do
+    t <- genWith (Just . showBST) $ genBST genKey genValue
     k <- gen genKey
     v <- gen genValue
     assert $ P.eq
@@ -508,9 +521,10 @@ prop_model_insert_wrong = forAllBST $ \t -> do
   Section 4.6 A Note on Generation
 -------------------------------------------------------------------------------}
 
-prop_measure :: Property ()
-prop_measure = forAllBST $ \t -> do
-    k <- gen genKey
+prop_measureWith :: (Show a, Ord a) => Gen a -> Property ()
+prop_measureWith key = do
+    t <- genWith (Just . showBST) $ genBST key genValue
+    k <- gen key
     collect "present" [k `elem` keys t]
     collect "where" $ if
       | t == nil            -> ["empty"]
@@ -519,3 +533,11 @@ prop_measure = forAllBST $ \t -> do
       | all (<= k) (keys t) -> ["at end"]
       | otherwise           -> ["middle"]
 
+prop_measure :: Property ()
+prop_measure = prop_measureWith genKey
+
+genSmallKey :: Gen Int
+genSmallKey = Gen.integral $ Range.skewedBy 1 (0, 100)
+
+prop_measure_small :: Property ()
+prop_measure_small = prop_measureWith genSmallKey

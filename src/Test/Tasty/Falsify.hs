@@ -22,7 +22,7 @@ module Test.Tasty.Falsify (
   ) where
 
 import Test.Falsify.Generator (Gen)
-import Test.Falsify.Internal.Tasty
+import Test.Falsify.Internal.Driver.Tasty
 import Test.Falsify.Property
 
 import qualified Test.Falsify.Reexported.Generator.Function as Gen

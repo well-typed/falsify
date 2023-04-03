@@ -8,7 +8,7 @@
 -- "encoded" replay seed. This has the additional benefits that the length of
 -- the replay seed is always the same (unlike just writing a 'Word64'), and we
 -- could in principle at some point support other kinds of PRNGs.
-module Test.Falsify.Driver.ReplaySeed (
+module Test.Falsify.Internal.Driver.ReplaySeed (
     ReplaySeed(..)
   , parseReplaySeed
   , safeReadReplaySeed

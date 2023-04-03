@@ -13,8 +13,9 @@ import Data.Word
 
 import Test.Falsify.Generator.Auxiliary
 import Test.Falsify.Internal.Generator
-import Test.Falsify.Range (Range(..))
+import Test.Falsify.Internal.Range
 import Test.Falsify.SampleTree (Sample(..), sampleValue)
+import qualified Test.Falsify.Range as Range
 
 {-------------------------------------------------------------------------------
   Simple generators
@@ -41,26 +42,8 @@ bool target = aux . sampleValue <$> primWith shrinker
   Integral ranges
 -------------------------------------------------------------------------------}
 
-between :: forall a. (FiniteBits a, Integral a) => a -> a -> Gen a
-between x y | x == y = return x
-between x y =
-    fromFraction <$> fraction (precisionRequiredToRepresent distance)
-  where
-    -- Distance between the bounds
-    distance :: a
-    distance
-      | x <= y    = y - x
-      | otherwise = x - y
-
-    -- Shrink towards x
-    fromFraction :: Fraction -> a
-    fromFraction (Fraction f)
-      | x <= y    = round $ x' + f * distance'
-      | otherwise = round $ x' - f * distance'
-      where
-        x', distance' :: Double
-        x'        = fromIntegral x
-        distance' = fromIntegral distance
+fromFraction :: FiniteBits a => (Fraction -> a) -> a -> Gen a
+fromFraction f delta = f <$> fraction (precisionRequiredToRepresent delta)
 
 towards :: forall a. (Ord a, Num a) => a -> [Gen a] -> Gen a
 towards origin gens =
@@ -77,8 +60,11 @@ towards origin gens =
 
 -- | Generate value of integral type
 integral :: (FiniteBits a, Integral a) => Range a -> Gen a
-integral (Between x y)  = between x y
-integral (Towards o rs) = towards o (map integral rs)
+integral r =
+    case r of
+     Constant x     -> pure x
+     FromFraction f -> fromFraction f (Range.delta r)
+     Towards o rs   -> towards o (map integral rs)
 
 -- | Type-specialization of 'integral'
 int :: Range Int -> Gen Int
