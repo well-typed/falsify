@@ -51,6 +51,7 @@ module Test.Falsify.Generator (
     -- * Primitive
   , prim
   , primWith
+  , exhaustive
   , captureLocalTree
     -- * Combinators
   , withoutShrinking

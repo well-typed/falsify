@@ -5,7 +5,6 @@ import Test.Tasty
 import Test.Tasty.Falsify
 
 import Test.Falsify.Generator.Auxiliary
-import Test.Falsify.Predicate ((.$))
 
 import qualified Test.Falsify.Predicate as P
 
@@ -46,7 +45,7 @@ prop_unsignedWordN_shrinking p =
 
 prop_unsignedWordN_minimum :: Precision -> Property ()
 prop_unsignedWordN_minimum p =
-    testMinimum (P.eq .$ ("expected", WordN p 0)) $ do
+    testMinimum (P.expect $ WordN p 0) $ do
       x <- gen $ unsignedWordN p
       testFailed x
 
@@ -60,7 +59,7 @@ prop_fraction_shrinking p =
 
 prop_fraction_minimum :: Precision -> Word -> Word -> Property ()
 prop_fraction_minimum p target expected =
-    testMinimum ((P.eq .$ ("expected", expected)) `P.dot` P.fn ("pct", pct)) $ do
+    testMinimum ((P.expect expected) `P.dot` P.fn ("pct", pct)) $ do
       x <- gen $ fraction p
       unless (pct x < target) $ testFailed x
   where

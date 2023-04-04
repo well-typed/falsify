@@ -401,13 +401,13 @@ testMinimum :: forall e.
 testMinimum p prop = do
     st <- genWith (const Nothing) $ Gen.captureLocalTree
     case Gen.runGen (runProperty prop) st of
-      ((TestPassed (), _run), _truncated, _shrunk) ->
+      ((TestPassed (), _run), _shrunk) ->
         -- The property passed; nothing to test
         discard
-      ((TestDiscarded, _run), _truncated, _shrunk) ->
+      ((TestDiscarded, _run), _shrunk) ->
         -- The property needs to be discarded; discard this one, too
         discard
-      ((TestFailed initErr, initRun), _truncated, shrunk) -> do
+      ((TestFailed initErr, initRun), shrunk) -> do
         let explanation :: ShrinkExplanation (e, TestRun) (Maybe (), TestRun)
             explanation = shrinkFrom
                             resultIsValidShrink

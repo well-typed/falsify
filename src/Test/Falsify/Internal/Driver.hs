@@ -121,7 +121,7 @@ falsify opts prop = do
 
         case runGen (runProperty prop) st of
           -- Test passed
-          ((TestPassed (), run), _truncated, _shrunk) -> do
+          ((TestPassed (), run), _shrunk) -> do
             let success :: Success
                 success = Success {
                     successSeed = splitmixReplaySeed now
@@ -138,7 +138,7 @@ falsify opts prop = do
           --
           -- We ignore the failure message here, because this is the failure
           -- message before shrinking, which we are typically not interested in.
-          ((TestFailed e, run), _truncated, shrunk) -> do
+          ((TestFailed e, run), shrunk) -> do
             let explanation :: ShrinkExplanation (String, TestRun) TestRun
                 explanation =
                     limitShrinkSteps (maxShrinks opts) . second snd $
@@ -160,11 +160,11 @@ falsify opts prop = do
             return (successes acc, discardedTotal acc, Just failure)
 
           -- Test discarded, but reached maximum already
-          ((TestDiscarded, _), _, _) | discardedForTest acc == maxRatio opts ->
+          ((TestDiscarded, _), _) | discardedForTest acc == maxRatio opts ->
             return (successes acc, discardedTotal acc, Nothing)
 
           -- Test discarded; continue.
-          ((TestDiscarded, _), _, _) ->
+          ((TestDiscarded, _), _) ->
             go $ withDiscard later acc
 
 {-------------------------------------------------------------------------------

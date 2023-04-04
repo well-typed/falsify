@@ -157,7 +157,7 @@ prop_perm_minimum n =
 
 test_tree_towardsSmaller1 :: Property ()
 test_tree_towardsSmaller1 =
-    testMinimum (P.eq .$ ("expected", expected)) $ do
+    testMinimum (P.expect expected) $ do
       t <- gen $ Gen.tree (Range.between (0, 100)) $
                    Gen.int $ Range.between (0, 1)
       -- "Every tree is height balanced"

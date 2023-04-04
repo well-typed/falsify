@@ -12,6 +12,7 @@ import qualified TestSuite.Sanity.Selective
 import qualified TestSuite.Prop.Generator.Auxiliary
 import qualified TestSuite.Prop.Generator.Compound
 import qualified TestSuite.Prop.Generator.Function
+import qualified TestSuite.Prop.Generator.Marking
 import qualified TestSuite.Prop.Generator.Prim
 import qualified TestSuite.Prop.Generator.Simple
 
@@ -27,6 +28,7 @@ main = defaultMain $ testGroup "falsify" [
         ]
     , testGroup "Prop" [
           TestSuite.Prop.Generator.Prim.tests
+        , TestSuite.Prop.Generator.Marking.tests
         , TestSuite.Prop.Generator.Auxiliary.tests
         , TestSuite.Prop.Generator.Simple.tests
         , TestSuite.Prop.Generator.Compound.tests
