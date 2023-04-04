@@ -29,8 +29,8 @@ import Numeric.Natural
 import qualified Data.Ratio as Ratio
 
 import Data.Falsify.Tree (Tree, Interval(..), Endpoint(..))
-import Test.Falsify.Generator.Auxiliary (firstThen)
 import Test.Falsify.Internal.Generator (Gen)
+import Test.Falsify.Reexported.Generator.Auxiliary (firstThen)
 import Test.Falsify.Reexported.Generator.Compound (shrinkToNothing, bst)
 
 import qualified Data.Falsify.Tree as Tree

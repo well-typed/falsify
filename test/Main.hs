@@ -9,6 +9,8 @@ import qualified TestSuite.Sanity.Predicate
 import qualified TestSuite.Sanity.Prim
 import qualified TestSuite.Sanity.Selective
 
+import qualified TestSuite.Prop.Data.Integer
+
 import qualified TestSuite.Prop.Generator.Auxiliary
 import qualified TestSuite.Prop.Generator.Compound
 import qualified TestSuite.Prop.Generator.Function
@@ -33,5 +35,8 @@ main = defaultMain $ testGroup "falsify" [
         , TestSuite.Prop.Generator.Simple.tests
         , TestSuite.Prop.Generator.Compound.tests
         , TestSuite.Prop.Generator.Function.tests
+        ]
+    , testGroup "Data" [
+          TestSuite.Prop.Data.Integer.tests
         ]
     ]

@@ -10,7 +10,6 @@ import qualified Test.QuickCheck as QuickCheck
 import Data.Falsify.List (pairwiseAll)
 import Test.Falsify.Debugging
 import Test.Falsify.Generator (Gen)
-import Test.Falsify.Generator.Auxiliary
 
 import qualified Test.Falsify.Generator  as Gen
 import qualified Test.Falsify.SampleTree as SampleTree
@@ -51,7 +50,7 @@ test_shrinkTo = do
     gen = Gen.prim
 
     gen' :: Gen Word64
-    gen' = shrinkToOneOf 3 [0 .. 2]
+    gen' = Gen.shrinkToOneOf 3 [0 .. 2]
 
     prop :: Word64 -> Bool
     prop = even
@@ -64,7 +63,7 @@ test_firstThen = do
         shrink (const True) gen (SampleTree.fromSeed seed)
   where
     gen :: Gen Bool
-    gen = firstThen True False
+    gen = Gen.firstThen True False
 
 {-------------------------------------------------------------------------------
   Test shrinkWith
@@ -101,7 +100,7 @@ test_shrinkWith_word =
       last $ shrink (not . prop) gen (SampleTree.fromSeed 2)
   where
     gen :: Gen Word64
-    gen = shrinkWith QuickCheck.shrink Gen.prim
+    gen = Gen.shrinkWith QuickCheck.shrink Gen.prim
 
     prop :: Word64 -> Bool
     prop = even
@@ -118,7 +117,7 @@ test_shrinkWith_list listLength = do
     -- shrinking. With manual shrinking, however, this does not matter.
     gen :: Gen [Word64]
     gen =
-        shrinkWith QuickCheck.shrink $
+        Gen.shrinkWith QuickCheck.shrink $
           replicateM (fromIntegral listLength) $
             (`mod` 10) <$> Gen.prim
 

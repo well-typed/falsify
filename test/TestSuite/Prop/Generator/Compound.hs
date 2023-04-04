@@ -42,8 +42,14 @@ tests = testGroup "TestSuite.Prop.Generator.Compound" [
             ]
         ]
     , testGroup "tree" [
-          testProperty "towardsSmaller1" test_tree_towardsSmaller1
-        , testProperty "towardsSmaller2" test_tree_towardsSmaller2
+          testProperty "towardsSmaller1" prop_tree_towardsSmaller1
+        , testProperty "towardsSmaller2" prop_tree_towardsSmaller2
+        ]
+    , testGroup "frequency" [
+          testProperty "shrinking" prop_frequency_shrinking
+        , testPropertyWith expectFailure
+            "shrinking_wrong" prop_frequency_shrinking_wrong
+        , testProperty "replicateM" prop_replicateM_shrinking
         ]
     ]
   where
@@ -155,8 +161,8 @@ prop_perm_minimum n =
   TODO: We're currently only testing minimums here.
 -------------------------------------------------------------------------------}
 
-test_tree_towardsSmaller1 :: Property ()
-test_tree_towardsSmaller1 =
+prop_tree_towardsSmaller1 :: Property ()
+prop_tree_towardsSmaller1 =
     testMinimum (P.expect expected) $ do
       t <- gen $ Gen.tree (Range.between (0, 100)) $
                    Gen.int $ Range.between (0, 1)
@@ -166,8 +172,8 @@ test_tree_towardsSmaller1 =
     expected :: Tree Int
     expected = Branch 0 Leaf (Branch 0 Leaf (Branch 0 Leaf Leaf))
 
-test_tree_towardsSmaller2 :: Property ()
-test_tree_towardsSmaller2 =
+prop_tree_towardsSmaller2 :: Property ()
+prop_tree_towardsSmaller2 =
     testMinimum (P.elem .$ ("expected", expected)) $ do
       t <- gen $ Gen.tree (Range.between (0, 100)) $
                    Gen.int $ Range.between (0, 1)
@@ -185,5 +191,63 @@ test_tree_towardsSmaller2 =
         , Branch 0 Leaf (Branch 0 Leaf (Branch 0 Leaf (Branch 0 Leaf Leaf)))
         ]
 
+{-------------------------------------------------------------------------------
+  Tweak test data distribution
+-------------------------------------------------------------------------------}
 
+propShrinkingList1 :: [Word] -> [Word] -> Bool
+propShrinkingList1 = aux
+  where
+    aux [_, _, _] [_, _]       = True
+    aux [_, _, _] [_]          = True
+    aux [_, _]    [_]          = True
+    aux [x]       [x']         = x >= x'
+    aux [x, y]    [x', y']     = x >= x' && y >= y'
+    aux [x, y, z] [x', y', z'] = x >= x' && y >= y' && z >= z'
+    aux _         _            = error "impossible"
 
+propShrinkingList2 :: [Word] -> [Word] -> Bool
+propShrinkingList2 = aux
+  where
+    aux :: [Word] -> [Word] -> Bool
+    aux [x, y, _] [x', y']     = x >= x' && y >= y'
+    aux [x, _, _] [x']         = x >= x'
+    aux [x, _]    [x']         = x >= x'
+    aux [x]       [x']         = x >= x'
+    aux [x, y]    [x', y']     = x >= x' && y >= y'
+    aux [x, y, z] [x', y', z'] = x >= x' && y >= y' && z >= z'
+    aux _         _            = error "impossible"
+
+genListFrequency :: Gen [Word]
+genListFrequency =
+    Gen.frequency [
+        (1, replicateM 1 $ Gen.integral $ Range.between (0, 10))
+      , (2, replicateM 2 $ Gen.integral $ Range.between (0, 10))
+      , (3, replicateM 3 $ Gen.integral $ Range.between (0, 10))
+      ]
+
+genListMonad :: Gen [Word]
+genListMonad = do
+    n <- Gen.integral $ Range.between (1, 3)
+    replicateM n $ Gen.integral $ Range.between (0, 10)
+
+prop_frequency_shrinking :: Property ()
+prop_frequency_shrinking =
+    testShrinkingOfGen
+      (P.relatedBy ("propShrinkingList1", propShrinkingList1))
+      genListFrequency
+
+-- 'propShrinkingList2' does /not/ hold for 'genListFrequency' because the
+-- generators are independent
+prop_frequency_shrinking_wrong :: Property ()
+prop_frequency_shrinking_wrong =
+    testShrinkingOfGen
+      (P.relatedBy ("propShrinkingList2", propShrinkingList2))
+      genListFrequency
+
+-- 'propShrinkingList2' /does/ hold if we simply use 'replicateM'.
+prop_replicateM_shrinking :: Property ()
+prop_replicateM_shrinking =
+    testShrinkingOfGen
+      (P.relatedBy ("propShrinkingList2", propShrinkingList2))
+      genListMonad

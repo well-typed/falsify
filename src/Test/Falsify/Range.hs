@@ -171,6 +171,11 @@ withOrigin (x, y) o
 -- > 10 |   0 |   3
 --
 -- Will shrink towards @x@, independent of skew.
+--
+-- NOTE: The implementation currently uses something similar to μ-law encoding.
+-- As a consequence, the generator gets increased precision near the end of the
+-- range we skew towards, and less precision near the other end. This means that
+-- not all values in the range can be produced.
 skewedBy :: Integral a => Double -> (a, a) -> Range a
 skewedBy s (x, y)
   | x == y    = constant x

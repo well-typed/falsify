@@ -6,6 +6,7 @@
 -- Intended for unqualified import.
 module Test.Falsify.Internal.Generator (
     Gen -- opaque
+    -- * Execution
   , runGen
   , shrinkFrom
     -- * Primitive generators
@@ -13,6 +14,9 @@ module Test.Falsify.Internal.Generator (
   , primWith
   , exhaustive
   , captureLocalTree
+    -- * Generator independence
+  , bindIntegral
+  , perturb
     -- * Combinators
   , withoutShrinking
   ) where

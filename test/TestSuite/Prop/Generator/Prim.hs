@@ -1,6 +1,7 @@
 module TestSuite.Prop.Generator.Prim (tests) where
 
 import Control.Monad
+import Control.Selective
 import Data.Default
 import Data.Word
 import Test.Tasty
@@ -50,6 +51,12 @@ tests = testGroup "TestSuite.Prop.Generator.Prim" [
             ]
         , testGroup "either" [
               testProperty "shrinking" prop_monad_either_shrinking
+            ]
+        ]
+    , testGroup "selective" [
+          testGroup "either" [
+              testPropertyWith expectFailure
+                "shrinking" prop_selective_either_shrinking_wrong
             ]
         ]
     ]
@@ -247,8 +254,8 @@ prop_monad_maybe_towardsJust_minimum_wrong =
   Monad: Either
 -------------------------------------------------------------------------------}
 
-genEither :: Gen (Either Word64 Word64)
-genEither = do
+genMonadEither :: Gen (Either Word64 Word64)
+genMonadEither = do
     genLeft <- (== 0) <$> Gen.prim -- shrink towards left
     if genLeft
       then Left  <$> Gen.prim
@@ -258,10 +265,36 @@ prop_monad_either_shrinking :: Property ()
 prop_monad_either_shrinking =
     testShrinkingOfGen
       (P.relatedBy ("validShrink", validShrink))
-      genEither
+      genMonadEither
   where
     -- The 'Left' and 'Right' case use the /same/ part of the sample tree, so
     -- that if we shrink from one to the other, we /must/ get the same value.
+    validShrink :: Either Word64 Word64 -> Either Word64 Word64 -> Bool
+    validShrink _         (Left 0)   = True -- We can always shrink to 'Minimal'
+    validShrink (Left x)  (Left x')  = x >= x'
+    validShrink (Left _)  (Right _)  = False
+    validShrink (Right x) (Left x')  = x == x'
+    validShrink (Right x) (Right x') = x >= x'
+
+{-------------------------------------------------------------------------------
+  Selective: either
+-------------------------------------------------------------------------------}
+
+genSelectiveEither :: Gen (Either Word64 Word64)
+genSelectiveEither =
+    ifS ((== 0) <$> Gen.prim)
+        (Left  <$> Gen.prim)
+        (Right <$> Gen.prim)
+
+prop_selective_either_shrinking_wrong :: Property ()
+prop_selective_either_shrinking_wrong =
+    testShrinkingOfGen
+      (P.relatedBy ("validShrink", validShrink))
+      genSelectiveEither
+  where
+    -- Like in 'prop_monad_either_shrinking', here the two generators are
+    -- independent, and so it's entirely possible we might shrink from @Right x@
+    -- to @Left y@ for @x /= y@.
     validShrink :: Either Word64 Word64 -> Either Word64 Word64 -> Bool
     validShrink _         (Left 0)   = True -- We can always shrink to 'Minimal'
     validShrink (Left x)  (Left x')  = x >= x'

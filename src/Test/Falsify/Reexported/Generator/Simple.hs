@@ -11,10 +11,11 @@ import Data.List (minimumBy)
 import Data.Ord
 import Data.Word
 
-import Test.Falsify.Generator.Auxiliary
 import Test.Falsify.Internal.Generator
 import Test.Falsify.Internal.Range
+import Test.Falsify.Reexported.Generator.Auxiliary
 import Test.Falsify.SampleTree (Sample(..), sampleValue)
+
 import qualified Test.Falsify.Range as Range
 
 {-------------------------------------------------------------------------------

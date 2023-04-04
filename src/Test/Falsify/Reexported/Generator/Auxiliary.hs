@@ -7,7 +7,7 @@
 -- use the generators in this module.
 --
 -- Intended for unqualified import.
-module Test.Falsify.Generator.Auxiliary (
+module Test.Falsify.Reexported.Generator.Auxiliary (
     -- * Auxiliary types
     -- ** Signed values
     Signed(..)
@@ -21,7 +21,7 @@ module Test.Falsify.Generator.Auxiliary (
   , mkFraction
     -- * Generators
     -- ** @n@-bit words
-  , unsignedWordN
+  , wordN
     -- ** Fractions
   , fraction
     -- * User-specified shrinking
@@ -70,7 +70,7 @@ newtype Precision = Precision Word8
   deriving newtype (Num, Enum)
 
 precisionRequiredToRepresent :: forall a. FiniteBits a => a -> Precision
-precisionRequiredToRepresent x = Precision $ fromIntegral $
+precisionRequiredToRepresent x = fromIntegral $
     finiteBitSize (undefined :: a) - countLeadingZeros x
 
 -- | @n@-bit word
@@ -121,8 +121,8 @@ mkFraction (WordN (Precision p) x) = Fraction $ (fromIntegral x) / (2 ^ p - 1)
 -------------------------------------------------------------------------------}
 
 -- | Uniform selection of @n@-bit word of given precision, shrinking towards 0
-unsignedWordN :: Precision -> Gen WordN
-unsignedWordN p =
+wordN :: Precision -> Gen WordN
+wordN p =
     fmap (truncateAt p . sampleValue) . primWith $
         binarySearch
       . forgetPrecision
@@ -135,7 +135,7 @@ unsignedWordN p =
 -- 0; it is meaningless to have a fraction in a point range).
 fraction :: HasCallStack => Precision -> Gen Fraction
 fraction (Precision 0) = error "fraction: 0 precision"
-fraction p             = mkFraction <$> unsignedWordN p
+fraction p             = mkFraction <$> wordN p
 
 {-------------------------------------------------------------------------------
   Specialized shrinking behaviour

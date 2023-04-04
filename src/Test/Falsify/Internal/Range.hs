@@ -13,6 +13,7 @@ module Test.Falsify.Internal.Range (
 -- | Value in the range [0 .. 1]
 newtype Fraction = Fraction { getFraction :: Double }
   deriving stock (Show, Eq, Ord)
+  deriving newtype (Num, Fractional)
 
 instance Bounded Fraction where
   minBound = Fraction 0
