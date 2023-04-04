@@ -40,7 +40,6 @@ import GHC.Stack
 import qualified Data.Tree as Rose
 
 import Test.Falsify.Internal.Generator
-import Test.Falsify.Internal.Generator.Truncated (Truncated)
 import Test.Falsify.Internal.Search
 import Test.Falsify.Internal.Range
 import Test.Falsify.SampleTree (Sample(..), sampleValue, SampleTree)
@@ -245,5 +244,5 @@ toShrinkTree :: forall a. Gen a -> Gen (Rose.Tree a)
 toShrinkTree gen =
     Rose.unfoldTree aux . runGen gen <$> captureLocalTree
   where
-    aux :: (a, Truncated, [SampleTree]) -> (a,[(a, Truncated, [SampleTree])])
-    aux (x, _, shrunk) = (x, map (runGen gen) shrunk)
+    aux :: (a, [SampleTree]) -> (a,[(a, [SampleTree])])
+    aux (x, shrunk) = (x, map (runGen gen) shrunk)

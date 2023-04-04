@@ -15,7 +15,6 @@ import Data.Either
 import Data.List.NonEmpty (NonEmpty((:|)))
 
 import Test.Falsify.Internal.Generator.Definition
-import Test.Falsify.Internal.Generator.Truncated (Truncated)
 import Test.Falsify.SampleTree (SampleTree(..))
 
 {-------------------------------------------------------------------------------
@@ -157,8 +156,8 @@ shrinkFrom prop gen = \(p, shrunk) ->
         candidates :: [Either (p, [SampleTree]) n]
         candidates = map consider $ map (runGen gen) shrunk
 
-    consider :: (a, Truncated, [SampleTree]) -> Either (p, [SampleTree]) n
-    consider (a, _, shrunk) =
+    consider :: (a, [SampleTree]) -> Either (p, [SampleTree]) n
+    consider (a, shrunk) =
         case prop a of
           ValidShrink p   -> Left (p, shrunk)
           InvalidShrink n -> Right n

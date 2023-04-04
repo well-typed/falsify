@@ -6,22 +6,13 @@
 --
 -- Intended for unqualified import.
 module Test.Falsify.Debugging (
-    -- * Truncated sample tree
-    Truncated(..)
-  , expandTruncated
-  , replaceValues
-    -- * Generalization
-  , Truncated'(..)
-  , toTruncated'
-  , expandTruncated'
     -- * Shrinking
-  , ShrinkExplanation(..)
+    ShrinkExplanation(..)
   , IsValidShrink(..)
   , limitShrinkSteps
   , shrinkHistory
     -- * Convenience driver-like functions
   , run
-  , run'
   , shrink
   , shrink'
     -- * Specialized generators
@@ -35,7 +26,6 @@ import Data.Maybe (fromMaybe)
 
 import Test.Falsify.Internal.Generator.Definition
 import Test.Falsify.Internal.Generator.Shrinking
-import Test.Falsify.Internal.Generator.Truncated
 import Test.Falsify.SampleTree (SampleTree(..), Sample, pattern Inf)
 
 {-------------------------------------------------------------------------------
@@ -44,16 +34,7 @@ import Test.Falsify.SampleTree (SampleTree(..), Sample, pattern Inf)
 
 -- | Run generator against specified sample tree
 run :: Gen a -> SampleTree -> a
-run gen = fst . run' gen
-
--- | Run generator against specified sample tree
---
--- Also returns the part of the sample tree used to produce the result.
-run' :: Gen a -> SampleTree -> (a, Truncated)
-run' gen = aux . runGen gen
-  where
-    aux :: (a, Truncated, [SampleTree]) -> (a, Truncated)
-    aux (outcome, truncated, _) = (outcome, truncated)
+run gen = fst . runGen gen
 
 -- | Run the generator and return the full shrink history
 --
@@ -75,8 +56,8 @@ shrink' :: forall a.
   -> Maybe (ShrinkExplanation a a)
 shrink' prop gen = aux . runGen gen
   where
-    aux :: (a, Truncated, [SampleTree]) -> Maybe (ShrinkExplanation a a)
-    aux (outcome, _, shrunk) = do
+    aux :: (a, [SampleTree]) -> Maybe (ShrinkExplanation a a)
+    aux (outcome, shrunk) = do
         guard (prop outcome)
         return $ shrinkFrom prop' gen (outcome, shrunk)
 
@@ -90,9 +71,9 @@ shrink' prop gen = aux . runGen gen
 -- | Varation on @(>>=)@ that doesn't apply the shortcut to 'Minimal'
 bindWithoutShortcut :: Gen a -> (a -> Gen b) -> Gen b
 bindWithoutShortcut x f = Gen $ \(Inf s l r) ->
-    let (a, tl, ls) = runGen x l
-        (b, tr, rs) = runGen (f a) r
-    in (b, B tl tr, combine s (l :| ls) (r :| rs))
+    let (a, ls) = runGen x l
+        (b, rs) = runGen (f a) r
+    in (b, combine s (l :| ls) (r :| rs))
   where
     -- Variation on 'combineShrunk' that doesn't apply the shortcut
     combine ::

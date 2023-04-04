@@ -97,7 +97,7 @@ prop_prim_shrinking = testShrinkingOfGen P.gt $ Gen.prim
 -- The minimum is always 0, unless 0 is not a counter-example
 prop_prim_minimum :: Word64 -> Property ()
 prop_prim_minimum target = do
-    testMinimum (P.eq .$ ("expected", if target == 0 then 1 else 0)) $ do
+    testMinimum (P.expect $ if target == 0 then 1 else 0) $ do
       x <- gen $ Gen.prim
       unless (x == target) $ testFailed x
 
@@ -111,7 +111,7 @@ prop_bool_shrinking True  = testShrinkingOfGen P.le $ Gen.bool True
 
 prop_bool_minimum :: Bool -> Property ()
 prop_bool_minimum target =
-    testMinimum (P.eq .$ ("target", target)) $ do
+    testMinimum (P.expect target) $ do
       b <- gen $ Gen.bool target
       testFailed b
 
@@ -129,13 +129,13 @@ prop_int_between_shrinking (x, y)
 
 prop_int_between_minimum :: (Int, Int) -> Int -> Property ()
 prop_int_between_minimum (x, y) _target | x == y =
-    testMinimum (P.eq .$ ("expected", x)) $ do
+    testMinimum (P.expect x) $ do
       n <- gen $ Gen.integral $ Range.between (x, y)
       -- The only value we can produce here is @x@, so no point looking for
       -- anything these (that would just result in all tests being discarded)
       testFailed n
 prop_int_between_minimum (x, y) target =
-    testMinimum (P.eq .$ ("expected", expected)) $ do
+    testMinimum (P.expect expected) $ do
       n <- gen $ Gen.integral $ Range.between (x, y)
       unless (n == target) $ testFailed n
   where
@@ -159,7 +159,7 @@ prop_integral_withOrigin_minimum :: forall a.
      (Show a, Integral a, FiniteBits a)
   => (a, a) -> a -> a -> Property ()
 prop_integral_withOrigin_minimum (x, y) o _target | x == y =
-    testMinimum (P.eq .$ ("expected", x)) $ do
+    testMinimum (P.expect x) $ do
       -- See discussion in 'prop_int_between_minimum'
       n <- gen $ Gen.integral $ Range.withOrigin (x, y) o
       testFailed n

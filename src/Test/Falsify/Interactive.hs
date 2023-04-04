@@ -13,5 +13,5 @@ import qualified Test.Falsify.SampleTree as SampleTree
 sample :: Gen a -> IO a
 sample gen = do
     prng <- initSMGen
-    let (x, _truncated, _shrunk) = runGen gen (SampleTree.fromPRNG prng)
+    let (x, _shrunk) = runGen gen (SampleTree.fromPRNG prng)
     return x

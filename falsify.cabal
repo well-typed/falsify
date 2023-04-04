@@ -98,7 +98,6 @@ library
       Test.Falsify.Internal.Generator
       Test.Falsify.Internal.Generator.Definition
       Test.Falsify.Internal.Generator.Shrinking
-      Test.Falsify.Internal.Generator.Truncated
       Test.Falsify.Internal.Property
       Test.Falsify.Internal.Range
       Test.Falsify.Internal.Search
@@ -144,6 +143,7 @@ test-suite test-falsify
       TestSuite.Prop.Generator.Auxiliary
       TestSuite.Prop.Generator.Compound
       TestSuite.Prop.Generator.Function
+      TestSuite.Prop.Generator.Marking
       TestSuite.Prop.Generator.Prim
       TestSuite.Prop.Generator.Simple
   build-depends:

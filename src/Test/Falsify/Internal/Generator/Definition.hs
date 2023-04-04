@@ -4,6 +4,7 @@ module Test.Falsify.Internal.Generator.Definition (
     -- * Primitive generators
   , prim
   , primWith
+  , exhaustive
   , captureLocalTree
     -- * Combinators
   , withoutShrinking
@@ -14,7 +15,6 @@ import Control.Selective
 import Data.List.NonEmpty (NonEmpty((:|)))
 import Data.Word
 
-import Test.Falsify.Internal.Generator.Truncated
 import Test.Falsify.Internal.Search
 import Test.Falsify.SampleTree (SampleTree(..), Sample (..), pattern Inf)
 
@@ -54,29 +54,29 @@ import qualified Test.Falsify.SampleTree as SampleTree
 -- NOTE: 'Gen' is /NOT/ an instance of 'Alternative'; this would not be
 -- compatible with the generation of infinite data structures. For the same
 -- reason, we do not have a monad transformer version of Gen either.
-newtype Gen a = Gen { runGen :: SampleTree -> (a, Truncated, [SampleTree]) }
+newtype Gen a = Gen { runGen :: SampleTree -> (a, [SampleTree]) }
   deriving stock (Functor)
 
 instance Applicative Gen where
-  pure x = Gen $ \_st -> (x, E, [])
+  pure x = Gen $ \_st -> (x, [])
   (<*>)  = ap
 
 instance Monad Gen where
   return  = pure
   x >>= f = Gen $ \(Inf s l r) ->
-      let (a, tl, ls) = runGen x l
-          (b, tr, rs) = runGen (f a) r
-      in (b, B tl tr, combineShrunk s (l :| ls) (r :| rs))
+      let (a, ls) = runGen x l
+          (b, rs) = runGen (f a) r
+      in (b, combineShrunk s (l :| ls) (r :| rs))
 
 instance Selective Gen where
   select e f = Gen $ \(Inf s l r) -> do
-      let (ma, tl, ls) = runGen e l
+      let (ma, ls) = runGen e l
       case ma of
         Left a ->
-          let (f', tr, rs) = runGen f r
-          in (f' a, B tl tr, combineShrunk s (l :| ls) (r :| rs))
+          let (f', rs) = runGen f r
+          in (f' a, combineShrunk s (l :| ls) (r :| rs))
         Right b ->
-          (b, B tl E, combineShrunk s (l :| ls) (r :| []))
+          (b, combineShrunk s (l :| ls) (r :| []))
 
 -- | Combine shrunk left and right sample trees
 --
@@ -120,17 +120,35 @@ prim =
 primWith :: (Sample -> [Word64]) -> Gen Sample
 primWith f = Gen $ \(Inf s l r) -> (
       s
-    , S s
     , (\s' -> SampleTree (Shrunk s') l r) <$> f s
     )
+
+-- | Generate arbitrary value @x <= n@
+--
+-- Unlike 'prim', 'exhaustive' does not execute binary search. Instead, /all/
+-- smaller values are considered. This is potentially very expensive; the
+-- primary use case for this generator is testing shrinking behaviour, where
+-- binary search can lead to some unpredicatable results.
+--
+-- This does /NOT/ do uniform selection: for small @n@, the generator will with
+-- overwhelming probability produce @n@ itself as initial value.
+--
+-- This is a primitive generator; most users will probably not want to use this
+-- generator directly.
+exhaustive :: Word64 -> Gen Word64
+exhaustive n =
+    min n . SampleTree.sampleValue <$>
+      primWith (completeSearch . SampleTree.sampleValue)
+  where
+    completeSearch :: Word64 -> [Word64]
+    completeSearch 0 = []
+    completeSearch x = takeWhile (<= n) [0 .. pred x]
 
 -- | Capture the local sample tree
 --
 -- This generator does not shrink.
---
--- NOTE: This does not produce a valid 'Truncated' tree.
 captureLocalTree :: Gen SampleTree
-captureLocalTree = Gen $ \st -> (st, E, [])
+captureLocalTree = Gen $ \st -> (st, [])
 
 {-------------------------------------------------------------------------------
   Shrinking combinators
@@ -148,5 +166,5 @@ captureLocalTree = Gen $ \st -> (st, E, [])
 withoutShrinking :: Gen a -> Gen a
 withoutShrinking (Gen g) = Gen $ aux . g
   where
-    aux :: (a, Truncated, [SampleTree]) -> (a, Truncated, [SampleTree])
-    aux (outcome, truncated, _) = (outcome, truncated, [])
+    aux :: (a, [SampleTree]) -> (a, [SampleTree])
+    aux (outcome, _) = (outcome, [])
