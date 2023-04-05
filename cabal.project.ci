@@ -2,3 +2,4 @@ packages: .
 
 package falsify
   tests: true
+  ghc-options: -Werror
