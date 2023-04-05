@@ -1,0 +1,55 @@
+cabal-version:      3.0
+name:               demo
+version:            0.1.0
+license:            BSD-3-Clause
+license-file:       LICENSE
+author:             Edsko de Vries
+maintainer:         edsko@well-typed.com
+category:           Testing
+build-type:         Simple
+tested-with:        GHC==8.6.5
+                  , GHC==8.8.4
+                  , GHC==8.10.7
+                  , GHC==9.0.2
+                  , GHC==9.2.5
+                  , GHC==9.4.4
+                  , GHC==9.6.1
+
+common lang
+  ghc-options:
+      -Wall
+      -Wredundant-constraints
+      -Widentities
+  build-depends:
+      base >= 4.12 && < 4.19
+  default-language:
+      Haskell2010
+  default-extensions:
+      DataKinds
+      DeriveGeneric
+      DisambiguateRecordFields
+      MultiWayIf
+      NamedFieldPuns
+      NumericUnderscores
+      ScopedTypeVariables
+
+executable demo
+  import:
+      lang
+  hs-source-dirs:
+      src
+  main-is:
+      Main.hs
+  other-modules:
+      Demo.Distribution
+      Demo.Functions
+      Demo.HowToSpecifyIt
+      Demo.TestOptions
+      Demo.TestShrinking
+  build-depends:
+    , containers
+    , data-default
+    , falsify
+    , mtl
+    , tasty
+    , vector
