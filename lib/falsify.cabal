@@ -15,7 +15,7 @@ description:        This library provides property based testing with support
                     @<https://hackage.haskell.org/package/tasty tasty>@,
                     and use "Test.Tasty.Falsify" as their main entrypoint
                     into the library. The "Test.Falsify.Interactive" module
-                    can be used to experiment with the libary in @ghci@.
+                    can be used to experiment with the library in @ghci@.
 
 license:            BSD-3-Clause
 license-file:       LICENSE
