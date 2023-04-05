@@ -43,11 +43,9 @@ module Test.Falsify.Generator (
   , pattern Fn3
   , fun
     -- * Reducing precision
-  , Precision(..)
-  , Fraction(..)
   , WordN(..)
   , wordN
-  , fraction
+  , properFraction
     -- * User-specified shrinking
   , shrinkToOneOf
   , firstThen
@@ -67,7 +65,7 @@ module Test.Falsify.Generator (
   , withoutShrinking
   ) where
 
-import Prelude hiding (either, elem)
+import Prelude hiding (either, elem, properFraction)
 
 import Test.Falsify.Internal.Generator
 import Test.Falsify.Reexported.Generator.Auxiliary

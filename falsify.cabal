@@ -141,6 +141,7 @@ test-suite test-falsify
       TestSuite.Sanity.Function
       TestSuite.Sanity.Predicate
       TestSuite.Sanity.Prim
+      TestSuite.Sanity.Range
       TestSuite.Sanity.Selective
       TestSuite.Prop.Data.Integer
       TestSuite.Prop.Generator.Auxiliary

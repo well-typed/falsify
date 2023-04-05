@@ -4,7 +4,8 @@ import Control.Monad
 import Test.Tasty
 import Test.Tasty.Falsify
 
-import Test.Falsify.Generator (Precision(..), Fraction(..), WordN(..))
+import Test.Falsify.Generator (WordN(..))
+import Test.Falsify.Range (Precision(..), ProperFraction(..))
 
 import qualified Test.Falsify.Generator as Gen
 import qualified Test.Falsify.Predicate as P
@@ -25,13 +26,12 @@ tests = testGroup "TestSuite.Prop.Generator.Auxiliary" [
             ]
         | (p, target, expected) <- [
              -- The higher the precision, the closer we can get to the target
-             (1  , 50, 100)
-           , (2  , 50, 67)
-           , (3  , 50, 57)
-           , (4  , 50, 53)
-           , (5  , 50, 52)
-           , (63 , 50, 50)
-           , (64 , 50, 50)
+             (2  , 50, 75)
+           , (3  , 50, 62)
+           , (4  , 50, 56)
+           , (5  , 50, 53)
+           , (63 , 50, 51)
+           , (64 , 50, 51)
            ]
         ]
     ]
@@ -56,14 +56,14 @@ prop_wordN_minimum p =
 
 prop_fraction_shrinking :: Precision -> Property ()
 prop_fraction_shrinking p =
-    testShrinkingOfGen P.ge $ Gen.fraction p
+    testShrinkingOfGen P.ge $ Gen.properFraction p
 
 prop_fraction_minimum :: Precision -> Word -> Word -> Property ()
 prop_fraction_minimum p target expected =
     testMinimum ((P.expect expected) `P.dot` P.fn ("pct", pct)) $ do
-      x <- gen $ Gen.fraction p
-      unless (pct x < target) $ testFailed x
+      x <- gen $ Gen.properFraction p
+      unless (pct x <= target) $ testFailed x
   where
-    pct :: Fraction -> Word
-    pct (Fraction f) = round (f * 100)
+    pct :: ProperFraction -> Word
+    pct (ProperFraction f) = round (f * 100)
 

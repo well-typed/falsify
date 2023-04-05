@@ -6,9 +6,9 @@ module Test.Falsify.Reexported.Generator.Simple (
   , enum
   ) where
 
+import Prelude hiding (properFraction)
+
 import Data.Bits
-import Data.List (minimumBy)
-import Data.Ord
 import Data.Word
 
 import Test.Falsify.Internal.Generator
@@ -43,29 +43,9 @@ bool target = aux . sampleValue <$> primWith shrinker
   Integral ranges
 -------------------------------------------------------------------------------}
 
-fromFraction :: FiniteBits a => (Fraction -> a) -> a -> Gen a
-fromFraction f delta = f <$> fraction (precisionRequiredToRepresent delta)
-
-towards :: forall a. (Ord a, Num a) => a -> [Gen a] -> Gen a
-towards origin gens =
-    pick <$> sequence gens
-  where
-    pick :: [a] -> a
-    pick [] = origin
-    pick as = minimumBy (comparing distanceToOrigin) as
-
-    distanceToOrigin :: a -> a
-    distanceToOrigin x
-      | x >= origin = x - origin
-      | otherwise   = origin - x
-
 -- | Generate value of integral type
-integral :: (FiniteBits a, Integral a) => Range a -> Gen a
-integral r =
-    case r of
-     Constant x     -> pure x
-     FromFraction f -> fromFraction f (Range.delta r)
-     Towards o rs   -> towards o (map integral rs)
+integral :: Integral a => Range a -> Gen a
+integral r = Range.eval properFraction r
 
 -- | Type-specialization of 'integral'
 int :: Range Int -> Gen Int

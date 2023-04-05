@@ -1,10 +1,11 @@
 module Demo.Distribution (tests) where
 
 import Data.List (intercalate)
+import Data.Word
 import Test.Tasty
 import Test.Tasty.Falsify
 
-import Test.Falsify.Generator (Precision(..))
+import Test.Falsify.Range (Precision(..))
 
 import qualified Test.Falsify.Generator as Gen
 import qualified Test.Falsify.Range     as Range
@@ -16,10 +17,8 @@ tests = testGroup "Demo.Distribution" [
         | total <- [2, 3, 6, 10]
         ]
     , testGroup "fraction" [
-          testProperty (intercalate "_" $ [show p, show total]) $
-            prop_fraction (Precision p) total
+          testProperty (show p) $ prop_fraction p
         | p <- [2, 3, 4]
-        , total <- [2, 3, 6, 10]
         ]
     , testGroup "integral" [
           testProperty (show total) $ prop_integral total
@@ -35,12 +34,15 @@ tests = testGroup "Demo.Distribution" [
 prop_prim :: Word -> Property ()
 prop_prim total = do
     x <- gen $ Gen.prim
-    collect "x" [x `div` (maxBound `div` fromIntegral total)]
+    collect "bucket" [bucket bucketSize x]
+  where
+    bucketSize :: Word64
+    bucketSize = maxBound `div` fromIntegral total
 
-prop_fraction :: Precision -> Word -> Property ()
-prop_fraction p total = do
-    x <- gen $ Gen.fraction p
-    collect "x" [Gen.getFraction $ x / (maxBound / fromIntegral total)]
+prop_fraction :: Precision -> Property ()
+prop_fraction p = do
+    x <- gen $ Gen.properFraction p
+    collect "x" [x]
 
 prop_integral :: Word -> Property ()
 prop_integral total = do
@@ -56,4 +58,15 @@ prop_frequency a b c = do
       ]
     collect "x" [x]
 
+{-------------------------------------------------------------------------------
+  Auxiliary
+-------------------------------------------------------------------------------}
+
+bucket :: forall a. (Ord a, Num a) => a -> a -> Word
+bucket bucketSize = go 0
+  where
+    go :: Word -> a -> Word
+    go b value
+      | value <= bucketSize = b
+      | otherwise           = go (succ b) (value - bucketSize)
 
