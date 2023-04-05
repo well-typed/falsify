@@ -7,23 +7,12 @@
 -- use the generators in this module.
 --
 -- Intended for unqualified import.
-module Test.Falsify.Generator.Auxiliary (
-    -- * Auxiliary types
-    -- ** Signed values
-    Signed(..)
-  , forgetSign
-    -- ** @n@-bit words
-  , Precision(..)
-  , precisionRequiredToRepresent
-  , WordN(..)
+module Test.Falsify.Reexported.Generator.Auxiliary (
+    -- * @n@-bit words
+    WordN(..)
+  , wordN
     -- ** Fractions
-  , Fraction(..)
-  , mkFraction
-    -- * Generators
-    -- ** @n@-bit words
-  , unsignedWordN
-    -- ** Fractions
-  , fraction
+  , properFraction
     -- * User-specified shrinking
   , shrinkToOneOf
   , firstThen
@@ -32,6 +21,8 @@ module Test.Falsify.Generator.Auxiliary (
   , fromShrinkTree
   , toShrinkTree
   ) where
+
+import Prelude hiding (properFraction)
 
 import Data.Bits
 import Data.Word
@@ -45,33 +36,8 @@ import Test.Falsify.Internal.Range
 import Test.Falsify.SampleTree (Sample(..), sampleValue, SampleTree)
 
 {-------------------------------------------------------------------------------
-  Auxiliary type: signed values
+  @n@-bit word
 -------------------------------------------------------------------------------}
-
--- | Signed value
---
--- Depending on @a@, there is redundancy in this representation: @Pos 0@ and
--- @Neg 0@ represent the same value, for instance, so that 'Signed Word63' is
--- nearly but not quite isomorphic to 'Int64'.
-data Signed a = Pos a | Neg a
-  deriving stock (Functor, Show, Eq)
-
-forgetSign :: Signed a -> a
-forgetSign (Pos x) = x
-forgetSign (Neg x) = x
-
-{-------------------------------------------------------------------------------
-  Auxiliary type: @n@-bit word
--------------------------------------------------------------------------------}
-
--- | Precision (in bits)
-newtype Precision = Precision Word8
-  deriving stock (Show, Eq, Ord)
-  deriving newtype (Num, Enum)
-
-precisionRequiredToRepresent :: forall a. FiniteBits a => a -> Precision
-precisionRequiredToRepresent x = Precision $ fromIntegral $
-    finiteBitSize (undefined :: a) - countLeadingZeros x
 
 -- | @n@-bit word
 data WordN = WordN Precision Word64
@@ -108,34 +74,31 @@ truncateAt desiredPrecision x =
     mask :: Precision -> Word64
     mask (Precision n) = 2 ^ n - 1
 
-{-------------------------------------------------------------------------------
-  Auxiliary type: fractions
--------------------------------------------------------------------------------}
-
--- | Compute fraction from @n@-bit word
-mkFraction :: WordN -> Fraction
-mkFraction (WordN (Precision p) x) = Fraction $ (fromIntegral x) / (2 ^ p - 1)
-
-{-------------------------------------------------------------------------------
-  Generators
--------------------------------------------------------------------------------}
-
 -- | Uniform selection of @n@-bit word of given precision, shrinking towards 0
-unsignedWordN :: Precision -> Gen WordN
-unsignedWordN p =
+wordN :: Precision -> Gen WordN
+wordN p =
     fmap (truncateAt p . sampleValue) . primWith $
         binarySearch
       . forgetPrecision
       . truncateAt p
       . sampleValue
 
+{-------------------------------------------------------------------------------
+  Fractions
+-------------------------------------------------------------------------------}
+
+-- | Compute fraction from @n@-bit word
+mkFraction :: WordN -> ProperFraction
+mkFraction (WordN (Precision p) x) =
+    ProperFraction $ (fromIntegral x) / (2 ^ p)
+
 -- | Uniform selection of fraction, shrinking towards 0
 --
 -- Precondition: precision must be at least 1 bit (a zero-bit number is constant
 -- 0; it is meaningless to have a fraction in a point range).
-fraction :: HasCallStack => Precision -> Gen Fraction
-fraction (Precision 0) = error "fraction: 0 precision"
-fraction p             = mkFraction <$> unsignedWordN p
+properFraction :: HasCallStack => Precision -> Gen ProperFraction
+properFraction (Precision 0) = error "fraction: 0 precision"
+properFraction p             = mkFraction <$> wordN p
 
 {-------------------------------------------------------------------------------
   Specialized shrinking behaviour

@@ -40,7 +40,7 @@ tests = testGroup "TestSuite.Sanity.Compound" [
 test_tree_towardsOrigin1 :: Assertion
 test_tree_towardsOrigin1 = do
     assertEqual "" expected $
-      last $ shrink (not . prop) gen (SampleTree.fromSeed 4)
+      last $ shrink (not . prop) gen (SampleTree.fromSeed 5)
   where
     -- If we prefer a counter-example with 10 nodes, then this tree is indeed
     -- nicely minimal: note that the tree is /almost/ balanced, it's off by
@@ -48,13 +48,10 @@ test_tree_towardsOrigin1 = do
     expected :: Tree Word8
     expected =
         Branch 0
-          (Branch 0
-            (Branch 0 Leaf Leaf)
-            (Branch 0 Leaf (Branch 0 Leaf Leaf))
-          )
+          (Branch 0 Leaf (Branch 0 Leaf Leaf))
           (Branch 0
             (Branch 0 Leaf (Branch 0 Leaf (Branch 0 Leaf Leaf)))
-            (Branch 0 Leaf Leaf)
+            (Branch 0 (Branch 0 Leaf Leaf) (Branch 0 Leaf Leaf))
           )
 
     gen :: Gen (Tree Word8)
@@ -67,23 +64,21 @@ test_tree_towardsOrigin1 = do
 test_tree_towardsOrigin2 :: Assertion
 test_tree_towardsOrigin2 = do
     assertEqual "" expected $
-      last $ shrink (not . prop) gen (SampleTree.fromSeed 8)
+      last $ shrink (not . prop) gen (SampleTree.fromSeed 5)
   where
     -- Another beautiful example of a tree that is /not/ weight-balanced, but
     -- only barely so, with as side condition that we prefer to have 10 elements
     -- (and therefore /get/ 10 elements).
     expected :: Tree Word8
     expected =
-        Branch 0
-          -- This is the unbalanced subtree:
-          (Branch 0
-            Leaf
-            (Branch 0 (Branch 0 Leaf Leaf) (Branch 0 Leaf Leaf))
-          )
-          (Branch 0
-            (Branch 0 Leaf (Branch 0 Leaf Leaf))
-            (Branch 0 Leaf (Branch 0 Leaf Leaf))
-          )
+      Branch 0
+        (Branch 0
+          (Branch 0 Leaf Leaf)
+          (Branch 0 Leaf (Branch 0 (Branch 0 Leaf Leaf) (Branch 0 Leaf Leaf))))
+        (Branch 0
+          (Branch 0 Leaf Leaf)
+          (Branch 0 Leaf Leaf)
+        )
 
     gen :: Gen (Tree Word8)
     gen = Gen.tree (Range.withOrigin (0, 100) 10) $

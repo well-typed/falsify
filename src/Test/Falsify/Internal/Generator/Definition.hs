@@ -6,6 +6,9 @@ module Test.Falsify.Internal.Generator.Definition (
   , primWith
   , exhaustive
   , captureLocalTree
+    -- * Generator independence
+  , bindIntegral
+  , perturb
     -- * Combinators
   , withoutShrinking
   ) where
@@ -14,7 +17,11 @@ import Control.Monad
 import Control.Selective
 import Data.List.NonEmpty (NonEmpty((:|)))
 import Data.Word
+import Optics.Core (Lens', (%))
 
+import qualified Optics.Core as Optics
+
+import Data.Falsify.Integer (Bit(..), encIntegerEliasG)
 import Test.Falsify.Internal.Search
 import Test.Falsify.SampleTree (SampleTree(..), Sample (..), pattern Inf)
 
@@ -99,6 +106,37 @@ combineShrunk s (l :| ls) (r :| rs) = shortcut $ concat [
     shortcut :: [SampleTree] -> [SampleTree]
     shortcut [] = []
     shortcut ts = Minimal : ts
+
+{-------------------------------------------------------------------------------
+  Generator independence
+-------------------------------------------------------------------------------}
+
+-- | Selective bind
+--
+-- Unlike monadic bind, the RHS is generated and shrunk completely independently
+-- for each different value of @a@ produced by the LHS.
+--
+-- This is a generalization of 'bindS' to arbitrary integral values; it is also
+-- much more efficient than 'bindS'.
+--
+-- NOTE: This is only one way to make a generator independent. See 'perturb'
+-- for more primitive combinator.
+bindIntegral :: Integral a => Gen a -> (a -> Gen b) -> Gen b
+bindIntegral x f = x >>= \a -> perturb a (f a)
+
+-- | Run generator on different part of the sample tree depending on @a@
+perturb :: Integral a => a -> Gen b -> Gen b
+perturb a g = Gen $ \st ->
+    let (b, shrunk) = runGen g (Optics.view lens st)
+    in (b, map (\st' -> Optics.set lens st' st) shrunk)
+  where
+    lens :: Lens' SampleTree SampleTree
+    lens = computeLens (encIntegerEliasG $ fromIntegral a)
+
+    computeLens :: [Bit] -> Lens' SampleTree SampleTree
+    computeLens []       = Optics.castOptic Optics.simple
+    computeLens (O : bs) = SampleTree.left  % computeLens bs
+    computeLens (I : bs) = SampleTree.right % computeLens bs
 
 {-------------------------------------------------------------------------------
   Primitive generators

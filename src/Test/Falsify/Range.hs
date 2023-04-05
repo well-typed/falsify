@@ -2,22 +2,28 @@
 module Test.Falsify.Range (
     Range -- opaque
     -- * Primitive constructors
+  , ProperFraction(..)
+  , Precision(..)
   , constant
-  , fromFraction
+  , fromProperFraction
   , towards
-    -- * Constructing linear ranges
-  , Fraction(..)
+    -- * Constructors
+    -- ** Linear
   , between
   , withOrigin
+    -- ** Non-linear
   , skewedBy
     -- * Queries
-  , upperBound
-  , lowerBound
-  , delta
   , origin
+    -- * Evalation
+  , eval
   ) where
 
+import Data.List (minimumBy)
+import Data.Ord
+
 import Test.Falsify.Internal.Range
+import Data.Bits
 
 {-------------------------------------------------------------------------------
   Primitive ranges
@@ -33,8 +39,8 @@ constant = Constant
 --
 -- * for all @x <= y@, @f x <= f y@, /or/
 -- * for all @x <= y@, @f y <= f x@
-fromFraction :: (Fraction -> a) -> Range a
-fromFraction = FromFraction
+fromProperFraction :: Precision -> (ProperFraction -> a) -> Range a
+fromProperFraction = FromProperFraction
 
 -- | Generate value in any of the specified ranges, then choose the one
 -- that is closest to the specified origin
@@ -48,11 +54,11 @@ towards = Towards
 -------------------------------------------------------------------------------}
 
 -- | Uniform selection between the given bounds, shrinking towards first bound
-between :: forall a. Integral a => (a, a) -> Range a
+between :: forall a. (Integral a, FiniteBits a) => (a, a) -> Range a
 between = skewedBy 0
 
 -- | Selection within the given bounds, shrinking towards the specified origin
-withOrigin :: Integral a => (a, a) -> a -> Range a
+withOrigin :: (Integral a, FiniteBits a) => (a, a) -> a -> Range a
 withOrigin (x, y) o
   | not originInBounds
   = error "withOrigin: origin not within bounds"
@@ -171,54 +177,114 @@ withOrigin (x, y) o
 -- > 10 |   0 |   3
 --
 -- Will shrink towards @x@, independent of skew.
-skewedBy :: Integral a => Double -> (a, a) -> Range a
+--
+-- NOTE: The implementation currently uses something similar to μ-law encoding.
+-- As a consequence, the generator gets increased precision near the end of the
+-- range we skew towards, and less precision near the other end. This means that
+-- not all values in the range can be produced.
+skewedBy :: forall a. (FiniteBits a, Integral a) => Double -> (a, a) -> Range a
 skewedBy s (x, y)
   | x == y    = constant x
-  | x < y     = fromFraction $ \(Fraction f) -> round $ x' + skew f * (y' - x')
-  | otherwise = fromFraction $ \(Fraction f) -> round $ x' - skew f * (x' - y')
+  | x < y     = let p = precisionRequiredToRepresent (y - x)
+                in fromProperFraction p $ \(ProperFraction f) -> roundDown f
+  | otherwise = let p = precisionRequiredToRepresent (x - y)
+                in fromProperFraction p $ \(ProperFraction f) -> roundUp   f
   where
     x', y' :: Double
     x' = fromIntegral x
     y' = fromIntegral y
+
+    -- We have to be careful here. Perhaps the more obvious way to express this
+    -- calculation is
+    --
+    -- > round $ x' + skew f * (y' - x')
+    --
+    -- However, this leads to a bad distribution of test data. Suppose we are
+    -- generating values in the range [0 .. 2]. Then that call to 'round'
+    -- would result in something like this:
+    --
+    -- >  0..............1..............2
+    -- > [       /\             /\      ]
+    -- >  ^^^^^^^^  ^^^^^^^^^^^^  ^^^^^^
+    -- >     0            1           2
+    --
+    -- To avoid this heavy bias, we instead do this:
+    --
+    -- >  0..............1..............2..............3
+    -- > [              /\             /\               ]
+    -- >  ^^^^^^^^^^^^^^  ^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^
+    -- >        0                1              2
+    --
+    -- By insisting that the fraction is a /proper/ fraction (i.e., not equal to
+    -- 1), we avoid generating @3@ (which would be outside the range).
+    roundDown, roundUp :: Double -> a
+    roundDown f = floor   $ x' + skew f * (y' - x' + 1)
+    roundUp   f = ceiling $ x' - skew f * (x' - y' + 1)
 
     pos, neg :: Double -> Double
     pos f = 1 - ((1 -      f  ** (s + 1)) ** (1 / (    s + 1)))
     neg f =      (1 - (1 - f) ** (s + 1)) ** (1 / (abs s + 1))
 
     skew :: Double -> Double
-    skew | s >= 0    = pos
+    skew | s == 0    = id
+         | s >= 0    = pos
          | otherwise = neg
+
+{-------------------------------------------------------------------------------
+  Precision
+-------------------------------------------------------------------------------}
+
+-- | Precision required to be able to choose within the given range
+--
+-- In order to avoid rounding errors, we set a lower bound on the precision.
+-- This lower bound is verified in "TestSuite.Sanity.Range", which verifies that
+-- for small ranges, the expected distribution is never off by more than 1%
+-- from the actual distribution.
+precisionRequiredToRepresent :: forall a. FiniteBits a => a -> Precision
+precisionRequiredToRepresent x = fromIntegral $
+    7 `max` (finiteBitSize (undefined :: a) - countLeadingZeros x)
 
 {-------------------------------------------------------------------------------
   Queries
 -------------------------------------------------------------------------------}
 
--- | Maximum value in the range
-upperBound :: Ord a => Range a -> a
-upperBound (Constant x) =
-    x
-upperBound (FromFraction f) =
-    -- This relies on the precondition to 'fromFraction'
-    -- (monotonically increasing or decreasing)
-    max (f minBound) (f maxBound)
-upperBound (Towards o rs) =
-    -- This relies on the precondition to 'towards'
-    -- (origin within the bounds of all ranges).
-    maximum (o : map upperBound rs)
-
--- | Minimum value in the range
-lowerBound :: Ord a => Range a -> a
-lowerBound (Constant x)      = x
-lowerBound (FromFraction f) = min (f minBound) (f maxBound)
-lowerBound (Towards o rs)   = minimum (o : map lowerBound rs)
-
--- | Distance between the upper bound and the lower bound
-delta  :: (Ord a, Num a) => Range a -> a
-delta r = upperBound r - lowerBound r
-
 -- | Origin of the range (value we shrink towards)
 origin ::  Range a -> a
-origin (Constant x)     = x
-origin (FromFraction f) = f minBound
-origin (Towards o _)    = o
+origin (Constant x)             = x
+origin (FromProperFraction _ f) = f (ProperFraction 0)
+origin (Towards o _)            = o
 
+{-------------------------------------------------------------------------------
+  Evaluation
+-------------------------------------------------------------------------------}
+
+-- | Internal auxiliary for 'eval'
+evalTowards :: forall f a.
+     (Applicative f, Ord a, Num a)
+  => a -> [f a] -> f a
+evalTowards o gens =
+    pick <$> sequenceA gens
+  where
+    pick :: [a] -> a
+    pick [] = o
+    pick as = minimumBy (comparing distanceToOrigin) as
+
+    distanceToOrigin :: a -> a
+    distanceToOrigin x
+      | x >= o    = x - o
+      | otherwise = o - x
+
+-- | Evaluate a range, given an action to generate fractions
+--
+-- Most users will probably never need to call this function.
+eval :: forall f a.
+     (Applicative f, Ord a, Num a)
+  => (Precision -> f ProperFraction) -> Range a -> f a
+eval genFraction = go
+  where
+    go :: Range a -> f a
+    go r =
+        case r of
+          Constant x             -> pure x
+          FromProperFraction p f -> f <$> genFraction p
+          Towards o rs           -> evalTowards o (map go rs)

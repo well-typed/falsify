@@ -7,7 +7,6 @@
 module Test.Falsify.Generator (
     -- * Definition
     Gen -- opaque
-  , runGen
     -- * Simple (non-compound) generators
   , bool
   , integral
@@ -22,6 +21,8 @@ module Test.Falsify.Generator (
     -- *** Shuffling
   , shuffle
   , permutation
+    -- ** Tweak test data distribution
+  , frequency
     -- ** Trees
     -- *** Binary trees
   , tree
@@ -41,6 +42,10 @@ module Test.Falsify.Generator (
   , pattern Fn2
   , pattern Fn3
   , fun
+    -- * Reducing precision
+  , WordN(..)
+  , wordN
+  , properFraction
     -- * User-specified shrinking
   , shrinkToOneOf
   , firstThen
@@ -53,14 +58,17 @@ module Test.Falsify.Generator (
   , primWith
   , exhaustive
   , captureLocalTree
+    -- * Generator independence
+  , bindIntegral
+  , perturb
     -- * Combinators
   , withoutShrinking
   ) where
 
-import Prelude hiding (either, elem)
+import Prelude hiding (either, elem, properFraction)
 
-import Test.Falsify.Generator.Auxiliary
 import Test.Falsify.Internal.Generator
+import Test.Falsify.Reexported.Generator.Auxiliary
 import Test.Falsify.Reexported.Generator.Compound
 import Test.Falsify.Reexported.Generator.Function
 import Test.Falsify.Reexported.Generator.Simple

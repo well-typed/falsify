@@ -76,7 +76,6 @@ library
   exposed-modules:
       Test.Falsify.Debugging
       Test.Falsify.Generator
-      Test.Falsify.Generator.Auxiliary
       Test.Falsify.Interactive
       Test.Falsify.Nudge
       Test.Falsify.Predicate
@@ -84,6 +83,7 @@ library
       Test.Falsify.Range
       Test.Falsify.SampleTree
 
+      Data.Falsify.Integer
       Data.Falsify.List
       Data.Falsify.Marked
       Data.Falsify.Tree
@@ -101,6 +101,7 @@ library
       Test.Falsify.Internal.Property
       Test.Falsify.Internal.Range
       Test.Falsify.Internal.Search
+      Test.Falsify.Reexported.Generator.Auxiliary
       Test.Falsify.Reexported.Generator.Compound
       Test.Falsify.Reexported.Generator.Function
       Test.Falsify.Reexported.Generator.Simple
@@ -113,6 +114,7 @@ library
     , containers
     , data-default
     , mtl
+    , optics-core
     , optparse-applicative
     , selective
     , sop-core
@@ -139,7 +141,9 @@ test-suite test-falsify
       TestSuite.Sanity.Function
       TestSuite.Sanity.Predicate
       TestSuite.Sanity.Prim
+      TestSuite.Sanity.Range
       TestSuite.Sanity.Selective
+      TestSuite.Prop.Data.Integer
       TestSuite.Prop.Generator.Auxiliary
       TestSuite.Prop.Generator.Compound
       TestSuite.Prop.Generator.Function
@@ -163,6 +167,7 @@ executable demo
   main-is:
       Main.hs
   other-modules:
+      Demo.Distribution
       Demo.Functions
       Demo.HowToSpecifyIt
       Demo.TestOptions
