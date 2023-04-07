@@ -58,6 +58,10 @@ between :: forall a. (Integral a, FiniteBits a) => (a, a) -> Range a
 between = skewedBy 0
 
 -- | Selection within the given bounds, shrinking towards the specified origin
+--
+-- All else being equal, prefers values in the /second/ half of the range
+-- (in the common case of say @withOrigin (-100, 100) 0@, this means we prefer
+-- positive values).
 withOrigin :: (Integral a, FiniteBits a) => (a, a) -> a -> Range a
 withOrigin (x, y) o
   | not originInBounds
@@ -79,8 +83,8 @@ withOrigin (x, y) o
 -- would be at the origin, we would only ever produce that one value.
   | otherwise =
       towards o [
-          between (o, x)
-        , between (o, y)
+          between (o, y)
+        , between (o, x)
         ]
   where
     originInBounds :: Bool

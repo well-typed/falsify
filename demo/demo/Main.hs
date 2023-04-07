@@ -2,6 +2,7 @@ module Main (main) where
 
 import Test.Tasty
 
+import qualified Demo.Blogpost
 import qualified Demo.Distribution
 import qualified Demo.Functions
 import qualified Demo.HowToSpecifyIt
@@ -15,4 +16,5 @@ main = defaultMain $ testGroup "demo" [
     , Demo.TestShrinking.tests
     , Demo.Distribution.tests
     , Demo.HowToSpecifyIt.tests
+    , Demo.Blogpost.tests
     ]

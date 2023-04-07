@@ -24,6 +24,7 @@ module Test.Falsify.Predicate (
   , relatedBy
     -- * Combinators
   , dot
+  , split
   , on
   , flip
   , matchEither
@@ -45,6 +46,7 @@ module Test.Falsify.Predicate (
   , even
   , odd
   , elem
+  , pairwise
   ) where
 
 import Prelude hiding (all, flip, even, odd, pred, elem)
@@ -230,16 +232,16 @@ data Predicate :: [Type] -> Type where
   Both :: Predicate xs -> Predicate xs -> Predicate xs
 
   -- | Abstraction
-  Lam :: (x -> Predicate xs) -> Predicate (x ': xs)
+  Lam :: (Input x -> Predicate xs) -> Predicate (x ': xs)
 
   -- | Partial application
   At :: Predicate (x : xs) -> Input x -> Predicate xs
 
   -- | Function compostion
-  Dot :: Predicate (x : xs) -> Fn y x -> Predicate (y : xs)
+  Dot :: Predicate (x' : xs) -> Fn x x' -> Predicate (x : xs)
 
-  -- | Analogue of 'Prelude.on'
-  On :: Predicate (x : x : xs) -> Fn y x -> Predicate (y : y : xs)
+  -- | Analogue of 'Control.Arrow.(***)'
+  Split :: Predicate (x' : y' : xs) -> (Fn x x', Fn y y') -> Predicate (x : y : xs)
 
   -- | Analogue of 'Prelude.flip'
   Flip :: Predicate (x : y : zs) -> Predicate (y : x : zs)
@@ -329,9 +331,16 @@ relatedBy (n, p) =
 dot :: Predicate (x : xs) -> Fn y x -> Predicate (y : xs)
 dot = Dot
 
+-- | Analogue of 'Control.Arrow.(***)'
+split ::
+     Predicate (x' : y' : xs)
+  -> (Fn x x', Fn y y')
+  -> Predicate (x : y : xs)
+split = Split
+
 -- | Analogue of 'Prelude.on'
 on :: Predicate (x : x : xs) -> Fn y x -> Predicate (y : y : xs)
-on = On
+on p f = p `split` (f, f)
 
 -- | Analogue of 'Prelude.flip'
 flip :: Predicate (x : y : zs) -> Predicate (y : x : zs)
@@ -411,12 +420,12 @@ evalPrim p err xs
 
 evalLam ::
      SListI xs
-  => (x -> Predicate xs)
+  => (Input x -> Predicate xs)
   -> NP Input (x : xs)
   -> Either Failure ()
 evalLam f (x :* xs) =
     first (addInputs [renderInput x]) $
-      evalAt (f $ inputValue x) xs
+      evalAt (f x) xs
 
 evalDot ::
      SListI xs
@@ -430,18 +439,18 @@ evalDot p f (x :* xs) =
   where
     (y, x') = applyFn f x
 
-evalOn ::
+evalSplit ::
      SListI xs
-  => Predicate (x : x : xs)
-  -> Fn y x
-  -> NP Input (y : y : xs)
+  => Predicate (x' : y' : xs)
+  -> (Fn x x', Fn y y')
+  -> NP Input (x : y : xs)
   -> Either Failure ()
-evalOn p f (x0 :* x1 :* xs) =
-    first (addInputs $ catMaybes [x0', x1']) $
-      evalAt p (y0 :* y1 :* xs)
+evalSplit p (f, g) (x :* y :* xs) =
+    first (addInputs $ catMaybes [inp_x, inp_y]) $
+      evalAt p (x' :* y' :* xs)
   where
-    (y0, x0') = applyFn f x0
-    (y1, x1') = applyFn f x1
+    (x', inp_x) = applyFn f x
+    (y', inp_y) = applyFn g y
 
 evalChoice ::
      SListI xs
@@ -456,17 +465,18 @@ evalChoice t f (x :* xs) =
         Right b -> evalAt f (x{inputValue = b} :* xs)
 
 evalAt :: SListI xs => Predicate xs -> NP Input xs -> Either Failure ()
-evalAt (Prim p err) xs = evalPrim p err xs
-evalAt Pass         _  = return ()
-evalAt Fail         xs = Left $ Failure "Fail" (renderInputs xs)
-evalAt (Both p1 p2) xs = evalAt p1 xs >> evalAt p2 xs
-evalAt (Lam f)      xs = evalLam f xs
-evalAt (p `At` x)   xs = evalAt p (x :* xs)
-evalAt (p `Dot` f)  xs = evalDot p f xs
-evalAt (p `On` f)   xs = evalOn  p f xs
-evalAt (Flip p)     xs = let (x :* y :* zs) = xs in evalAt p (y :* x :* zs)
-evalAt (Choose l r) xs = evalChoice l r xs
-evalAt (Const p)    xs = evalAt p (SOP.tl xs)
+evalAt (Prim p err)       xs = evalPrim p err xs
+evalAt Pass               _  = return ()
+evalAt Fail               xs = Left $ Failure "Fail" (renderInputs xs)
+evalAt (Both p1 p2)       xs = evalAt p1 xs >> evalAt p2 xs
+evalAt (Lam f)            xs = evalLam f xs
+evalAt (p `At` x)         xs = evalAt p (x :* xs)
+evalAt (p `Dot` f)        xs = evalDot p f xs
+evalAt (p `Split` (f, g)) xs = evalSplit p (f, g) xs
+evalAt (Flip p)           xs = let (x :* y :* zs) = xs in
+                               evalAt p (y :* x :* zs)
+evalAt (Choose l r)       xs = evalChoice l r xs
+evalAt (Const p)          xs = evalAt p (SOP.tl xs)
 
 {-------------------------------------------------------------------------------
   Evaluation and partial evaluation
@@ -485,14 +495,14 @@ eval p = first prettyFailure $ evalAt p Nil
 -- >   .$ ("x", x)
 -- >   .$ ("y", y)
 (.$) :: Show x => Predicate (x : xs) -> (Var, x) -> Predicate xs
-p .$ (n, x) = p `at` (n, show x, x)
+p .$ (n, x) = p `at` (Var n, show x, x)
 
 -- | Generation of '(.$)' that does not require a 'Show' instance
 at ::
      Predicate (x : xs)
-  -> (Var, String, x) -- ^ Renderded name, name for the input, and input proper
+  -> (Expr, String, x) -- ^ Renderded name, expression, and input proper
   -> Predicate xs
-p `at` (n, r, x) = p `At` (Input (Var n) r x)
+p `at` (e, r, x) = p `At` (Input e r x)
 
 {-------------------------------------------------------------------------------
   Specific predicates
@@ -535,7 +545,8 @@ towards :: forall a. (Show a, Ord a, Num a) => a -> Predicate [a, a]
 towards = \target -> pred .$ ("target", target)
   where
     pred :: Predicate [a, a, a]
-    pred = Lam (\target -> ge `on` fn ("distanceToTarget", distanceTo target))
+    pred = Lam $ \target ->
+        ge `on` fn ("distanceToTarget", distanceTo (inputValue target))
 
     distanceTo :: a -> a -> a
     distanceTo target x
@@ -562,5 +573,24 @@ odd :: Integral a => Predicate '[a]
 odd  = satisfies ("odd ", Prelude.odd)
 
 -- | Membership check
-elem :: Eq a => Predicate '[[a], a]
+elem :: Eq a => Predicate [[a], a]
 elem = flip $ binaryInfix ("`notElem`") Prelude.elem
+
+-- | Apply predicate to every pair of consecutive elements in the list
+pairwise :: forall a. Show a => Predicate [a, a] -> Predicate '[[a]]
+pairwise p = Lam $ \xs ->
+    foldMap
+      (uncurry $ pred (inputExpr xs))
+      (pairs $ zip [0..] (inputValue xs))
+  where
+    pairs :: forall x. [x] -> [(x, x)]
+    pairs []           = []
+    pairs [_]          = []
+    pairs (x : y : zs) = (x, y) : pairs (y : zs)
+
+    pred :: Expr -> (Word, a) -> (Word, a) -> Predicate '[]
+    pred xs (i, x) (j, y) =
+             p
+        `at` (Infix "!!" xs (Var $ show i), show x, x)
+        `at` (Infix "!!" xs (Var $ show j), show y, y)
+

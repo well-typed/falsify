@@ -105,7 +105,7 @@ prop_list_towardsShorterEven_shrinking_wrong =
 -- due to binary search
 prop_list_towardsShorterEven_minimum :: Property ()
 prop_list_towardsShorterEven_minimum =
-    testMinimum (P.elem .$ ("expected", [[6,4],[4,2]])) $ do
+    testMinimum (P.elem .$ ("expected", [[6,4],[8,6]])) $ do
       xs <- gen $ fmap (filter even) $
                      Gen.list (Range.between (10, 20)) $
                        Gen.int $ Range.withOrigin (0, 10) 5
@@ -177,14 +177,17 @@ prop_perm_minimum n =
 
 prop_tree_towardsSmaller1 :: Property ()
 prop_tree_towardsSmaller1 =
-    testMinimum (P.expect expected) $ do
+    testMinimum (P.satisfies ("expected", expected)) $ do
       t <- gen $ Gen.tree (Range.between (0, 100)) $
                    Gen.int $ Range.between (0, 1)
       -- "Every tree is height balanced"
       unless (Tree.isHeightBalanced t) $ testFailed t
   where
-    expected :: Tree Int
-    expected = Branch 0 Leaf (Branch 0 Leaf (Branch 0 Leaf Leaf))
+    expected :: Tree Int -> Bool
+    expected t = or [
+          t == Branch 0 (Branch 0 Leaf (Branch 0 Leaf Leaf)) Leaf
+        , t == Branch 0 Leaf (Branch 0 Leaf (Branch 0 Leaf Leaf))
+        ]
 
 prop_tree_towardsSmaller2 :: Property ()
 prop_tree_towardsSmaller2 =

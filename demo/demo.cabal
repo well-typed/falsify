@@ -21,13 +21,15 @@ common lang
       -Wredundant-constraints
       -Widentities
   build-depends:
-      base >= 4.12 && < 4.19
+      base
   default-language:
       Haskell2010
   default-extensions:
       DataKinds
       DeriveGeneric
+      DerivingStrategies
       DisambiguateRecordFields
+      GeneralizedNewtypeDeriving
       MultiWayIf
       NamedFieldPuns
       NumericUnderscores
@@ -37,10 +39,11 @@ executable demo
   import:
       lang
   hs-source-dirs:
-      src
+      demo
   main-is:
       Main.hs
   other-modules:
+      Demo.Blogpost
       Demo.Distribution
       Demo.Functions
       Demo.HowToSpecifyIt
@@ -51,5 +54,23 @@ executable demo
     , data-default
     , falsify
     , mtl
+    , selective
+    , splitmix
     , tasty
+    , tasty-hunit
     , vector
+
+executable template
+  -- intentionally no import of lang
+  hs-source-dirs:
+      template
+  main-is:
+      Main.hs
+  ghc-options:
+      -Wall
+  default-language:
+      Haskell2010
+  build-depends:
+      base
+    , tasty
+    , falsify
