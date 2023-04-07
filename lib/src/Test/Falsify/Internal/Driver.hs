@@ -373,13 +373,34 @@ renderTestResult
          where
            history = shrinkHistory (failureRun e)
 
-      (_, DontExpectFailure, Just e) -> RenderedTestResult {
+      (NotVerbose, DontExpectFailure, Just e) -> RenderedTestResult {
              testPassed = False
            , testOutput = unlines [
                  "failed after " ++ countHistory history
                , fst $ NE.last history
                , "Logs for failed test run:"
                , renderLog . runLog . snd $ NE.last history
+               , showSeed $ failureSeed e
+               ]
+           }
+         where
+           history = shrinkHistory (failureRun e)
+
+      (Verbose, DontExpectFailure, Just e) -> RenderedTestResult {
+             testPassed = False
+           , testOutput = unlines [
+                 "failed after " ++ countHistory history
+               , fst $ NE.last history
+               , ""
+               , "Logs for complete shrink history:"
+               , ""
+               , intercalate "\n" $ [
+                     intercalate "\n" [
+                         "Step " ++ show (step :: Word)
+                       , renderLog (runLog run)
+                       ]
+                   | (step, (_result, run)) <- zip [1..] (NE.toList history)
+                   ]
                , showSeed $ failureSeed e
                ]
            }
