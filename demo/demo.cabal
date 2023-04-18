@@ -30,6 +30,7 @@ common lang
       DerivingStrategies
       DisambiguateRecordFields
       GeneralizedNewtypeDeriving
+      LambdaCase
       MultiWayIf
       NamedFieldPuns
       NumericUnderscores
