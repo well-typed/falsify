@@ -129,6 +129,14 @@ newtype LinearParser a = LinearParser (State [Word] a)
 runLinearParser :: LinearParser a -> [Word] -> (a, [Word])
 runLinearParser (LinearParser g) = runState g
 
+parseBool :: LinearParser Bool
+parseBool = LinearParser $ state $ \case
+    []     -> error "parseBool: no more samples"
+    (s:ss) -> (
+        if s >= maxBound `div` 2 then True else False
+      , ss
+      )
+
 {-------------------------------------------------------------------------------
   QuickCheck
 -------------------------------------------------------------------------------}
