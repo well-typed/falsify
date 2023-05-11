@@ -2,7 +2,8 @@
 
 ## 0.2 -- unreleased
 
-* Add `oneof` (Simon Kohlmeyer)
+* Avoid use of `Expr` in `at` (#48)
+* Add `oneof` (#54, Simon Kohlmeyer)
 
 ## 0.1.1 -- 2023-04-07
 
