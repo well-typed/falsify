@@ -23,6 +23,26 @@ module Test.Falsify.Generator (
   , pick
   , pickBiased
   , shuffle
+    -- ** Text
+  , binit
+  , octit
+  , digit
+  , hexit
+  , asciiLower
+  , asciiUpper
+  , asciiAlpha
+  , asciiAlphaNum
+  , asciiWhitespace
+  , asciiSymbol
+  , asciiPunctuation
+  , asciiControl
+  , ascii
+  , asciiAll
+  , unicode
+  , unicodeNonSpace
+  , unicodeAll
+  , string
+  , text
     -- ** Permutations
   , Permutation
   , applyPermutation
@@ -91,4 +111,5 @@ import Test.Falsify.Reexported.Generator.Function
 import Test.Falsify.Reexported.Generator.Precision
 import Test.Falsify.Reexported.Generator.Shrinking
 import Test.Falsify.Reexported.Generator.Simple
+import Test.Falsify.Reexported.Generator.Text
 import Data.Falsify.Tree
