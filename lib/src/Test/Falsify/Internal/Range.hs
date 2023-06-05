@@ -6,6 +6,7 @@ module Test.Falsify.Internal.Range (
   , Precision(..)
   ) where
 
+import Data.List.NonEmpty (NonEmpty)
 import Data.Word
 import GHC.Show
 import GHC.Stack
@@ -51,8 +52,20 @@ newtype Precision = Precision Word8
 -------------------------------------------------------------------------------}
 
 -- | Range of values
-data Range a =
-    Constant a
-  | FromProperFraction Precision (ProperFraction -> a)
-  | Towards a [Range a]
-  deriving stock (Functor)
+data Range a where
+  -- | Constant (point) range
+  Constant :: a -> Range a
+
+  -- | Construct values in the range from a 'ProperFraction'
+  --
+  -- This is the main constructor for 'Range'.
+  FromProperFraction :: Precision -> (ProperFraction -> a) -> Range a
+
+  -- | Evaluate each range and choose the \"smallest\"
+  --
+  -- Each value in the range is annotated with some distance metric; for
+  -- example, this could be the distance to some predefined point (e.g. as in
+  -- 'Test.Falsify.Range.towards')
+  Smallest :: Ord b => NonEmpty (Range (a, b)) -> Range a
+
+deriving stock instance Functor Range

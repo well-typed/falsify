@@ -9,9 +9,10 @@ module Test.Falsify.Generator (
     Gen -- opaque
     -- * Simple (non-compound) generators
   , bool
+  , inRange
   , integral
-  , int
   , enum
+  , int
     -- * Compound generators
     -- ** Taking advantage of 'Selective'
   , choose

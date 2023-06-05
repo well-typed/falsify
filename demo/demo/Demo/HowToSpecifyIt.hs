@@ -90,7 +90,7 @@ tests = testGroup "Demo.HowToSpecifyIt" [
 forAllLists :: ([Int] -> Property a) -> Property a
 forAllLists p = do
     xs <- gen $ Gen.list (Range.between (0, 100)) $
-            Gen.enum (Range.between (0, 100))
+            Gen.inRange (Range.between (0, 100))
     p xs
 
 prop_reverse_reverse :: Property ()
@@ -213,10 +213,10 @@ genBST :: forall k v. Ord k => Gen k -> Gen v -> Gen (BST k v)
 genBST k v = fromList <$> Gen.list (Range.between (0, 100)) ((,) <$> k <*> v)
 
 genKey :: Gen Int
-genKey = Gen.integral $ Range.between (0, 100)
+genKey = Gen.inRange $ Range.between (0, 100)
 
 genValue :: Gen Int
-genValue = Gen.integral $ Range.between (0, 100)
+genValue = Gen.inRange $ Range.between (0, 100)
 
 {-------------------------------------------------------------------------------
   Section 4: "Approaches to Writing Properties"
@@ -537,7 +537,7 @@ prop_measure :: Property ()
 prop_measure = prop_measureWith genKey
 
 genSmallKey :: Gen Int
-genSmallKey = Gen.integral $ Range.skewedBy 1 (0, 100)
+genSmallKey = Gen.inRange $ Range.skewedBy 1 (0, 100)
 
 prop_measure_small :: Property ()
 prop_measure_small = prop_measureWith genSmallKey

@@ -1,9 +1,10 @@
 -- | Simple (i.e., non-compound) generators
 module Test.Falsify.Reexported.Generator.Simple (
     bool
+  , inRange
   , integral
-  , int
   , enum
+  , int
   ) where
 
 import Prelude hiding (properFraction)
@@ -43,17 +44,21 @@ bool target = aux . sampleValue <$> primWith shrinker
   Integral ranges
 -------------------------------------------------------------------------------}
 
--- | Generate value of integral type
-integral :: Integral a => Range a -> Gen a
-integral r = Range.eval properFraction r
+-- | Generate value in the specified range
+inRange :: Range a -> Gen a
+inRange r = Range.eval properFraction r
 
--- | Type-specialization of 'integral'
+-- | Deprecated alias for 'inRange'
+integral :: Range a -> Gen a
+{-# DEPRECATED integral "Use inRange instead" #-}
+integral = inRange
+
+-- | Deprecated alias for 'inRange'
+enum :: Range a -> Gen a
+{-# DEPRECATED enum "Use inRange instead" #-}
+enum = inRange
+
+-- | Type-specialization of 'inRange'
 int :: Range Int -> Gen Int
-int = integral
+int = inRange
 
--- | Generate value of enumerable type
---
--- For most types 'integral' is preferred; the 'Enum' class goes through 'Int',
--- and is therefore also limited by the range of 'Int'.
-enum :: forall a. Enum a => Range a -> Gen a
-enum r = toEnum <$> integral (fromEnum <$> r)
