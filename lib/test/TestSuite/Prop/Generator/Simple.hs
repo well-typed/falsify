@@ -83,6 +83,11 @@ tests = testGroup "TestSuite.Prop.Generator.Simple" [
              , test_int_withOrigin (Proxy @Word)
              ]
       ]
+    , testGroup "char" [
+          testGroup "enum" [
+               testProperty "shrinking" $ prop_char_enum_shrinking ('a', 'z')
+            ]
+        ]
     ]
 
 
@@ -124,19 +129,19 @@ prop_bool_minimum target =
 
 prop_int_between_shrinking :: (Int, Int) -> Property ()
 prop_int_between_shrinking (x, y)
-  | x <= y    = testShrinkingOfGen P.ge $ Gen.integral $ Range.between (x, y)
-  | otherwise = testShrinkingOfGen P.le $ Gen.integral $ Range.between (x, y)
+  | x <= y    = testShrinkingOfGen P.ge $ Gen.inRange $ Range.between (x, y)
+  | otherwise = testShrinkingOfGen P.le $ Gen.inRange $ Range.between (x, y)
 
 prop_int_between_minimum :: (Int, Int) -> Int -> Property ()
 prop_int_between_minimum (x, y) _target | x == y =
     testMinimum (P.expect x) $ do
-      n <- gen $ Gen.integral $ Range.between (x, y)
+      n <- gen $ Gen.inRange $ Range.between (x, y)
       -- The only value we can produce here is @x@, so no point looking for
       -- anything these (that would just result in all tests being discarded)
       testFailed n
 prop_int_between_minimum (x, y) target =
     testMinimum (P.expect expected) $ do
-      n <- gen $ Gen.integral $ Range.between (x, y)
+      n <- gen $ Gen.inRange $ Range.between (x, y)
       unless (n == target) $ testFailed n
   where
     expected :: Int
@@ -153,7 +158,7 @@ prop_integral_withOrigin_shrinking ::
   => (a, a) -> a -> Property ()
 prop_integral_withOrigin_shrinking (x, y) o =
     testShrinkingOfGen (P.towards o) $
-      Gen.integral $ Range.withOrigin (x, y) o
+      Gen.inRange $ Range.withOrigin (x, y) o
 
 prop_integral_withOrigin_minimum :: forall a.
      (Show a, Integral a, FiniteBits a)
@@ -161,14 +166,24 @@ prop_integral_withOrigin_minimum :: forall a.
 prop_integral_withOrigin_minimum (x, y) o _target | x == y =
     testMinimum (P.expect x) $ do
       -- See discussion in 'prop_int_between_minimum'
-      n <- gen $ Gen.integral $ Range.withOrigin (x, y) o
+      n <- gen $ Gen.inRange $ Range.withOrigin (x, y) o
       testFailed n
 prop_integral_withOrigin_minimum (x, y) o target =
     testMinimum (P.elem .$ ("expected", expected)) $ do
-      n <- gen $ Gen.integral $ Range.withOrigin (x, y) o
+      n <- gen $ Gen.inRange $ Range.withOrigin (x, y) o
       unless (n == target) $ testFailed n
   where
     expected :: [a]
     expected
       | target == o = [o + 1, o - 1]
       | otherwise   = [o]
+
+{-------------------------------------------------------------------------------
+  Range: 'enum'
+-------------------------------------------------------------------------------}
+
+prop_char_enum_shrinking :: (Char, Char) -> Property ()
+prop_char_enum_shrinking (x, y)
+  | x <= y    = testShrinkingOfGen P.ge $ Gen.inRange $ Range.enum (x, y)
+  | otherwise = testShrinkingOfGen P.le $ Gen.inRange $ Range.enum (x, y)
+

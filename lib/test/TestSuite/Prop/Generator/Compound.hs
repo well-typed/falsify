@@ -294,15 +294,15 @@ propShrinkingList2 = aux
 genListFrequency :: Gen [Word]
 genListFrequency =
     Gen.frequency [
-        (1, replicateM 1 $ Gen.integral $ Range.between (0, 10))
-      , (2, replicateM 2 $ Gen.integral $ Range.between (0, 10))
-      , (3, replicateM 3 $ Gen.integral $ Range.between (0, 10))
+        (1, replicateM 1 $ Gen.inRange $ Range.between (0, 10))
+      , (2, replicateM 2 $ Gen.inRange $ Range.between (0, 10))
+      , (3, replicateM 3 $ Gen.inRange $ Range.between (0, 10))
       ]
 
 genListMonad :: Gen [Word]
 genListMonad = do
-    n <- Gen.integral $ Range.between (1, 3)
-    replicateM n $ Gen.integral $ Range.between (0, 10)
+    n <- Gen.inRange $ Range.between (1, 3)
+    replicateM n $ Gen.inRange $ Range.between (0, 10)
 
 prop_frequency_shrinking :: Property ()
 prop_frequency_shrinking =

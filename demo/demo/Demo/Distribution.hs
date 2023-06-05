@@ -20,7 +20,7 @@ tests = testGroup "Demo.Distribution" [
           testProperty (show p) $ prop_fraction p
         | p <- [2, 3, 4]
         ]
-    , testGroup "integral" [
+    , testGroup "inRange" [
           testProperty (show total) $ prop_integral total
         | total <- [2, 3, 6, 10]
         ]
@@ -46,7 +46,7 @@ prop_fraction p = do
 
 prop_integral :: Word -> Property ()
 prop_integral total = do
-    x <- gen $ Gen.integral (Range.between (0, total - 1))
+    x <- gen $ Gen.inRange (Range.between (0, total - 1))
     collect "x" [x]
 
 prop_frequency :: Word -> Word -> Word -> Property ()

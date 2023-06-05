@@ -4,6 +4,7 @@ module Test.Falsify.Range (
     -- * Constructors
     -- ** Linear
   , between
+  , enum
   , withOrigin
     -- ** Non-linear
   , skewedBy
@@ -19,11 +20,14 @@ module Test.Falsify.Range (
   , eval
   ) where
 
-import Data.List (minimumBy)
+import Data.Bits
+import Data.List.NonEmpty (NonEmpty(..))
 import Data.Ord
 
+import qualified Data.List.NonEmpty as NE
+
 import Test.Falsify.Internal.Range
-import Data.Bits
+import Data.Functor.Identity
 
 {-------------------------------------------------------------------------------
   Primitive ranges
@@ -46,8 +50,17 @@ fromProperFraction = FromProperFraction
 -- that is closest to the specified origin
 --
 -- Precondition: the target must be within the bounds of all ranges.
-towards :: a -> [Range a] -> Range a
-towards = Towards
+towards :: forall a. (Ord a, Num a) => a -> [Range a] -> Range a
+towards o []     = Constant o
+towards o (r:rs) = Smallest $ fmap aux (r :| rs)
+  where
+    aux :: Range a -> Range (a, a)
+    aux = fmap $ \x -> (x, distanceToOrigin x)
+
+    distanceToOrigin :: a -> a
+    distanceToOrigin x
+      | x >= o    = x - o
+      | otherwise = o - x
 
 {-------------------------------------------------------------------------------
   Constructing ranges
@@ -56,6 +69,13 @@ towards = Towards
 -- | Uniform selection between the given bounds, shrinking towards first bound
 between :: forall a. (Integral a, FiniteBits a) => (a, a) -> Range a
 between = skewedBy 0
+
+-- | Variation on 'between' for types that are 'Enum' but not 'Integral'
+--
+-- This is useful for types such as 'Char'. However, since this relies on
+-- 'Enum', it's limited by the precision of 'Int'.
+enum :: Enum a => (a, a) -> Range a
+enum (x, y) = toEnum <$> between (fromEnum x, fromEnum y)
 
 -- | Selection within the given bounds, shrinking towards the specified origin
 --
@@ -254,41 +274,26 @@ precisionRequiredToRepresent x = fromIntegral $
 
 -- | Origin of the range (value we shrink towards)
 origin ::  Range a -> a
-origin (Constant x)             = x
-origin (FromProperFraction _ f) = f (ProperFraction 0)
-origin (Towards o _)            = o
+origin = runIdentity . eval (\_precision -> Identity $ ProperFraction 0)
 
 {-------------------------------------------------------------------------------
   Evaluation
 -------------------------------------------------------------------------------}
 
--- | Internal auxiliary for 'eval'
-evalTowards :: forall f a.
-     (Applicative f, Ord a, Num a)
-  => a -> [f a] -> f a
-evalTowards o gens =
-    pick <$> sequenceA gens
-  where
-    pick :: [a] -> a
-    pick [] = o
-    pick as = minimumBy (comparing distanceToOrigin) as
-
-    distanceToOrigin :: a -> a
-    distanceToOrigin x
-      | x >= o    = x - o
-      | otherwise = o - x
-
 -- | Evaluate a range, given an action to generate fractions
 --
 -- Most users will probably never need to call this function.
 eval :: forall f a.
-     (Applicative f, Ord a, Num a)
+     Applicative f
   => (Precision -> f ProperFraction) -> Range a -> f a
 eval genFraction = go
   where
-    go :: Range a -> f a
+    go :: forall x. Range x -> f x
     go r =
         case r of
           Constant x             -> pure x
           FromProperFraction p f -> f <$> genFraction p
-          Towards o rs           -> evalTowards o (map go rs)
+          Smallest rs            -> smallest <$> sequenceA (fmap go rs)
+
+    smallest :: Ord b => NonEmpty (x, b) -> x
+    smallest = fst . NE.head . NE.sortBy (comparing snd)

@@ -73,7 +73,7 @@ tests = testGroup "Demo.Blogpost" [
 -- >    --falsify-replay=012f1ef548663a9b73ceaebf948d9f87a7
 prop_list :: Property ()
 prop_list = do
-    n  <- gen $ Gen.integral $ Range.between (0, 10)
+    n  <- gen $ Gen.inRange $ Range.between (0, 10)
     xs <- gen $ replicateM n $ Gen.int $ Range.between (0, 1)
     assert $ P.pairwise P.eq .$ ("xs", xs)
 
@@ -244,8 +244,8 @@ prop_multiply3_even_pred = do
 
 prop_skew :: Double -> Property ()
 prop_skew skew = do
-    xs <- gen $ Gen.list rangeListLen $ Gen.integral rangeValues
-    x  <- gen $ Gen.integral rangeValues
+    xs <- gen $ Gen.list rangeListLen $ Gen.inRange rangeValues
+    x  <- gen $ Gen.inRange rangeValues
     collect "elem" [x `elem` xs]
   where
     rangeListLen, rangeValues :: Range Word
@@ -288,12 +288,12 @@ below n = (`mod` n) <$> Gen.prim
 
 prop_below_shrinking :: Property ()
 prop_below_shrinking = do
-    n <- gen $ Gen.integral $ Range.between (1, 1_000)
+    n <- gen $ Gen.inRange $ Range.between (1, 1_000)
     testShrinkingOfGen P.ge $ below n
 
 naiveList :: Range Int -> Gen a -> Gen [a]
 naiveList r g = do
-    n  <- Gen.integral r
+    n  <- Gen.inRange r
     replicateM n g
 
 prop_naiveList_minimum :: Property ()

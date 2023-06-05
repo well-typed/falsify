@@ -61,7 +61,7 @@ instance Show Percentage where
 -- Whenever the 'Range' asks for a fraction with a certain precision, we give
 -- it /all/ possible fractions with that precision. We then count how often
 -- each value in the range is produced.
-stats :: forall a. (Ord a, Num a) => Range a -> [(a, Percentage)]
+stats :: forall a. Ord a => Range a -> [(a, Percentage)]
 stats r =
     count Map.empty $ Range.eval genFraction r
   where
