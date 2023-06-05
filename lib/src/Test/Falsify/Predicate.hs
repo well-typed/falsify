@@ -495,14 +495,24 @@ eval p = first prettyFailure $ evalAt p Nil
 -- >   .$ ("x", x)
 -- >   .$ ("y", y)
 (.$) :: Show x => Predicate (x : xs) -> (Var, x) -> Predicate xs
-p .$ (n, x) = p `at` (Var n, show x, x)
+p .$ (n, x) = p `at` (n, show x, x)
 
--- | Generation of '(.$)' that does not require a 'Show' instance
+-- | Generalization of '(.$)' that does not require a 'Show' instance
 at ::
      Predicate (x : xs)
-  -> (Expr, String, x) -- ^ Renderded name, expression, and input proper
+  -> (Var, String, x) -- ^ Rendered name, expression, and input proper
   -> Predicate xs
-p `at` (e, r, x) = p `At` (Input e r x)
+p `at` (n, r, x) = p `atExpr` (Var n, r, x)
+
+-- | Generalization of 'at' for an arbitrary 'Expr'
+--
+-- This is not currently part of the public API, since we haven't yet decided
+-- how exactly we want to expose 'Expr' (if at all).
+atExpr ::
+     Predicate (x : xs)
+  -> (Expr, String, x) -- ^ Rendered name, expression, and input proper
+  -> Predicate xs
+p `atExpr` (e, r, x) = p `At` (Input e r x)
 
 {-------------------------------------------------------------------------------
   Specific predicates
@@ -590,7 +600,7 @@ pairwise p = Lam $ \xs ->
 
     pred :: Expr -> (Word, a) -> (Word, a) -> Predicate '[]
     pred xs (i, x) (j, y) =
-             p
-        `at` (Infix "!!" xs (Var $ show i), show x, x)
-        `at` (Infix "!!" xs (Var $ show j), show y, y)
+                 p
+        `atExpr` (Infix "!!" xs (Var $ show i), show x, x)
+        `atExpr` (Infix "!!" xs (Var $ show j), show y, y)
 
