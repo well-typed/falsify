@@ -15,6 +15,7 @@ module Test.Falsify.Generator (
     -- * Compound generators
     -- ** Taking advantage of 'Selective'
   , choose
+  , oneof
     -- ** Lists
   , list
   , elem

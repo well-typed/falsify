@@ -2,6 +2,7 @@
 module Test.Falsify.Reexported.Generator.Compound (
     -- * Taking advantage of 'Selective'
     choose
+  , oneof
     -- * Lists
   , list
   , elem
@@ -102,6 +103,12 @@ import qualified Test.Falsify.Range as Range
 -- conditionally use a value is to use the selective interface, as we do here.
 choose :: Gen a -> Gen a -> Gen a
 choose = ifS (bool True)
+
+-- | Generate a value with one of many generators
+--
+-- Uniformly selects a generator and shrinks towards the first one.
+oneof :: NonEmpty (Gen a) -> Gen a
+oneof gens = frequency $ map (1,) $ NE.toList gens
 
 {-------------------------------------------------------------------------------
   Auxiliary: marking elements
