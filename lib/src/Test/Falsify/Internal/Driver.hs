@@ -13,6 +13,7 @@ module Test.Falsify.Internal.Driver (
   , TotalDiscarded(..)
     -- * Test driver
   , falsify
+  , falsifyIO
     -- * Process results
   , Verbose(..)
   , ExpectFailure(..)
@@ -43,6 +44,10 @@ import Test.Falsify.Internal.Property
 import Test.Falsify.Internal.SampleTree (SampleTree)
 
 import qualified Test.Falsify.Internal.SampleTree as SampleTree
+import Control.Exception (try, AsyncException, throwIO)
+import Control.Monad (when)
+import Data.Maybe (isJust)
+import Debug.Trace (trace)
 
 {-------------------------------------------------------------------------------
   Options
@@ -166,6 +171,120 @@ falsify opts prop = do
                     }
 
             return (successes acc, discardedTotal acc, Just failure)
+
+          -- Test discarded, but reached maximum already
+          TestDiscarded | discardedForTest acc == maxRatio opts ->
+            return (successes acc, discardedTotal acc, Nothing)
+
+          -- Test discarded; continue.
+          TestDiscarded ->
+            go $ withDiscard later acc
+
+-- | Run a test: attempt to falsify the given property
+--
+-- We return
+--
+-- * initial replay seed (each test also records its own seed)
+-- * successful tests
+-- * how many tests we discarded
+-- * the failed test (if any).
+falsifyIO :: forall a.
+     Options
+  -> Property' String (IO a)
+  -> IO (ReplaySeed, [Success a], TotalDiscarded, Maybe (Failure String))
+falsifyIO opts prop = do
+    acc <- initDriverState opts
+    (successes, discarded, mFailure) <- go acc
+    return (
+        splitmixReplaySeed (prng acc)
+      , successes
+      , TotalDiscarded discarded
+      , mFailure
+      )
+  where
+    go :: DriverState a -> IO ([Success a], Word, Maybe (Failure String))
+    go acc | todo acc == 0 = return (successes acc, discardedTotal acc, Nothing)
+    go acc = do
+        let now, later :: SMGen
+            (now, later) = splitSMGen (prng acc)
+
+            st :: SampleTree
+            st = SampleTree.fromPRNG now
+
+            result :: TestResult String (IO a)
+            run    :: TestRun
+            shrunk :: [SampleTree]
+            ((result, run), shrunk) = runGen (runProperty prop) st
+
+
+        case result of
+          -- Test passed
+          TestPassed xIO -> do
+            -- TODO: catch relevant exception here
+            try @SomeException xIO >>= \case
+                Left someException -> do
+                    when (isJust (fromException @AsyncException someException))
+                        $ throwIO someException
+
+                    let e = trace "displayException" $ displayException someException
+                    explanation <-
+                        limitShrinkSteps (maxShrinks opts) . second snd <$>
+                            shrinkFromIO
+                                resultIsValidShrinkIO
+                                (runProperty prop)
+                                ((e, run), shrunk)
+
+                    -- We have to be careful here: if the user specifies a seed, we
+                    -- will first /split/ it to run the test (call to splitSMGen,
+                    -- above). This means that the seed we should provide for the
+                    -- test is the seed /before/ splitting.
+                    let failure :: Failure String
+                        failure = Failure {
+                            failureSeed = splitmixReplaySeed (prng acc)
+                            , failureRun  = explanation
+                        }
+
+
+
+                    return (successes acc, discardedTotal acc, Just failure)
+
+                Right result' -> do
+                    let success :: Success a
+                        success = Success
+                            { successResult = result'
+                            , successSeed   = splitmixReplaySeed now
+                            , successRun    = run
+                            }
+                    if runDeterministic run then
+                        case (successes acc, discardedTotal acc) of
+                            ([], 0)    -> return ([success], 0, Nothing)
+                            _otherwise -> error "falsify.go: impossible"
+                    else
+                        go $ withSuccess later success acc
+
+          -- Test failed
+          --
+          -- We ignore the failure message here, because this is the failure
+          -- message before shrinking, which we are typically not interested in.
+          TestFailed e -> do
+                explanation <-
+                    limitShrinkSteps (maxShrinks opts) . second snd <$>
+                        shrinkFromIO
+                            resultIsValidShrinkIO
+                            (runProperty prop)
+                            ((e, run), shrunk)
+
+                -- We have to be careful here: if the user specifies a seed, we
+                -- will first /split/ it to run the test (call to splitSMGen,
+                -- above). This means that the seed we should provide for the
+                -- test is the seed /before/ splitting.
+                let failure :: Failure String
+                    failure = Failure {
+                        failureSeed = splitmixReplaySeed (prng acc)
+                        , failureRun  = explanation
+                    }
+
+                return (successes acc, discardedTotal acc, Just failure)
 
           -- Test discarded, but reached maximum already
           TestDiscarded | discardedForTest acc == maxRatio opts ->
