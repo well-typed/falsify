@@ -1,6 +1,10 @@
 {-# LANGUAGE UndecidableInstances #-}
 
-module Test.Falsify.Generator.Default
+-- | This module defines something similar to QuickCheck's Arbitrary class along with
+-- some DerivingVia helpers. Our version, 'GenDefault', allows one to choose between
+-- sets of default generators with a user-defined tag. See 'Test.Falsify.GenDefault.Std' for
+-- the standard tag with a few useful instances.
+module Test.Falsify.GenDefault
   ( GenDefault (..)
   , ViaTag (..)
   , ViaIntegral (..)
