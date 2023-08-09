@@ -83,6 +83,8 @@ library
   import:
       lang
   exposed-modules:
+      Test.Falsify.GenDefault
+      Test.Falsify.GenDefault.Std
       Test.Falsify.Generator
       Test.Falsify.Interactive
       Test.Falsify.Predicate
