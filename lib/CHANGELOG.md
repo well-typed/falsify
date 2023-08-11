@@ -7,6 +7,8 @@
 * Generalize `Range`, so that it can be used for types like `Char` (#51).
   As a consequence, `Gen.integral` and `Gen.enum` are now deprecated, and
   superseded by `Gen.inRange`.
+* Add `GenDefault` class and `DerivingVia` helpers to derive generators
+  (#61, #64).
 
 ## 0.1.1 -- 2023-04-07
 
