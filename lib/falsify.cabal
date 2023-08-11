@@ -146,6 +146,7 @@ test-suite test-falsify
   main-is:
       Main.hs
   other-modules:
+      TestSuite.GenDefault
       TestSuite.Sanity.Predicate
       TestSuite.Sanity.Range
       TestSuite.Sanity.Selective
