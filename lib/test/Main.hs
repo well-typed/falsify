@@ -2,6 +2,8 @@ module Main (main) where
 
 import Test.Tasty
 
+import qualified TestSuite.GenDefault
+
 import qualified TestSuite.Sanity.Predicate
 import qualified TestSuite.Sanity.Range
 import qualified TestSuite.Sanity.Selective
@@ -32,4 +34,5 @@ main = defaultMain $ testGroup "falsify" [
         , TestSuite.Prop.Generator.Compound.tests
         , TestSuite.Prop.Generator.Function.tests
         ]
+    , TestSuite.GenDefault.tests
     ]
