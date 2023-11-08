@@ -1,6 +1,6 @@
 cabal-version:      3.0
 name:               falsify
-version:            0.1.1
+version:            0.2.0
 synopsis:           Property-based testing with internal integrated shrinking
 description:        This library provides property based testing with support
                     for internal integrated shrinking: integrated in the sense
@@ -25,13 +25,11 @@ copyright:          Well-Typed LLP
 category:           Testing
 build-type:         Simple
 extra-doc-files:    CHANGELOG.md
-tested-with:        GHC==8.6.5
-                  , GHC==8.8.4
-                  , GHC==8.10.7
+tested-with:        GHC==8.10.7
                   , GHC==9.0.2
-                  , GHC==9.2.5
-                  , GHC==9.4.4
-                  , GHC==9.6.1
+                  , GHC==9.2.8
+                  , GHC==9.4.7
+                  , GHC==9.6.3
 
 source-repository head
   type:     git
