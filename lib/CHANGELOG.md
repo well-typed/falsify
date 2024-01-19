@@ -1,5 +1,9 @@
 # Revision history for falsify
 
+## 0.2.1 -- 2023-12-xx
+
+* Relax upper bound of `optparse-applicative`
+
 ## 0.2.0 -- 2023-11-08
 
 * Avoid use of `Expr` in `at` (#48)

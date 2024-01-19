@@ -1,6 +1,6 @@
 cabal-version:      3.0
 name:               falsify
-version:            0.2.0
+version:            0.2.1
 synopsis:           Property-based testing with internal integrated shrinking
 description:        This library provides property based testing with support
                     for internal integrated shrinking: integrated in the sense
@@ -123,7 +123,7 @@ library
     , data-default         >= 0.7  && < 0.8
     , mtl                  >= 2.2  && < 2.4
     , optics-core          >= 0.3  && < 0.5
-    , optparse-applicative >= 0.16 && < 0.18
+    , optparse-applicative >= 0.16 && < 0.19
     , selective            >= 0.4  && < 0.8
     , sop-core             >= 0.5  && < 0.6
     , splitmix             >= 0.1  && < 0.2
