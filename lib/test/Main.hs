@@ -16,6 +16,7 @@ import qualified TestSuite.Prop.Generator.Prim
 import qualified TestSuite.Prop.Generator.Selective
 import qualified TestSuite.Prop.Generator.Shrinking
 import qualified TestSuite.Prop.Generator.Simple
+import qualified TestSuite.Prop.Generator.Text
 
 main :: IO ()
 main = defaultMain $ testGroup "falsify" [
@@ -31,6 +32,7 @@ main = defaultMain $ testGroup "falsify" [
         , TestSuite.Prop.Generator.Precision.tests
         , TestSuite.Prop.Generator.Simple.tests
         , TestSuite.Prop.Generator.Shrinking.tests
+        , TestSuite.Prop.Generator.Text.tests
         , TestSuite.Prop.Generator.Compound.tests
         , TestSuite.Prop.Generator.Function.tests
         ]
