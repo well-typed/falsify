@@ -2,6 +2,7 @@ module Test.Falsify.Internal.Generator.Definition (
     -- * Definition
     Gen(..)
   , bindWithoutShortcut
+  , minimalValue
     -- * Primitive generators
   , prim
   , primWith
@@ -128,6 +129,13 @@ bindWithoutShortcut x f = Gen $ \(Inf s l r) ->
           [SampleTree s l' r  | l' <- ls]
         , [SampleTree s l  r' | r' <- rs]
         ]
+
+-- | Get the value produced by the generator on the minimal sample tree.
+--
+-- Having `Gen a` is a proof that `a` is inhabited, so this function
+-- gives access to a witness.
+minimalValue :: Gen a -> a
+minimalValue g = fst (runGen g Minimal)
 
 {-------------------------------------------------------------------------------
   Generator independence

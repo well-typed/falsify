@@ -10,6 +10,7 @@ module Test.Falsify.Internal.Generator (
     -- * Execution
   , runGen
   , shrinkFrom
+  , minimalValue
     -- * Primitive generators
   , prim
   , primWith

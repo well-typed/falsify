@@ -79,6 +79,7 @@ module Test.Falsify.Generator (
   , exhaustive
   , captureLocalTree
   , bindWithoutShortcut
+  , minimalValue
   ) where
 
 import Prelude hiding (either, elem, properFraction)
