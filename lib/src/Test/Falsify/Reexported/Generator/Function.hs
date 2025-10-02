@@ -23,6 +23,7 @@ import Data.Kind
 import Data.List (intercalate)
 import Data.Maybe (fromMaybe, mapMaybe)
 import Data.Ratio (Ratio)
+import Data.Void (Void)
 import Data.Word
 import GHC.Generics
 import Numeric.Natural
@@ -248,6 +249,7 @@ instance Function Char where
 
 instance Function ()
 instance Function Bool
+instance Function Void
 
 instance (Function a, Function b) => Function (Either a b)
 
@@ -358,6 +360,9 @@ class GFunction f where
 
 instance GFunction f => GFunction (M1 i c f) where
   gFunction = fmap (functionMap unM1 M1) . gFunction @f
+
+instance GFunction V1 where
+  gFunction _ = pure Nil
 
 instance GFunction U1 where
   gFunction = fmap (functionMap unwrap wrap) . unit
