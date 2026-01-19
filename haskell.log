@@ -1,0 +1,287 @@
+2026-01-19 04:34:43.9930000 [client] INFO Writing client log to file /home/john-walker/repos/falsify/haskell.log
+2026-01-19 04:34:43.9940000 [client] INFO Finding haskell-language-server
+2026-01-19 04:34:43.9940000 [client] INFO Checking for ghcup installation
+2026-01-19 04:34:44.0000000 [client] INFO found ghcup at ghcup
+2026-01-19 04:34:44.0010000 [client] INFO Executing 'ghcup --no-verbose upgrade' in cwd '/home/john-walker'
+2026-01-19 04:34:44.9170000 [client] INFO Checking for ghcup installation
+2026-01-19 04:34:44.9220000 [client] INFO found ghcup at ghcup
+2026-01-19 04:34:44.9230000 [client] INFO Executing 'ghcup --no-verbose list -t hls -c installed -r' in cwd '/home/john-walker'
+2026-01-19 04:34:44.9660000 [client] INFO Checking for ghcup installation
+2026-01-19 04:34:44.9700000 [client] INFO found ghcup at ghcup
+2026-01-19 04:34:44.9710000 [client] INFO Executing 'ghcup --no-verbose list -t cabal -c set -r' in cwd '/home/john-walker'
+2026-01-19 04:34:45.0050000 [client] INFO Checking for ghcup installation
+2026-01-19 04:34:45.0090000 [client] INFO found ghcup at ghcup
+2026-01-19 04:34:45.0090000 [client] INFO Executing 'ghcup --no-verbose list -t stack -c set -r' in cwd '/home/john-walker'
+2026-01-19 04:34:45.0460000 [client] INFO Checking for ghcup installation
+2026-01-19 04:34:45.0500000 [client] INFO found ghcup at ghcup
+2026-01-19 04:34:45.0510000 [client] INFO Executing 'ghcup --no-verbose whereis hls 2.12.0.0' in cwd '/home/john-walker'
+2026-01-19 04:34:45.0640000 [client] INFO Checking for ghcup installation
+2026-01-19 04:34:45.0670000 [client] INFO found ghcup at ghcup
+2026-01-19 04:34:45.0680000 [client] INFO Executing 'ghcup --no-verbose whereis cabal 3.14.2.0' in cwd '/home/john-walker'
+2026-01-19 04:34:45.0810000 [client] INFO Checking for ghcup installation
+2026-01-19 04:34:45.0850000 [client] INFO found ghcup at ghcup
+2026-01-19 04:34:45.0850000 [client] INFO Executing 'ghcup --no-verbose whereis stack 3.1.1' in cwd '/home/john-walker'
+2026-01-19 04:34:45.1010000 [client] INFO Executing 'ghc --numeric-version' in cwd '/home/john-walker'
+2026-01-19 04:34:45.1240000 [client] INFO Checking for ghcup installation
+2026-01-19 04:34:45.1280000 [client] INFO found ghcup at ghcup
+2026-01-19 04:34:45.1280000 [client] INFO Executing 'ghcup --no-verbose run --hls 2.12.0.0 --cabal 3.14.2.0 --stack 3.1.1 --install' in cwd '/home/john-walker'
+2026-01-19 04:34:45.1610000 [client] INFO Working out the project GHC version. This might take a while...
+2026-01-19 04:34:45.1620000 [client] INFO Executing 'haskell-language-server-wrapper --project-ghc-version' in cwd '/home/john-walker/repos/falsify'
+2026-01-19 04:34:45.2960000 [client] INFO The GHC version for the project or file: 9.6.7
+2026-01-19 04:34:45.8560000 [client] INFO Platform constants: Linux_UnknownLinux, A_64
+2026-01-19 04:34:45.8560000 [client] INFO Checking for ghcup installation
+2026-01-19 04:34:45.8610000 [client] INFO found ghcup at ghcup
+2026-01-19 04:34:45.8610000 [client] INFO Executing 'ghcup --no-verbose list -t hls -c installed -r' in cwd '/home/john-walker'
+2026-01-19 04:34:45.9060000 [client] INFO Checking for ghcup installation
+2026-01-19 04:34:45.9110000 [client] INFO found ghcup at ghcup
+2026-01-19 04:34:45.9120000 [client] INFO Executing 'ghcup --no-verbose whereis bindir' in cwd '/home/john-walker'
+2026-01-19 04:34:45.9260000 [client] INFO Checking for ghcup installation
+2026-01-19 04:34:45.9300000 [client] INFO found ghcup at ghcup
+2026-01-19 04:34:45.9310000 [client] INFO Executing 'ghcup --no-verbose whereis hls 2.12.0.0' in cwd '/home/john-walker'
+2026-01-19 04:34:45.9430000 [client] INFO Checking for ghcup installation
+2026-01-19 04:34:45.9470000 [client] INFO found ghcup at ghcup
+2026-01-19 04:34:45.9470000 [client] INFO Executing 'ghcup --no-verbose whereis ghc 9.6.7' in cwd '/home/john-walker'
+2026-01-19 04:34:45.9600000 [client] INFO Checking for ghcup installation
+2026-01-19 04:34:45.9640000 [client] INFO found ghcup at ghcup
+2026-01-19 04:34:45.9650000 [client] INFO Executing 'ghcup --no-verbose run --hls 2.12.0.0 --cabal 3.14.2.0 --stack 3.1.1 --ghc 9.6.7 --install' in cwd '/home/john-walker'
+2026-01-19 04:34:46.0200000 [client] INFO Support for '.cabal' files: automatic
+2026-01-19 04:34:46.0200000 [client] INFO Activating the language server in working dir: /home/john-walker/repos/falsify (the workspace folder)
+2026-01-19 04:34:46.0200000 [client] INFO run command: /home/john-walker/.ghcup/tmp/ghcup-ghc-9.6.7_cabal-3.14.2.0_hls-2.12.0.0_stack-3.1.1/haskell-language-server-wrapper --lsp -l haskell.log
+2026-01-19 04:34:46.0200000 [client] INFO debug command: /home/john-walker/.ghcup/tmp/ghcup-ghc-9.6.7_cabal-3.14.2.0_hls-2.12.0.0_stack-3.1.1/haskell-language-server-wrapper --lsp -l haskell.log
+2026-01-19 04:34:46.0200000 [client] INFO server cwd: /home/john-walker/repos/falsify
+2026-01-19 04:34:46.0200000 [client] INFO server environment variables:
+2026-01-19 04:34:46.0200000 [client] INFO   PATH=/home/john-walker/.ghcup/tmp/ghcup-ghc-9.6.7_cabal-3.14.2.0_hls-2.12.0.0_stack-3.1.1:/home/john-walker/.cabal/bin:/home/john-walker/.ghcup/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin
+2026-01-19 04:34:46.0200000 [client] INFO Executing '/home/john-walker/.ghcup/tmp/ghcup-ghc-9.6.7_cabal-3.14.2.0_hls-2.12.0.0_stack-3.1.1/haskell-language-server-wrapper --numeric-version' in cwd '/home/john-walker/repos/falsify'
+2026-01-19 04:34:46.0330000 [client] INFO Starting language server
+2026-01-19T04:34:47.633210Z | Info | haskell-language-server version: 2.12.0.0 (GHC: 9.6.7) (PATH: /home/john-walker/.ghcup/hls/2.12.0.0/lib/haskell-language-server-2.12.0.0/bin/haskell-language-server-9.6.7)
+2026-01-19T04:34:47.635031Z | Info | Directory: /home/john-walker/repos/falsify
+2026-01-19T04:34:47.635179Z | Info | Starting (haskell-language-server) LSP server...
+  GhcideArguments {argsCommand = LSP, argsCwd = Nothing, argsShakeProfiling = Nothing, argsTesting = False, argsExamplePlugin = False, argsLogLevel = Info, argsLogFile = Just "haskell.log", argsLogStderr = True, argsLogClient = False, argsThreads = 0, argsProjectGhcVersion = False}
+  PluginIds: [ pragmas-suggest
+             , pragmas-completion
+             , ghcide-code-actions-bindings
+             , cabalHaskellIntegration
+             , ghcide-extend-import-action
+             , signatureHelp
+             , retrie
+             , stylish-haskell
+             , explicit-fields
+             , ghcide-code-actions-type-signatures
+             , ghcide-code-actions-fill-holes
+             , stan
+             , hlint
+             , changeTypeSignature
+             , ghcide-code-actions-imports-exports
+             , cabal-fmt
+             , notes
+             , ghcide-completions
+             , eval
+             , ghcide-type-lenses
+             , cabal
+             , overloaded-record-dot
+             , gadt
+             , LSPRecorderCallback
+             , importLens
+             , floskell
+             , codeRangeoptparse-applicative
+             , class
+             , ormolu
+             , qualifyImportedNames
+             , ghcide-hover-and-symbols
+             , alternateNumberFormat
+             , rename
+             , splice
+             , moduleName
+             , semanticTokens
+             , fourmolu
+             , cabal-gild
+             , callHierarchy
+             , ghcide-core
+             , explicit-fixity
+             , pragmas-disable ]optparse-applicative
+2026-01-19T04:34:47.641551Z | Info | Logging heap statistics every 60.00s
+2026-01-19T04:34:47.649455Z | Info | Starting LSP server...
+  If you are seeing this in a terminal, you probably should have run WITHOUT the --lsp option!
+  PluginIds: [ pragmas-suggest
+             , pragmas-completion
+             , ghcide-code-actions-bindings
+             , cabalHaskellIntegration
+             , ghcide-extend-import-action
+             , signatureHelp
+             , retrie
+             , stylish-haskell
+             , explicit-fields
+             , ghcide-code-actions-type-signatures
+             , ghcide-code-actions-fill-holes
+             , stan
+             , hlint
+             , changeTypeSignature
+             , ghcide-code-actions-imports-exports
+             , cabal-fmt
+             , notes
+             , ghcide-completions
+             , eval
+             , ghcide-type-lenses
+             , cabal
+             , overloaded-record-dot
+             , gadt
+             , LSPRecorderCallback
+             , importLens
+             , floskell
+             , codeRange
+             , class
+             , ormolu
+             , qualifyImportedNames
+             , ghcide-hover-and-symbols
+             , alternateNumberFormat
+             , rename
+             , splice
+             , moduleName
+             , semanticTokens
+             , fourmolu
+             , cabal-gild
+             , callHierarchy
+             , ghcide-core
+             , explicit-fixity
+             , pragmas-disable ]
+2026-01-19T04:34:47.649859Z | Info | Starting server
+2026-01-19T04:34:47.673154Z | Info | Registering IDE configuration: IdeConfiguration {workspaceFolders = fromList [NormalizedUri (-3722117574800173699) "file:///home/john-walker/repos/falsify"], clientSettings = hashed Nothing}
+2026-01-19T04:34:47.730404Z | Info | Started LSP server in 0.08s
+2026-01-19T04:34:47.756205Z | Warning | No plugin handles this "textDocument/inlayHint" request.
+2026-01-19T04:34:47.789813Z | Warning | No plugin handles this "textDocument/inlayHint" request.
+2026-01-19T04:34:47.854186Z | Warning | No plugin handles this "textDocument/inlayHint" request.
+2026-01-19T04:34:47.888364Z | Warning | No plugin handles this "textDocument/inlayHint" request.
+2026-01-19T04:34:47.996995Z | Warning | No plugin handles this "textDocument/codeLens" request.
+2026-01-19T04:34:48.205530Z | Warning | No plugin handles this "textDocument/inlayHint" request.
+2026-01-19T04:34:48.472177Z | Warning | No plugin handles this "textDocument/inlayHint" request.
+2026-01-19T04:34:48.505768Z | Warning | No plugin handles this "textDocument/inlayHint" request.
+2026-01-19T04:34:48.722041Z | Warning | No plugin handles this "textDocument/inlayHint" request.
+2026-01-19T04:34:48.754860Z | Warning | No plugin handles this "textDocument/inlayHint" request.
+2026-01-19T04:34:48.754985Z | Warning | No plugin handles this "textDocument/semanticTokens/full" request.
+2026-01-19T04:34:48.939940Z | Warning | No plugin handles this "textDocument/inlayHint" request.
+2026-01-19T04:34:48.989284Z | Warning | No plugin handles this "textDocument/inlayHint" request.
+2026-01-19T04:34:49.355897Z | Warning | No plugin handles this "textDocument/inlayHint" request.
+2026-01-19T04:34:49.610602Z | Warning | No plugin handles this "textDocument/inlayHint" request.
+2026-01-19T04:34:49.656214Z | Warning | No plugin handles this "textDocument/inlayHint" request.
+2026-01-19T04:34:49.939012Z | Warning | No plugin handles this "textDocument/inlayHint" request.
+2026-01-19T04:34:49.970376Z | Warning | No plugin handles this "textDocument/inlayHint" request.
+2026-01-19T04:34:49.996421Z | Warning | No plugin handles this "textDocument/inlayHint" request.
+2026-01-19T04:34:50.983695Z | Warning | No plugin handles this "textDocument/inlayHint" request.
+2026-01-19T04:34:51.074833Z | Warning | No plugin handles this "textDocument/inlayHint" request.
+2026-01-19T04:34:51.141005Z | Warning | No plugin handles this "textDocument/inlayHint" request.
+2026-01-19T04:34:51.441824Z | Warning | No plugin handles this "textDocument/inlayHint" request.
+2026-01-19T04:34:51.507646Z | Warning | No plugin handles this "textDocument/inlayHint" request.
+2026-01-19T04:34:51.758888Z | Warning | No plugin handles this "textDocument/inlayHint" request.
+2026-01-19T04:34:51.962731Z | Warning | No plugin handles this "textDocument/inlayHint" request.
+2026-01-19T04:34:52.075727Z | Warning | No plugin handles this "textDocument/inlayHint" request.
+2026-01-19T04:34:52.341996Z | Warning | No plugin handles this "textDocument/inlayHint" request.
+2026-01-19T04:34:52.375375Z | Warning | No plugin handles this "textDocument/inlayHint" request.
+2026-01-19T04:34:52.545364Z | Warning | No plugin handles this "textDocument/inlayHint" request.
+2026-01-19T04:34:52.625521Z | Warning | No plugin handles this "textDocument/inlayHint" request.
+2026-01-19T04:34:52.909817Z | Warning | No plugin handles this "textDocument/inlayHint" request.
+2026-01-19T04:34:52.942934Z | Warning | No plugin handles this "textDocument/inlayHint" request.
+2026-01-19T04:34:54.455322Z | Warning | No plugin handles this "textDocument/inlayHint" request.optparse-applicative
+2026-01-19T04:34:54.943727Z | Warning | No plugin handles this "textDocument/inlayHint" request.
+2026-01-19T04:35:01.084355Z | Warning | No plugin handles this "textDocument/inlayHint" request.
+2026-01-19T04:35:47.688649Z | Info | Live bytes: 0.00MB Heap size: 0.00MB
+2026-01-19T04:35:57.424334Z | Warning | No plugin handles this "textDocument/documentHighlight" request.
+2026-01-19T04:35:57.625272Z | Warning | No plugin handles this "textDocument/codeLens" request.
+2026-01-19T04:36:04.416580Z | Warning | LSP: no handler for: "$/setTrace"
+2026-01-19T04:36:04.550657Z | Warning | LSP: no handler for: "$/setTrace"
+2026-01-19T04:36:04.743602Z | Warning | LSP: no handler for: "$/setTrace"
+2026-01-19T04:36:47.707232Z | Info | Live bytes: 0.00MB Heap size: 0.00MB
+2026-01-19T04:37:46.053664Z | Warning | No plugin handles this "textDocument/documentHighlight" request.
+2026-01-19T04:37:46.055110Z | Warning | No plugin handles this "textDocument/semanticTokens/full" request.
+2026-01-19T04:37:46.103449Z | Warning | No plugin handles this "textDocument/inlayHint" request.
+2026-01-19T04:37:46.286633Z | Warning | No plugin handles this "textDocument/codeLens" request.
+2026-01-19T04:37:46.925493Z | Warning | No plugin handles this "textDocument/inlayHint" request.
+2026-01-19T04:37:47.006777Z | Warning | No plugin handles this "textDocument/inlayHint" request.
+2026-01-19T04:37:47.043379Z | Warning | No plugin handles this "textDocument/inlayHint" request.
+2026-01-19T04:37:47.710080Z | Info | Live bytes: 0.00MB Heap size: 0.00MB
+2026-01-19T04:37:50.110047Z | Warning | No plugin handles this "textDocument/documentHighlight" request.
+2026-01-19T04:37:50.307446Z | Warning | No plugin handles this "textDocument/codeLens" request.
+2026-01-19T04:38:04.252574Z | Warning | No plugin handles this "textDocument/inlayHint" request.
+2026-01-19T04:38:04.465639Z | Warning | No plugin handles this "textDocument/codeLens" request.
+2026-01-19T04:38:05.015562Z | Warning | No plugin handles this "textDocument/inlayHint" request.
+2026-01-19T04:38:05.208991Z | Warning | No plugin handles this "textDocument/semanticTokens/full" request.
+2026-01-19T04:38:05.773672Z | Warning | No plugin handles this "textDocument/inlayHint" request.
+2026-01-19T04:38:05.992930Z | Warning | No plugin handles this "textDocument/codeLens" request.
+2026-01-19T04:38:06.543068Z | Warning | No plugin handles this "textDocument/inlayHint" request.
+2026-01-19T04:38:06.742017Z | Warning | No plugin handles this "textDocument/semanticTokens/full" request.
+2026-01-19T04:38:08.607723Z | Warning | No plugin handles this "textDocument/documentHighlight" request.
+2026-01-19T04:38:11.100685Z | Warning | No plugin handles this "textDocument/inlayHint" request.optparse-applicative
+2026-01-19T04:38:11.322065Z | Warning | No plugin handles this "textDocument/codeLens" request.
+2026-01-19T04:38:11.383721Z | Warning | No plugin handles this "textDocument/inlayHint" request.
+2026-01-19T04:38:11.612062Z | Warning | No plugin handles this "textDocument/codeLens" request.
+2026-01-19T04:38:12.073091Z | Warning | No plugin handles this "textDocument/semanticTokens/full" request.
+2026-01-19T04:38:12.159207Z | Warning | No plugin handles this "textDocument/inlayHint" request.
+2026-01-19T04:38:13.570826Z | Warning | No plugin handles this "textDocument/documentHighlight" request.
+2026-01-19T04:38:15.542987Z | Warning | No plugin handles this "textDocument/documentHighlight" request.
+2026-01-19T04:38:23.641083Z | Warning | No plugin handles this "textDocument/inlayHint" request.
+2026-01-19T04:38:23.867247Z | Warning | No plugin handles this "textDocument/codeLens" request.
+2026-01-19T04:38:24.273507Z | Warning | No plugin handles this "textDocument/inlayHint" request.
+2026-01-19T04:38:24.439560Z | Warning | No plugin handles this "textDocument/inlayHint" request.
+2026-01-19T04:38:24.616081Z | Warning | No plugin handles this "textDocument/semanticTokens/full" request.
+2026-01-19T04:38:24.665015Z | Warning | No plugin handles this "textDocument/codeLens" request.
+2026-01-19T04:38:25.215915Z | Warning | No plugin handles this "textDocument/inlayHint" request.
+2026-01-19T04:38:27.728621Z | Warning | No plugin handles this "textDocument/inlayHint" request.
+2026-01-19T04:38:27.954471Z | Warning | No plugin handles this "textDocument/codeLens" request.
+2026-01-19T04:38:28.426126Z | Warning | No plugin handles this "textDocument/inlayHint" request.
+2026-01-19T04:38:28.649590Z | Warning | No plugin handles this "textDocument/codeLens" request.
+2026-01-19T04:38:28.703000Z | Warning | No plugin handles this "textDocument/semanticTokens/full" request.
+2026-01-19T04:38:29.199458Z | Warning | No plugin handles this "textDocument/inlayHint" request.
+2026-01-19T04:38:29.418353Z | Warning | No plugin handles this "textDocument/documentHighlight" request.
+2026-01-19T04:38:47.719107Z | Info | Live bytes: 0.00MB Heap size: 0.00MB
+2026-01-19T04:39:47.779572Z | Info | Live bytes: 0.00MB Heap size: 0.00MB
+2026-01-19T04:39:53.256739Z | Warning | No plugin handles this "textDocument/inlayHint" request.
+2026-01-19T04:39:53.296782Z | Warning | No plugin handles this "textDocument/inlayHint" request.
+2026-01-19T04:39:53.365357Z | Warning | No plugin handles this "textDocument/inlayHint" request.
+2026-01-19T04:39:56.832891Z | Warning | No plugin handles this "textDocument/inlayHint" request.
+2026-01-19T04:39:56.892134Z | Warning | No plugin handles this "textDocument/inlayHint" request.
+2026-01-19T04:39:56.924581Z | Warning | No plugin handles this "textDocument/inlayHint" request.
+2026-01-19T04:40:47.840370Z | Info | Live bytes: 0.00MB Heap size: 0.00MB
+2026-01-19T04:41:47.849994Z | Info | Live bytes: 0.00MB Heap size: 0.00MB
+2026-01-19T04:42:47.856527Z | Info | Live bytes: 0.00MB Heap size: 0.00MB
+2026-01-19T04:43:25.891217Z | Warning | No plugin handles this "textDocument/documentHighlight" request.
+2026-01-19T04:43:26.082102Z | Warning | No plugin handles this "textDocument/codeLens" request.
+2026-01-19T04:43:35.814552Z | Warning | No plugin handles this "textDocument/inlayHint" request.
+2026-01-19T04:43:36.033892Z | Warning | No plugin handles this "textDocument/codeLens" request.
+2026-01-19T04:43:36.583618Z | Warning | No plugin handles this "textDocument/inlayHint" request.
+2026-01-19T04:43:36.779133Z | Warning | No plugin handles this "textDocument/semanticTokens/full" request.
+2026-01-19T04:43:37.754593Z | Warning | No plugin handles this "textDocument/documentHighlight" request.
+2026-01-19T04:43:38.916681Z | Warning | No plugin handles this "textDocument/inlayHint" request.
+2026-01-19T04:43:39.140655Z | Warning | No plugin handles this "textDocument/codeLens" request.
+2026-01-19T04:43:39.690918Z | Warning | No plugin handles this "textDocument/inlayHint" request.
+2026-01-19T04:43:39.889535Z | Warning | No plugin handles this "textDocument/semanticTokens/full" request.
+2026-01-19T04:43:40.348205Z | Warning | No plugin handles this "textDocument/documentHighlight" request.
+2026-01-19T04:43:42.625818Z | Warning | No plugin handles this "textDocument/inlayHint" request.
+2026-01-19T04:43:42.778370Z | Warning | No plugin handles this "textDocument/inlayHint" request.
+2026-01-19T04:43:43.003531Z | Warning | No plugin handles this "textDocument/codeLens" request.
+2026-01-19T04:43:43.554038Z | Warning | No plugin handles this "textDocument/inlayHint" request.
+2026-01-19T04:43:43.594283Z | Warning | No plugin handles this "textDocument/semanticTokens/full" request.
+2026-01-19T04:43:44.195691Z | Warning | No plugin handles this "textDocument/inlayHint" request.
+2026-01-19T04:43:44.420735Z | Warning | No plugin handles this "textDocument/codeLens" request.
+2026-01-19T04:43:44.490854Z | Warning | No plugin handles this "textDocument/inlayHint" request.
+2026-01-19T04:43:44.716593Z | Warning | No plugin handles this "textDocument/codeLens" request.
+2026-01-19T04:43:45.169844Z | Warning | No plugin handles this "textDocument/semanticTokens/full" request.
+2026-01-19T04:43:45.266140Z | Warning | No plugin handles this "textDocument/inlayHint" request.
+2026-01-19T04:43:47.062579Z | Warning | No plugin handles this "textDocument/inlayHint" request.
+2026-01-19T04:43:47.282846Z | Warning | No plugin handles this "textDocument/codeLens" request.
+2026-01-19T04:43:47.833622Z | Warning | No plugin handles this "textDocument/inlayHint" request.
+2026-01-19T04:43:47.857911Z | Info | Live bytes: 0.00MB Heap size: 0.00MB
+2026-01-19T04:43:48.032282Z | Warning | No plugin handles this "textDocument/semanticTokens/full" request.
+2026-01-19T04:44:17.086882Z | Warning | No plugin handles this "textDocument/documentHighlight" request.
+2026-01-19T04:44:17.232432Z | Warning | No plugin handles this "textDocument/codeLens" request.
+2026-01-19T04:44:32.030334Z | Warning | No plugin handles this "textDocument/documentHighlight" request.
+2026-01-19T04:44:32.213499Z | Warning | No plugin handles this "textDocument/codeLens" request.
+2026-01-19T04:44:33.635181Z | Warning | No plugin handles this "textDocument/inlayHint" request.
+2026-01-19T04:44:33.858179Z | Warning | No plugin handles this "textDocument/codeLens" request.
+2026-01-19T04:44:34.407776Z | Warning | No plugin handles this "textDocument/inlayHint" request.
+2026-01-19T04:44:34.601964Z | Warning | No plugin handles this "textDocument/semanticTokens/full" request.
+2026-01-19T04:44:47.871314Z | Info | Live bytes: 0.00MB Heap size: 0.00MB
+2026-01-19T04:45:23.562773Z | Warning | LSP: no handler for: "$/setTrace"
+2026-01-19T04:45:25.618179Z | Warning | No plugin handles this "textDocument/documentHighlight" request.
+2026-01-19T04:45:25.685792Z | Warning | No plugin handles this "textDocument/documentHighlight" request.
+2026-01-19T04:45:25.708997Z | Warning | No plugin handles this "textDocument/inlayHint" request.
+2026-01-19T04:45:25.932103Z | Warning | No plugin handles this "textDocument/codeLens" request.
+2026-01-19T04:45:26.540364Z | Warning | No plugin handles this "textDocument/semanticTokens/full" request.
