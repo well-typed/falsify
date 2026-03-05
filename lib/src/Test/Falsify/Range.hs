@@ -1,4 +1,9 @@
 -- | Numerical ranges
+--
+-- Intended for qualified import.
+--
+-- > import Test.Falsify.Range (Range)
+-- > import qualified Test.Falsify.Range as Range
 module Test.Falsify.Range (
     Range -- opaque
     -- * Constructors

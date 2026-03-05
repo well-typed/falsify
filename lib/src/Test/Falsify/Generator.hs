@@ -3,7 +3,7 @@
 -- Intended for qualified import.
 --
 -- > import Test.Falsify.Generator (Gen)
--- > import qualified Test.Falsify.Generator qualified as Gen
+-- > import qualified Test.Falsify.Generator as Gen
 module Test.Falsify.Generator (
     -- * Definition
     Gen -- opaque

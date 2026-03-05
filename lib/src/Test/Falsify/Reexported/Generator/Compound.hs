@@ -375,8 +375,12 @@ bst gen = go >=> traverse (\a -> (a,) <$> gen a)
             <$> go (Interval (Inclusive lo) (Exclusive mid))
             <*> go (Interval (Exclusive mid) (Inclusive hi))
       where
+        -- Go through 'Integer' to avoid overflow
+        mid' :: Integer
+        mid' = fromIntegral lo + ((fromIntegral hi - fromIntegral lo) `div` 2)
+
         mid :: a
-        mid = lo + ((hi - lo) `div` 2)
+        mid = fromInteger mid'
 
 {-------------------------------------------------------------------------------
   Shrink trees

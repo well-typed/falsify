@@ -148,9 +148,6 @@ test-suite test-falsify
       Main.hs
   other-modules:
       TestSuite.GenDefault
-      TestSuite.Sanity.Predicate
-      TestSuite.Sanity.Range
-      TestSuite.Sanity.Selective
       TestSuite.Prop.Generator.Compound
       TestSuite.Prop.Generator.Function
       TestSuite.Prop.Generator.Marking
@@ -159,6 +156,10 @@ test-suite test-falsify
       TestSuite.Prop.Generator.Selective
       TestSuite.Prop.Generator.Shrinking
       TestSuite.Prop.Generator.Simple
+      TestSuite.Regression
+      TestSuite.Sanity.Predicate
+      TestSuite.Sanity.Range
+      TestSuite.Sanity.Selective
       TestSuite.Util.List
       TestSuite.Util.Tree
   build-depends:
