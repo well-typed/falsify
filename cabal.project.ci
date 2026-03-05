@@ -1,7 +1,10 @@
 packages: lib, demo
 
-allow-newer: sop-core:base
-
 package falsify
   tests: true
   ghc-options: -Werror
+
+-- Temporary overrides for ghc 9.14 (needed as of 2026-03-05)
+if impl(ghc >= 9.14)
+  allow-newer: indexed-traversable-0.1.4:base
+  allow-newer: indexed-traversable-0.1.4:containers
