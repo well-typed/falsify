@@ -1,26 +1,28 @@
 -- | Fixed precision generators
 module Test.Falsify.Reexported.Generator.Precision (
     -- * @n@-bit words
-    WordN(..)
+    Precision(..)
+  , WordN(..)
+    -- * Construction and generation
+  , truncateAt
   , wordN
-    -- ** Fractions
-  , properFraction
   ) where
-
-import Prelude hiding (properFraction)
 
 import Data.Bits
 import Data.Word
-import GHC.Stack
 
 import Test.Falsify.Internal.Generator
-import Test.Falsify.Internal.Range
 import Test.Falsify.Internal.SampleTree (sampleValue)
 import Test.Falsify.Internal.Search
 
 {-------------------------------------------------------------------------------
-  @n@-bit word
+  Definition
 -------------------------------------------------------------------------------}
+
+-- | Precision (in bits)
+newtype Precision = Precision Word8
+  deriving stock (Show, Eq, Ord)
+  deriving newtype (Num, Enum)
 
 -- | @n@-bit word
 data WordN = WordN Precision Word64
@@ -28,6 +30,10 @@ data WordN = WordN Precision Word64
 
 forgetPrecision :: WordN -> Word64
 forgetPrecision (WordN _ x) = x
+
+{-------------------------------------------------------------------------------
+  Construction and generation
+-------------------------------------------------------------------------------}
 
 -- | Make @n@-bit word (@n <= 64@)
 --
@@ -65,20 +71,3 @@ wordN p =
       . forgetPrecision
       . truncateAt p
       . sampleValue
-
-{-------------------------------------------------------------------------------
-  Fractions
--------------------------------------------------------------------------------}
-
--- | Compute fraction from @n@-bit word
-mkFraction :: WordN -> ProperFraction
-mkFraction (WordN (Precision p) x) =
-    ProperFraction $ (fromIntegral x) / (2 ^ p)
-
--- | Uniform selection of fraction, shrinking towards 0
---
--- Precondition: precision must be at least 1 bit (a zero-bit number is constant
--- 0; it is meaningless to have a fraction in a point range).
-properFraction :: HasCallStack => Precision -> Gen ProperFraction
-properFraction (Precision 0) = error "fraction: 0 precision"
-properFraction p             = mkFraction <$> wordN p

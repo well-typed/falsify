@@ -102,6 +102,7 @@ library
       Test.Falsify.Internal.Generator
       Test.Falsify.Internal.Generator.Definition
       Test.Falsify.Internal.Generator.Shrinking
+      Test.Falsify.Internal.ProperFraction
       Test.Falsify.Internal.Property
       Test.Falsify.Internal.Range
       Test.Falsify.Internal.SampleTree

@@ -40,7 +40,7 @@ instance GenDefault tag' a => GenDefault tag (ViaTag tag' a) where
 newtype ViaIntegral a = ViaIntegral {unViaIntegral :: a}
 
 instance (Integral a, FiniteBits a, Bounded a) => GenDefault tag (ViaIntegral a) where
-  genDefault _ = fmap ViaIntegral (Gen.inRange (Range.between (minBound, maxBound)))
+  genDefault _ = fmap ViaIntegral (Gen.inRange Range.uniform)
 
 -- | DerivingVia wrapper for Enum types
 newtype ViaEnum a = ViaEnum {unViaEnum :: a}

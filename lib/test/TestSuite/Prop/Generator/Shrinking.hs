@@ -1,7 +1,10 @@
 module TestSuite.Prop.Generator.Shrinking (tests) where
 
 import Control.Monad
+import Data.Bits
 import Data.Default
+import Data.Int
+import Data.Proxy
 import Data.Word
 import Test.Tasty
 import Test.Tasty.Falsify
@@ -10,14 +13,27 @@ import qualified Test.QuickCheck as QuickCheck
 
 import qualified Test.Falsify.Generator as Gen
 import qualified Test.Falsify.Predicate as P
+import qualified Test.Falsify.Range as Range
 
 import TestSuite.Util.List
 
 tests :: TestTree
 tests = testGroup "TestSuite.Prop.Generator.Shrinking" [
       testGroup "prim" [
-        testPropertyWith expectFailure  "prim" prop_prim_minimum
-      ]
+          testPropertyWith expectFailure  "prim" prop_prim_minimum
+        ]
+    , testGroup "uniform" [
+          testProperty "Word8"  $ prop_uniform (Proxy @Word8)
+        , testProperty "Word16" $ prop_uniform (Proxy @Word16)
+        , testProperty "Word32" $ prop_uniform (Proxy @Word32)
+        , testProperty "Word64" $ prop_uniform (Proxy @Word64)
+        , testProperty "Word"   $ prop_uniform (Proxy @Word)
+        , testProperty "Int8"   $ prop_uniform (Proxy @Int8)
+        , testProperty "Int16"  $ prop_uniform (Proxy @Int16)
+        , testProperty "Int32"  $ prop_uniform (Proxy @Int32)
+        , testProperty "Int64"  $ prop_uniform (Proxy @Int64)
+        , testProperty "Int"    $ prop_uniform (Proxy @Int)
+        ]
     , testGroup "shrinkTo" [
           testProperty "shrinking" prop_shrinkTo_shrinking
         , testProperty "minimum"   prop_shrinkTo_minimum
@@ -57,6 +73,23 @@ prop_prim_minimum =
     testMinimum (P.expect 1) $ do
       x <- gen Gen.prim
       unless (even x) $ testFailed x
+
+{-------------------------------------------------------------------------------
+  uniform
+-------------------------------------------------------------------------------}
+
+prop_uniform :: forall a.
+     (Show a, FiniteBits a, Integral a, Bounded a)
+  => Proxy a -> Property ()
+prop_uniform _ =
+    testShrinkingOfGen (P.relatedBy ("validShrink", validShrink)) $
+      Gen.inRange Range.uniform
+  where
+    -- We must be getting closer to 0
+    validShrink :: a -> a -> Bool
+    validShrink orig shrunk
+      | orig >= 0 = shrunk < orig
+      | otherwise = shrunk > orig
 
 {-------------------------------------------------------------------------------
   shrinkTo
