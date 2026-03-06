@@ -46,7 +46,7 @@ bool target = aux . sampleValue <$> primWith shrinker
 
 -- | Generate value in the specified range
 inRange :: Range a -> Gen a
-inRange r = Range.eval properFraction r
+inRange r = Range.eval wordN r
 
 -- | Deprecated alias for 'inRange'
 integral :: Range a -> Gen a

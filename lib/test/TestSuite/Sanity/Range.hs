@@ -4,13 +4,15 @@ import Control.Monad
 import Data.Bifunctor
 import Data.Map (Map)
 import Data.Maybe (fromMaybe)
+import Data.Word
 import Test.Tasty
 import Test.Tasty.HUnit
 import Text.Printf
 
 import qualified Data.Map as Map
 
-import Test.Falsify.Range (Range, Precision(..), ProperFraction(..))
+import Test.Falsify.Generator (WordN(..))
+import Test.Falsify.Range (Range, Precision(..))
 
 import qualified Test.Falsify.Range as Range
 
@@ -63,15 +65,12 @@ instance Show Percentage where
 -- each value in the range is produced.
 stats :: forall a. Ord a => Range a -> [(a, Percentage)]
 stats r =
-    count Map.empty $ Range.eval genFraction r
+    count Map.empty $ Range.eval genWordN r
   where
-    genFraction :: Precision -> [ProperFraction]
-    genFraction (Precision p)
+    genWordN :: Precision -> [WordN]
+    genWordN (Precision p)
       | p >= 16   = error $ "stats: precision " ++ show p ++ " too high"
-      | otherwise = [
-            ProperFraction $ fromIntegral x / fromIntegral ((2 :: Word) ^ p)
-          | x <- [0 .. (2 :: Word) ^ p - 1]
-          ]
+      | otherwise = [WordN (Precision p) x | x <- [0 .. (2 :: Word64) ^ p - 1]]
 
     count :: Map a Word -> [a] -> [(a, Percentage)]
     count acc (x:xs) = count (Map.alter (Just . (+1) . fromMaybe 0) x acc) xs

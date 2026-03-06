@@ -3,7 +3,7 @@
 -- Intended for qualified import.
 --
 -- > import Test.Falsify.Generator (Gen)
--- > import qualified Test.Falsify.Generator qualified as Gen
+-- > import qualified Test.Falsify.Generator as Gen
 module Test.Falsify.Generator (
     -- * Definition
     Gen -- opaque
@@ -86,10 +86,12 @@ import Prelude hiding (either, elem, properFraction)
 
 import Data.Falsify.List
 import Data.Falsify.Marked
+import Data.Falsify.Tree
+
 import Test.Falsify.Internal.Generator
+import Test.Falsify.Internal.ProperFraction
 import Test.Falsify.Reexported.Generator.Compound
 import Test.Falsify.Reexported.Generator.Function
 import Test.Falsify.Reexported.Generator.Precision
 import Test.Falsify.Reexported.Generator.Shrinking
 import Test.Falsify.Reexported.Generator.Simple
-import Data.Falsify.Tree

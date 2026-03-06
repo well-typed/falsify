@@ -14,7 +14,7 @@ module Test.Falsify.GenDefault
   , ViaGeneric (..)
   ) where
 
-import Control.Applicative (liftA2)
+import qualified Control.Applicative as Ap
 import Data.Proxy (Proxy (..))
 import GHC.Generics (Generic (..), K1 (..), M1 (..), U1 (..), (:+:) (..), (:*:) (..))
 import Test.Falsify.Generator (Gen)
@@ -40,7 +40,7 @@ instance GenDefault tag' a => GenDefault tag (ViaTag tag' a) where
 newtype ViaIntegral a = ViaIntegral {unViaIntegral :: a}
 
 instance (Integral a, FiniteBits a, Bounded a) => GenDefault tag (ViaIntegral a) where
-  genDefault _ = fmap ViaIntegral (Gen.inRange (Range.between (minBound, maxBound)))
+  genDefault _ = fmap ViaIntegral (Gen.inRange Range.uniform)
 
 -- | DerivingVia wrapper for Enum types
 newtype ViaEnum a = ViaEnum {unViaEnum :: a}
@@ -76,7 +76,7 @@ instance GGenDefault tag a => GGenDefault tag (M1 i c a) where
   ggenDefault = fmap M1 . ggenDefault
 
 instance (GGenDefault tag a, GGenDefault tag b) => GGenDefault tag (a :*: b) where
-  ggenDefault p = liftA2 (:*:) (ggenDefault p) (ggenDefault p)
+  ggenDefault p = Ap.liftA2 (:*:) (ggenDefault p) (ggenDefault p)
 
 instance (GGenDefault tag a, GGenDefault tag b) => GGenDefault tag (a :+: b) where
   ggenDefault p = Gen.choose (fmap L1 (ggenDefault p)) (fmap R1 (ggenDefault p))

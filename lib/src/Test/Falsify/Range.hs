@@ -1,8 +1,14 @@
 -- | Numerical ranges
+--
+-- Intended for qualified import.
+--
+-- > import Test.Falsify.Range (Range)
+-- > import qualified Test.Falsify.Range as Range
 module Test.Falsify.Range (
     Range -- opaque
     -- * Constructors
     -- ** Linear
+  , uniform
   , between
   , enum
   , withOrigin
@@ -21,13 +27,16 @@ module Test.Falsify.Range (
   ) where
 
 import Data.Bits
+import Data.Functor.Identity
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.Ord
+import Data.Word
 
 import qualified Data.List.NonEmpty as NE
 
+import Test.Falsify.Internal.ProperFraction
 import Test.Falsify.Internal.Range
-import Data.Functor.Identity
+import Test.Falsify.Reexported.Generator.Precision
 
 {-------------------------------------------------------------------------------
   Primitive ranges
@@ -44,7 +53,7 @@ constant = Constant
 -- * for all @x <= y@, @f x <= f y@, /or/
 -- * for all @x <= y@, @f y <= f x@
 fromProperFraction :: Precision -> (ProperFraction -> a) -> Range a
-fromProperFraction = FromProperFraction
+fromProperFraction p f = FromWordN p $ f . mkFraction
 
 -- | Generate value in any of the specified ranges, then choose the one
 -- that is closest to the specified origin
@@ -66,7 +75,51 @@ towards o (r:rs) = Smallest $ fmap aux (r :| rs)
   Constructing ranges
 -------------------------------------------------------------------------------}
 
+-- | Uniform selection anywhere in the full range @[minBound .. maxBound]@
+--
+-- Shrinks towards zero.
+--
+-- If you don't need specific bounds, you should probably use 'uniform' instead
+-- of 'between', especially for large bit sizes, because we can more easily
+-- guarantee a true uniform selection here.
+uniform :: forall a. (Integral a, FiniteBits a, Bounded a) => Range a
+uniform = FromWordN precision $ \(WordN _ x) ->
+    if isUnsigned
+      then toUnsigned x
+      else toSigned   x
+  where
+    precision :: Precision
+    precision = Precision $ fromIntegral $ finiteBitSize (undefined :: a)
+
+    isUnsigned :: Bool
+    isUnsigned = signum (-1 :: a) == 1
+
+    toUnsigned :: Word64 -> a
+    toUnsigned = fromIntegral
+
+    -- For signed numbers we must be careful. Consider Int8, starting with an
+    -- 8-bit precision Word64. That Word64 might shrink from 255 to 254; if we
+    -- just cast this to Int8, the corresponding values would be -1 and -2,
+    -- violating the requirement that we shrink towards zero. We therefore need
+    -- to "reflect" the negative range.
+    --
+    -- NOTE: 'fromIntegral' just does a bit-wise cast, e.g
+    --
+    -- >    fromIntegral (200 :: Word64) :: Int8
+    -- > == (-56)
+    toSigned :: Word64 -> a
+    toSigned x
+      | x <= maxPos = fromIntegral x
+      | otherwise   = (maxBound :: a) - fromIntegral x
+      where
+        -- maxBound must fit within 64-bits
+        -- (assuming @a@ does not exceed 64 bits, of course)
+        maxPos :: Word64
+        maxPos = fromIntegral (maxBound :: a)
+
 -- | Uniform selection between the given bounds, shrinking towards first bound
+--
+-- See also 'uniform'.
 between :: forall a. (Integral a, FiniteBits a) => (a, a) -> Range a
 between = skewedBy 0
 
@@ -117,7 +170,7 @@ withOrigin (x, y) o
   Skew
 
   To introduce skew, we want something that is reasonably simply to implement
-  but also has some reasonal properties. Suppose a skew of @s@ means that we
+  but also has some reasonable properties. Suppose a skew of @s@ means that we
   generate value from the lower 20% of the range 60% of the time. Then:
 
   - Symmetry around the antidiagonal: we will generate a value from the
@@ -235,8 +288,8 @@ skewedBy s (x, y)
     -- To avoid this heavy bias, we instead do this:
     --
     -- >  0..............1..............2..............3
-    -- > [              /\             /\               ]
-    -- >  ^^^^^^^^^^^^^^  ^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^
+    -- > [              /|             /|              /]
+    -- >  ^^^^^^^^^^^^^^ ^^^^^^^^^^^^^^ ^^^^^^^^^^^^^^^
     -- >        0                1              2
     --
     -- By insisting that the fraction is a /proper/ fraction (i.e., not equal to
@@ -274,7 +327,7 @@ precisionRequiredToRepresent x = fromIntegral $
 
 -- | Origin of the range (value we shrink towards)
 origin ::  Range a -> a
-origin = runIdentity . eval (\_precision -> Identity $ ProperFraction 0)
+origin = runIdentity . eval (\p -> Identity $ WordN p 0)
 
 {-------------------------------------------------------------------------------
   Evaluation
@@ -285,15 +338,15 @@ origin = runIdentity . eval (\_precision -> Identity $ ProperFraction 0)
 -- Most users will probably never need to call this function.
 eval :: forall f a.
      Applicative f
-  => (Precision -> f ProperFraction) -> Range a -> f a
-eval genFraction = go
+  => (Precision -> f WordN) -> Range a -> f a
+eval genWordN = go
   where
     go :: forall x. Range x -> f x
     go r =
         case r of
-          Constant x             -> pure x
-          FromProperFraction p f -> f <$> genFraction p
-          Smallest rs            -> smallest <$> sequenceA (fmap go rs)
+          Constant x    -> pure x
+          FromWordN p f -> f <$> genWordN p
+          Smallest rs   -> smallest <$> sequenceA (fmap go rs)
 
     smallest :: Ord b => NonEmpty (x, b) -> x
     smallest = fst . NE.head . NE.sortBy (comparing snd)
