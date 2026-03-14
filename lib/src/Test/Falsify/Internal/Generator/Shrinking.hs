@@ -1,6 +1,9 @@
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# HLINT ignore "Redundant <$>" #-}
 module Test.Falsify.Internal.Generator.Shrinking (
     -- * Shrinking
     shrinkFrom
+  , shrinkFromIO
     -- * With full history
   , ShrinkExplanation(..)
   , ShrinkHistory(..)
@@ -16,6 +19,7 @@ import Data.List.NonEmpty (NonEmpty((:|)))
 
 import Test.Falsify.Internal.Generator.Definition
 import Test.Falsify.Internal.SampleTree (SampleTree(..))
+import {-# SOURCE #-} Test.Falsify.Internal.Property (TestResult, TestRun)
 
 {-------------------------------------------------------------------------------
   Explanation
@@ -167,3 +171,33 @@ shrinkFrom prop gen = \(p, shrunk) ->
         case prop a of
           ValidShrink p   -> Left (p, shrunk)
           InvalidShrink n -> Right n
+
+shrinkFromIO :: forall a p n.
+     ((TestResult String (IO a), TestRun) -> IO (IsValidShrink p n))
+  -> Gen (TestResult String (IO a), TestRun)
+  -> (p, [SampleTree]) -- ^ Initial result of the generator
+  -> IO (ShrinkExplanation p n)
+shrinkFromIO prop gen = \(p, shrunk) ->
+    ShrinkExplanation p <$> go shrunk
+  where
+    go :: [SampleTree] -> IO (ShrinkHistory p n)
+    go shrunk = do
+        -- Shrinking is a greedy algorithm: we go with the first candidate that
+        -- works, and discard the others.
+        --
+        -- NOTE: 'partitionEithers' is lazy enough:
+        --
+        -- > head . fst $ partitionEithers [Left True, undefined] == True
+        partitionEithers <$> candidates >>= \case
+          ([], rejected)      -> pure $ ShrinkingDone rejected
+          ((p, shrunk'):_, _) -> ShrunkTo p <$> go shrunk'
+      where
+        candidates :: IO [Either (p, [SampleTree]) n]
+        candidates =
+            traverse (consider . runGen gen) shrunk
+
+    consider :: ((TestResult String (IO a), TestRun), [SampleTree]) -> IO (Either (p, [SampleTree]) n)
+    consider (a, shrunk) =
+        prop a >>= \case
+          ValidShrink p   -> pure $ Left (p, shrunk)
+          InvalidShrink n -> pure $ Right n

@@ -10,6 +10,7 @@ module Test.Falsify.Internal.Property (
     -- * Test results
   , TestResult(..)
   , resultIsValidShrink
+  , resultIsValidShrinkIO
     -- * State
   , TestRun(..)
   , Log(..)
@@ -58,6 +59,8 @@ import Test.Falsify.Predicate (Predicate, (.$))
 import qualified Test.Falsify.Generator          as Gen
 import qualified Test.Falsify.Internal.Generator as Gen
 import qualified Test.Falsify.Predicate          as P
+import Data.Functor ((<&>))
+import Control.Exception (AsyncException, try, Exception (fromException, displayException), throwIO)
 
 {-------------------------------------------------------------------------------
   Information about a test run
@@ -140,6 +143,24 @@ resultIsValidShrink (result, run) =
       TestFailed e  -> ValidShrink   (e       , run)
       TestDiscarded -> InvalidShrink (Nothing , run)
       TestPassed a  -> InvalidShrink (Just a  , run)
+
+resultIsValidShrinkIO ::
+     (TestResult String (IO a), TestRun)
+  -> IO (IsValidShrink (String, TestRun) (Maybe a, TestRun))
+resultIsValidShrinkIO (result, run) =
+    case result of
+      TestFailed e     -> pure $ ValidShrink   (e       , run)
+      TestDiscarded    -> pure $ InvalidShrink (Nothing , run)
+      TestPassed runA  -> do
+        try runA >>= \case
+            Right a -> pure $ InvalidShrink (Just a, run)
+            Left exc ->
+                case fromException @AsyncException exc of
+                    Just _ ->
+                        throwIO exc -- Let async exceptions pass
+                    Nothing ->
+                        -- failed again
+                        pure $ ValidShrink (displayException exc, run)
 
 {-------------------------------------------------------------------------------
   Monad-transformer version of 'TestResult'
