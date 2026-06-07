@@ -1,4 +1,5 @@
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP               #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 -- | Properties
 --
@@ -17,7 +18,7 @@ module Test.Falsify.Internal.Property (
     -- * Running generators
   , gen
   , genWith
-    -- * 'Property' features
+    -- * 'Property'' features
   , testFailed
   , info
   , assert
@@ -171,10 +172,10 @@ instance Monad m => Monad (TestResultT e m) where
 
 -- | Property
 --
--- A 'Property' is a generator that can fail and keeps a track of some
+-- A 'Property'' is a generator that can fail and keeps a track of some
 -- information about the test run.
 --
--- In most cases, you will probably want to use 'Test.Falsify.Property.Property'
+-- In most cases, you will probably want to use t'Test.Falsify.Property.Property'
 -- instead, which fixes @e@ at 'String'.
 newtype Property' e a = WrapProperty {
       unwrapProperty :: TestResultT e (StateT TestRun Gen) a
@@ -336,8 +337,10 @@ genWith = genWithCallStack callStack
 -- | Construct random path through the property's shrink tree
 genShrinkPath :: Property' e () -> Property' e' [(e, TestRun)]
 genShrinkPath prop = do
-    st    <- genWith (const Nothing) $ Gen.toShrinkTree (runProperty prop)
-    mPath <- genWith (const Nothing) $ Gen.path resultIsValidShrink st
+    st    <- genWith (const Nothing) $
+               Gen.toShrinkTree (runProperty prop)
+    mPath <- genWith (const Nothing) $
+               Gen.path (isValidShrink . resultIsValidShrink) st
     aux mPath
   where
     aux ::
@@ -467,4 +470,3 @@ testGen' p g = WrapProperty $ TestResultT $ StateT $ \run ->
 -- property).
 testShrinkingOfGen :: Show a => Predicate [a, a] -> Gen a -> Property' String ()
 testShrinkingOfGen p = testShrinking p . testGen' Left
-

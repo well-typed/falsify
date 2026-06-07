@@ -15,7 +15,10 @@ import Data.Word
 import qualified Data.Tree as Rose
 
 import Test.Falsify.Internal.Generator
-import Test.Falsify.Internal.SampleTree (Sample(..), SampleTree)
+import Test.Falsify.SampleTree (SampleTree(..), Sample(..))
+import Test.Falsify.ShrinkTree (ShrinkTree(..))
+
+import qualified Test.Falsify.ShrinkTree as ShrinkTree
 
 {-------------------------------------------------------------------------------
   Specialized shrinking behaviour
@@ -88,7 +91,7 @@ shrinkWith f gen = do
     -- different context; we must take this case into account in
     -- 'shrinkToOneOf'.
     x <- withoutShrinking gen
-    fromShrinkTree $ Rose.unfoldTree (\x' -> (x', f x')) x
+    fromShrinkTree $ ShrinkTree.unfold x f
 
 {-------------------------------------------------------------------------------
   Shrink trees
@@ -107,8 +110,8 @@ shrinkWith f gen = do
 --
 -- The O(n^2) cost is only incurred on /locating/ the next element to be tested;
 -- the property is not reevaluated at already-shrunk values.
-fromShrinkTree :: forall a. Rose.Tree a -> Gen a
-fromShrinkTree = go
+fromShrinkTree :: forall a. ShrinkTree a -> Gen a
+fromShrinkTree = go . unwrapShrinkTree
   where
     go :: Rose.Tree a -> Gen a
     go (Rose.Node x xs) = do
@@ -120,9 +123,9 @@ fromShrinkTree = go
 -- | Expose the full shrink tree of a generator
 --
 -- This generator does not shrink.
-toShrinkTree :: forall a. Gen a -> Gen (Rose.Tree a)
+toShrinkTree :: forall a. Gen a -> Gen (ShrinkTree a)
 toShrinkTree gen =
-    Rose.unfoldTree aux . runGen gen <$> captureLocalTree
+    WrapShrinkTree . Rose.unfoldTree aux . runGen gen <$> captureLocalTree
   where
-    aux :: (a, [SampleTree]) -> (a,[(a, [SampleTree])])
+    aux :: (a, [SampleTree]) -> (a, [(a, [SampleTree])])
     aux (x, shrunk) = (x, map (runGen gen) shrunk)

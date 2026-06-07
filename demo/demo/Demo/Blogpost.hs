@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Demo.Blogpost where
 
 import Control.Monad

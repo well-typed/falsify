@@ -1,5 +1,33 @@
 # Revision history for falsify
 
+## 0.4.0 -- ??
+
+* In `Test.Falsify.Predicate`, `VarName` is now a newtype rather than a type
+  alias, and we now also have `FnName` alongside `VarName`. Both of these have
+  `IsString` instances, so code that uses `OverloadedStrings` should not be
+  affected
+* `ShrinkTree` is now a newtype rather than a type alias, and is moved to
+  `Test.Falsify.ShrinkTree`
+* Improve module hierarchy
+  - `Test.Falsify.Generator` now really only provides generators
+    (it was previously an awkward mix of generators and custom datatypes)
+  - `Data.Falsify.*` is a new public module hierarchy providing some general
+    purpose data structures and utilities:
+    - `Data.Falsify.Concrete`
+    - `Data.Falsify.Permutation`
+    - `Data.Falsify.ProperFraction`
+    - `Data.Falsify.Tree`
+    - `Data.Falsify.WordN`
+  - Some testing specific data structures now have dedicated modules:
+    - `Test.Falsify.Fun`
+    - `Test.Falsify.Marked`
+    - `Test.Falsify.SampleTree`
+    - `Test.Falsify.ShrinkTree`
+* The signature of `path` has been simplified: it no logner uses `IsValidShrink`
+  (which is now internal API)
+* Simplified signature of `bst`, which now only accepts inclusive bounds (#91)
+* Remove deprecated functions `integral` and `enum`
+
 ## 0.3.0 -- 2026-03-05
 
 * Introduce new `Range` constructor called `between`, which can be used for

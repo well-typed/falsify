@@ -1,16 +1,23 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 -- | Predicates
 --
 -- Intended for qualified import.
 --
 -- > import Test.Falsify.Predicate (Predicate, (.$))
 -- > import qualified Test.Falsify.Predicate as P
+--
+-- = Overview
+--
+-- TODO
 module Test.Falsify.Predicate (
     Predicate -- opaque
     -- * Expressions
   , Expr -- opaque
   , prettyExpr
     -- * Functions
-  , Fn -- opaque
+  , Fn     -- opaque
+  , FnName -- opaque
   , fn
   , fnWith
   , transparent
@@ -30,6 +37,8 @@ module Test.Falsify.Predicate (
   , matchEither
   , matchBool
     -- * Evaluation and partial evaluation
+  , VarName -- opaque
+  , Err
   , eval
   , (.$)
   , at
@@ -57,6 +66,7 @@ import Data.Kind
 import Data.List (intercalate)
 import Data.Maybe (catMaybes)
 import Data.SOP (NP(..), K(..), I(..), SListI)
+import Data.String
 
 import qualified Data.SOP as SOP
 
@@ -65,21 +75,30 @@ import qualified Data.SOP as SOP
 -------------------------------------------------------------------------------}
 
 -- | Variable
-type Var = String
+newtype VarName = WrapVarName{
+      unwrapVarName :: String
+    }
+  deriving newtype (IsString)
 
 -- | Simple expression language
 --
 -- The internal details of this type are (currently) not exposed.
 data Expr =
     -- | Variable
-    Var Var
+    Var VarName
+
+    -- | Function
+    --
+    -- We distinguish between v'Var' and v'Fn' only for improved readability.
+  | Fn FnName
 
     -- | Application
   | App Expr Expr
 
     -- | Non-associative infix operator
-  | Infix Var Expr Expr
+  | Infix FnName Expr Expr
 
+-- | Pretty-print expression
 prettyExpr :: Expr -> String
 prettyExpr = go False
   where
@@ -87,14 +106,15 @@ prettyExpr = go False
          Bool -- Does the context require brackets?
       -> Expr -> String
     go needsBrackets = \case
-        Var x          -> x
+        Var x          -> unwrapVarName x
+        Fn f           -> unwrapFnName f
         App e1 e2      -> parensIf needsBrackets $ intercalate " " [
                               go False e1 -- application is left associative
                             , go True  e2
                             ]
         Infix op e1 e2 -> parensIf needsBrackets $ intercalate " " [
                               go True e1
-                            , op
+                            , unwrapFnName op
                             , go True e2
                             ]
 
@@ -106,10 +126,16 @@ prettyExpr = go False
   Functions
 -------------------------------------------------------------------------------}
 
+-- | Function name
+newtype FnName = WrapFnName{
+      unwrapFnName :: String
+    }
+  deriving newtype (IsString)
+
 -- | Function (used for composition of a 'Predicate' with a function)
 data Fn a b =
     -- | Function that is visible in rendered results
-    Visible Var (b -> String) (a -> b)
+    Visible FnName (b -> String) (a -> b)
 
     -- | Function that should not be visible in rendered results
     --
@@ -117,11 +143,11 @@ data Fn a b =
   | Transparent (a -> b)
 
 -- | Default constructor for a function
-fn :: Show b => (Var, a -> b) -> Fn a b
+fn :: Show b => (FnName, a -> b) -> Fn a b
 fn (n, f) = fnWith (n, show, f)
 
 -- | Generalization of 'fn' that does not depend on 'Show'
-fnWith :: (Var, b -> String, a -> b) -> Fn a b
+fnWith :: (FnName, b -> String, a -> b) -> Fn a b
 fnWith (n, r, f) = Visible n r f
 
 -- | Function that should not be visible in any rendered failure
@@ -132,7 +158,7 @@ fnWith (n, r, f) = Visible n r f
 -- > p1 = P.eq `P.on` (P.fn "ord"    ord)
 -- > p2 = P.eq `P.on` (P.transparent ord)
 --
--- Both of these compare two characters on their codepoints (through 'ord'), but
+-- Both of these compare two characters on their codepoints (through @ord@), but
 -- they result in different failures. The first would give us something like
 --
 -- > (ord x) /= (ord y)
@@ -177,7 +203,7 @@ data Input x = Input {
 applyFn :: Fn a b -> Input a -> (Input b, Maybe (Expr, String))
 applyFn (Visible n r f) x = (
       Input {
-          inputExpr     = App (Var n) $ inputExpr x
+          inputExpr     = App (Fn n) $ inputExpr x
         , inputRendered = r $ f (inputValue x)
         , inputValue    = f $ inputValue x
         }
@@ -312,16 +338,16 @@ binary p msg =
 -------------------------------------------------------------------------------}
 
 -- | Specialization of 'unary' for unary relations
-satisfies :: (Var, a -> Bool) -> Predicate '[a]
+satisfies :: (FnName, a -> Bool) -> Predicate '[a]
 satisfies (n, p) =
     unary p $ \x ->
-      prettyExpr $ Var "not" `App` (Var n `App` x)
+      prettyExpr $ Fn "not" `App` (Fn n `App` x)
 
 -- | Specialization of 'binary' for relations
-relatedBy :: (Var, a -> b -> Bool) -> Predicate [a, b]
+relatedBy :: (FnName, a -> b -> Bool) -> Predicate [a, b]
 relatedBy (n, p) =
     binary p $ \x y ->
-      prettyExpr $ Var "not" `App` (Var n `App` x `App` y)
+      prettyExpr $ Fn "not" `App` (Fn n `App` x `App` y)
 
 {-------------------------------------------------------------------------------
   Combinators
@@ -355,8 +381,8 @@ matchEither = Choose
 
 -- | Conditional
 --
--- This is a variation on 'choose' that provides no evidence for which branch is
--- taken.
+-- This is a variation on 'matchEither' that provides no evidence for which
+-- branch is taken.
 matchBool ::
      Predicate xs  -- ^ Predicate to evaluate if the condition is true
   -> Predicate xs  -- ^ Predicate to evaluate if the condition is false
@@ -494,13 +520,13 @@ eval p = first prettyFailure $ evalAt p Nil
 -- >      P.relatedBy ("equiv", equiv)
 -- >   .$ ("x", x)
 -- >   .$ ("y", y)
-(.$) :: Show x => Predicate (x : xs) -> (Var, x) -> Predicate xs
+(.$) :: Show x => Predicate (x : xs) -> (VarName, x) -> Predicate xs
 p .$ (n, x) = p `at` (n, show x, x)
 
 -- | Generalization of '(.$)' that does not require a 'Show' instance
 at ::
      Predicate (x : xs)
-  -> (Var, String, x) -- ^ Rendered name, expression, and input proper
+  -> (VarName, String, x) -- ^ Rendered name, expression, and input proper
   -> Predicate xs
 p `at` (n, r, x) = p `atExpr` (Var n, r, x)
 
@@ -522,7 +548,7 @@ p `atExpr` (e, r, x) = p `At` (Input e r x)
 --
 -- This is an internal auxiliary.
 binaryInfix ::
-     Var  -- ^ Infix operator corresponding to the relation /NOT/ holding
+     FnName  -- ^ Infix operator corresponding to the relation /NOT/ holding
   -> (a -> b -> Bool) -> Predicate [a, b]
 binaryInfix op f = binary f $ \x y -> prettyExpr (Infix op x y)
 
@@ -601,6 +627,5 @@ pairwise p = Lam $ \xs ->
     pred :: Expr -> (Word, a) -> (Word, a) -> Predicate '[]
     pred xs (i, x) (j, y) =
                  p
-        `atExpr` (Infix "!!" xs (Var $ show i), show x, x)
-        `atExpr` (Infix "!!" xs (Var $ show j), show y, y)
-
+        `atExpr` (Infix "!!" xs (Var $ WrapVarName $ show i), show x, x)
+        `atExpr` (Infix "!!" xs (Var $ WrapVarName $ show j), show y, y)

@@ -1,0 +1,156 @@
+-- | Sample tree
+--
+-- Intended for qualified import.
+--
+-- > import Test.Falsify.SampleTree (SampleTree(..), pattern Inf, Sample(..))
+-- > import qualified Test.Falsify.SampleTree as SampleTree
+module Test.Falsify.SampleTree (
+    -- * Definition
+    SampleTree(..)
+  , Sample(..)
+  , pattern Inf
+  , sampleValue
+    -- * Construction
+  , fromPRNG
+  , fromSeed
+  , minimal
+  , constant
+    -- * Combinators
+  , map
+  , mod
+  ) where
+
+import Prelude hiding (map, mod)
+import qualified Prelude
+
+import Data.Word
+import System.Random.SplitMix
+
+{-------------------------------------------------------------------------------
+  Definition
+-------------------------------------------------------------------------------}
+
+-- | Sample tree
+--
+-- A sample tree is a (conceptually and sometimes actually) infinite tree
+-- representing drawing values from and splitting a PRNG.
+data SampleTree =
+    -- | Default constructor
+    --
+    -- The type of ST is really
+    --
+    -- > ST :: Word64 & (SampleTree * SampleTree) -> SampleTree
+    --
+    -- where @(&)@ is the additive conjunction from linear logic. In other
+    -- words, the intention is that /either/ the @Word64@ is used, /or/
+    -- the pair of subtrees; put another way, we /either/ draw a value from the
+    -- PRNG, /or/ split it into two new PRNGs.
+    SampleTree Sample SampleTree SampleTree
+
+    -- | Minimal tree (0 everywhere)
+    --
+    -- This constructor allows us to represent an infinite tree in a finite way
+    -- and, importantly, /recognize/ a tree that is minimal everywhere. This is
+    -- necessary when shrinking in the context of generators that generate
+    -- infinitely large values.
+  | Minimal
+  deriving (Show)
+
+-- | Sample
+--
+-- The samples in the t'SampleTree' record if they were the originally produced
+-- sample, or whether they have been shrunk.
+data Sample =
+    NotShrunk Word64
+  | Shrunk    Word64
+  deriving (Show, Eq, Ord)
+
+{-------------------------------------------------------------------------------
+  Views
+-------------------------------------------------------------------------------}
+
+-- | Value of the sample
+--
+-- Samples differentiate between 'NotShrunk' and 'Shrunk', but for most use
+-- cases this distinction does not matter.
+sampleValue :: Sample -> Word64
+sampleValue (NotShrunk s) = s
+sampleValue (Shrunk    s) = s
+
+view :: SampleTree -> (Sample, SampleTree, SampleTree)
+view Minimal            = (Shrunk 0, Minimal, Minimal)
+view (SampleTree s l r) = (s, l, r)
+
+-- | Pattern synonym for treating the sample tree as infinite
+pattern Inf :: Sample -> SampleTree -> SampleTree -> SampleTree
+pattern Inf s l r <- (view -> (s, l, r))
+
+{-# COMPLETE Inf #-}
+
+{-------------------------------------------------------------------------------
+  Construction
+-------------------------------------------------------------------------------}
+
+-- | Construct t'SampleTree' from splittable PRNG
+fromPRNG :: SMGen -> SampleTree
+fromPRNG = go
+  where
+    go :: SMGen -> SampleTree
+    go g =
+        let (n, _) = nextWord64 g
+            (l, r) = splitSMGen g
+        in SampleTree (NotShrunk n) (go l) (go r)
+
+-- | Consruct t'SampleTree' from initial seed
+--
+-- The seed will be used to initialize an 'SMGen'
+fromSeed :: Word64 -> SampleTree
+fromSeed = fromPRNG . mkSMGen
+
+-- | Minimal sample tree
+--
+-- Generators should produce the \"simplest\" value when given this tree,
+-- for some suitable application-specific definition of \"simple\".
+minimal :: SampleTree
+minimal = Minimal
+
+-- | Sample tree that is the given value everywhere
+--
+-- This is primarily useful for debugging.
+constant :: Word64 -> SampleTree
+constant s = go
+  where
+    go :: SampleTree
+    go = SampleTree (NotShrunk s) go go
+
+{-------------------------------------------------------------------------------
+  Combinators
+-------------------------------------------------------------------------------}
+
+-- | Map function over all random samples in the tree
+--
+-- Precondition: the function must preserve zeros:
+--
+-- > f 0 == 0
+--
+-- This means that we have
+--
+-- > map f M == M
+--
+-- This is primarily useful for debugging.
+map :: (Word64 -> Word64) -> SampleTree -> SampleTree
+map f = go
+  where
+    go :: SampleTree -> SampleTree
+    go (SampleTree s l r) = SampleTree (mapSample s) (go l) (go r)
+    go Minimal            = Minimal
+
+    mapSample :: Sample -> Sample
+    mapSample (NotShrunk s) = NotShrunk (f s)
+    mapSample (Shrunk    s) = Shrunk    (f s)
+
+-- | Apply @mod m@ at every sample in the tree
+--
+-- This is primarily useful for debugging.
+mod :: Word64 -> SampleTree -> SampleTree
+mod m = map (\s -> s `Prelude.mod` m)

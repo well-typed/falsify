@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module TestSuite.Prop.Generator.Marking (tests) where
 
 import Control.Monad
@@ -10,9 +12,10 @@ import Test.Tasty.Falsify
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
-import Test.Falsify.Generator (Marked(..), Mark(..))
+import Test.Falsify.Marked (Mark(..), Marked(..))
 
 import qualified Test.Falsify.Generator as Gen hiding (mark)
+import qualified Test.Falsify.Marked    as Marked
 import qualified Test.Falsify.Predicate as P
 
 import TestSuite.Util.List
@@ -49,7 +52,7 @@ mark x = flip Marked x <$> (aux <$> Gen.prim)
 genMarkedList :: Gen [(Word, Word64)]
 genMarkedList = do
     xs <- forM [0 .. 9] (\i -> mark ((i, ) <$> Gen.prim))
-    catMaybes <$> Gen.selectAllKept xs
+    catMaybes <$> Marked.selectAllKept xs
 
 prop_list_shrinking :: Property ()
 prop_list_shrinking =

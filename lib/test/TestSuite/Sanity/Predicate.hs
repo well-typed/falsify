@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module TestSuite.Sanity.Predicate (tests) where
 
 import Test.Tasty

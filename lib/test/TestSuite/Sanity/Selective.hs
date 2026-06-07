@@ -6,7 +6,8 @@ import System.Timeout
 import Test.Tasty
 import Test.Tasty.HUnit
 
-import Test.Falsify.Generator (Gen, Tree(..))
+import Data.Falsify.Tree (Tree(..))
+import Test.Falsify.Generator (Gen)
 import Test.Falsify.Interactive (sample, shrink')
 
 import qualified Test.Falsify.Generator as Gen

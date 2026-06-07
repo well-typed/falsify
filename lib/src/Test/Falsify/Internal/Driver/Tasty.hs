@@ -38,6 +38,9 @@ import qualified Test.Tasty.Providers as Tasty
 
 data Test = Test TestOptions (Property' String ())
 
+-- | Tasty test options
+--
+-- These are normally specified on the command line.
 data TestOptions = TestOptions {
       -- | Do we expect this test to fail?
       expectFailure :: ExpectFailure
@@ -107,6 +110,7 @@ toTastyResult RenderedTestResult{testPassed, testOutput}
 testProperty :: TestName -> Property' String () -> TestTree
 testProperty = testPropertyWith def
 
+-- | Test @falsify@ 'Property'' as part of a @tasty@ 'TestTree'
 testPropertyWith :: TestOptions -> TestName -> Property' String () -> TestTree
 testPropertyWith testOpts name = Tasty.singleTest name . Test testOpts
 

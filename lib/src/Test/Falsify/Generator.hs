@@ -10,11 +10,9 @@ module Test.Falsify.Generator (
     -- * Simple (non-compound) generators
   , bool
   , inRange
-  , integral
-  , enum
   , int
     -- * Compound generators
-    -- ** Taking advantage of 'Selective'
+    -- ** Taking advantage of 'Control.Selective.Selective'
   , choose
   , oneof
     -- ** Lists
@@ -24,41 +22,22 @@ module Test.Falsify.Generator (
   , pickBiased
   , shuffle
     -- ** Permutations
-  , Permutation
-  , applyPermutation
   , permutation
     -- ** Tweak test data distribution
   , frequency
     -- ** Trees
-  , Tree(Leaf, Branch)
-  , drawTree
-    -- *** Binary trees
   , tree
   , bst
-    -- *** Shrink trees
-  , ShrinkTree
-  , IsValidShrink(..)
+    -- ** Shrink trees
   , path
   , pathAny
     -- ** Marking
-  , Marked(..)
-  , Mark(..)
-  , selectAllKept
   , mark
     -- * Functions
-    -- ** Generation
-  , Fun
-  , applyFun
-  , pattern Fn
-  , pattern Fn2
-  , pattern Fn3
   , fun
-    -- ** Construction
   , Function(..)
-  , (:->) -- opaque
-  , functionMap
+  , GFunction -- opaque
     -- * Reducing precision
-  , WordN(..)
   , wordN
   , properFraction
     -- * Overriding shrinking
@@ -84,12 +63,7 @@ module Test.Falsify.Generator (
 
 import Prelude hiding (either, elem, properFraction)
 
-import Data.Falsify.List
-import Data.Falsify.Marked
-import Data.Falsify.Tree
-
 import Test.Falsify.Internal.Generator
-import Test.Falsify.Internal.ProperFraction
 import Test.Falsify.Reexported.Generator.Compound
 import Test.Falsify.Reexported.Generator.Function
 import Test.Falsify.Reexported.Generator.Precision

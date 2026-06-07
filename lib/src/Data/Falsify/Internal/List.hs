@@ -1,22 +1,15 @@
-module Data.Falsify.List (
+module Data.Falsify.Internal.List (
     -- * Splitting
     chunksOfNonEmpty
-    -- * Permutations
-  , Permutation
-  , applyPermutation
     -- * Dealing with marks
   , keepAtLeast
   ) where
 
-import Control.Monad
-import Control.Monad.ST
 import Data.Foldable (toList)
 import Data.List.NonEmpty (NonEmpty(..))
 
-import qualified Data.Vector         as V
-import qualified Data.Vector.Mutable as VM
-
-import Data.Falsify.Marked
+import Test.Falsify.Marked (Mark(..), Marked(..))
+import qualified Test.Falsify.Marked as Marked
 
 {-------------------------------------------------------------------------------
   Splitting
@@ -42,33 +35,12 @@ chunksOfNonEmpty n (x :| xs) =
          (c:cs , r:rs) -> (c :| cs) :| toList (chunksOfNonEmpty n (r :| rs))
 
 {-------------------------------------------------------------------------------
-  Permutations
--------------------------------------------------------------------------------}
-
--- | Permutation is a sequence of swaps
-type Permutation = [(Word, Word)]
-
-applyPermutation :: Permutation -> [a] -> [a]
-applyPermutation p xs =
-    V.toList $ V.modify (forM_ (map conv p) . swap) (V.fromList xs)
-  where
-    swap :: V.MVector s a -> (Int, Int) -> ST s ()
-    swap vec (i, j) = do
-        x <- VM.read vec i
-        y <- VM.read vec j
-        VM.write vec i y
-        VM.write vec j x
-
-    conv :: (Word, Word) -> (Int, Int)
-    conv (i, j) = (fromIntegral i, fromIntegral j)
-
-{-------------------------------------------------------------------------------
   Dealing with marks
 -------------------------------------------------------------------------------}
 
 keepAtLeast :: Word -> [Marked f a] -> [Marked f a]
 keepAtLeast = \n xs ->
-    let kept = countKept xs
+    let kept = Marked.countKept xs
     in if kept >= n
          then xs
          else go (n - kept) xs

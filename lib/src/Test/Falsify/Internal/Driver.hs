@@ -40,9 +40,9 @@ import Test.Falsify.Internal.Driver.ReplaySeed
 import Test.Falsify.Internal.Generator
 import Test.Falsify.Internal.Generator.Shrinking
 import Test.Falsify.Internal.Property
-import Test.Falsify.Internal.SampleTree (SampleTree)
+import Test.Falsify.SampleTree (SampleTree)
 
-import qualified Test.Falsify.Internal.SampleTree as SampleTree
+import qualified Test.Falsify.SampleTree as SampleTree
 
 {-------------------------------------------------------------------------------
   Options
@@ -242,7 +242,7 @@ data Verbose = Verbose | NotVerbose
 
 -- | Do we expect the property to fail?
 --
--- If 'ExpectFailure', the test will fail if the property does /not/ fail.
+-- If v'ExpectFailure', the test will fail if the property does /not/ fail.
 -- Note that if we expect failure for a property, then we can stop at the first
 -- failed test; the number of tests to run for the property becomes a maximum
 -- rather than a goal.

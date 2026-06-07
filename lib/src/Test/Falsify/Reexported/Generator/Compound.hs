@@ -1,6 +1,6 @@
 -- | Compound generators
 module Test.Falsify.Reexported.Generator.Compound (
-    -- * Taking advantage of 'Selective'
+    -- * Taking advantage of 'Control.Selective.Selective'
     choose
   , oneof
     -- * Lists
@@ -19,7 +19,6 @@ module Test.Falsify.Reexported.Generator.Compound (
   , bst
     -- ** Shrink trees
   , IsValidShrink(..)
-  , ShrinkTree
   , path
   , pathAny
     -- * Auxiliary
@@ -39,21 +38,24 @@ import Data.Void
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Tree          as Rose
 
-import Data.Falsify.List (Permutation)
-import Data.Falsify.Marked
-import Data.Falsify.Tree (Tree(..), Interval(..), Endpoint(..))
+import Data.Falsify.Permutation (Permutation)
+import Data.Falsify.Tree (Tree(..))
 import Test.Falsify.Internal.Generator
 import Test.Falsify.Internal.Generator.Shrinking (IsValidShrink(..))
+import Test.Falsify.Marked (Mark(..), Marked(..))
 import Test.Falsify.Range (Range)
 import Test.Falsify.Reexported.Generator.Shrinking
 import Test.Falsify.Reexported.Generator.Simple
+import Test.Falsify.ShrinkTree (ShrinkTree(..))
 
-import qualified Data.Falsify.List  as List
-import qualified Data.Falsify.Tree  as Tree
-import qualified Test.Falsify.Range as Range
+import qualified Data.Falsify.Internal.List        as List
+import qualified Data.Falsify.Permutation          as Permutation
+import qualified Test.Falsify.Internal.Marked.Tree as MarkedTree
+import qualified Test.Falsify.Marked               as Marked
+import qualified Test.Falsify.Range                as Range
 
 {-------------------------------------------------------------------------------
-  Taking advantage of 'Selective'
+  Taking advantage of 'Control.Selective.Selective'
 -------------------------------------------------------------------------------}
 
 -- | Generate a value with one of two generators
@@ -66,7 +68,7 @@ import qualified Test.Falsify.Range as Range
 -- In the remainder of this docstring we give some background to this function,
 -- which may be useful for general understanding of the @falsify@ library.
 --
--- The implementation takes advantage of the that 'Gen' is a selective functor
+-- The implementation takes advantage of the that t'Gen' is a selective functor
 -- to ensure that the two generators can shrink independently: if the initial
 -- value of the generator is some @y@ produced by the second generator, later
 -- shrunk to some @y'@, then if the generator can shrink to @x@ at some point,
@@ -91,10 +93,10 @@ import qualified Test.Falsify.Range as Range
 -- In this case, @l@ and @r@ are run against /different/ sample trees, like we
 -- do here, /but/ in this case if the current value produced by the generator is
 -- produced by the right generator, then the sample tree used for the left
--- generator will always shrink to 'Minimal' (this /must/ be possible because
--- we're not currently using it); this means that we would then only be able to
--- shrink to a value from the left generator if the /minimal/ value produced by
--- that generator happens to work.
+-- generator will always shrink to 'Test.Falsify.Generator.Minimal' (this /must/
+-- be possible because we're not currently using it); this means that we would
+-- then only be able to shrink to a value from the left generator if the
+-- /minimal/ value produced by that generator happens to work.
 --
 -- To rephrase that last point: generating values that are not actually used
 -- will lead to poor shrinking, since those values can always be shrunk to their
@@ -120,7 +122,7 @@ shrinkToNothing g = firstThen Just (const Nothing) <*> g
 
 -- | Mark an element, shrinking towards 'Drop'
 --
--- This is similar to 'shrinkToNothing', except that 'Marked' still has a value
+-- This is similar to 'shrinkToNothing', except that t'Marked' still has a value
 -- in the 'Drop' case: marks are merely hints, that we may or may not use.
 mark :: Gen a -> Gen (Marked Gen a)
 mark x = flip Marked x <$> firstThen Keep Drop
@@ -137,17 +139,33 @@ mark x = flip Marked x <$> firstThen Keep Drop
 -- * We can drop random elements from the list, but prefer to drop them
 --   from near the /end/ of the list.
 --
--- Note on shrinking predictability: in the case that the specified 'Range' has
--- an origin which is neither the lower bound nor the upper bound (and only in
--- that case), 'list' can have confusing shrinking behaviour. For example,
--- suppose we have a range @(0, 10)@ with origin 5. Then we could start by
--- generating an intermediate list of length of 10 and then subsequently drop 5
--- elements from that, resulting in an optimal list length. However, we can now
--- shrink that length from 10 to 2 (which is closer to 5, after all), but now we
--- only have 2 elements to work with, and hence the generated list will now drop
--- from 5 elements to 2. This is not necessarily a problem, because that length
--- 2 can now subsequently shrink further towards closer to the origin (5), but
--- nonetheless it might result in confusing intermediate shrinking steps.
+-- == Note on shrinking predictability
+--
+-- The implementation of 'list' uses a combination of two principles to produce
+-- a list of the desired length:
+--
+-- * We generate a random list /length/ in the specified 'Range', and produce an
+--   initial length of that length
+-- * We then /drop/ elements from the resulting list, whilst still respecting the
+--   specified 'Range'.
+--
+-- This ensures that we will produce a list with a length that tends towards the
+-- origin of the specified 'Range', but whilst still being able to drop elements
+-- from anywhere within the list, rather than just shrinking towards a prefix
+-- (or suffix) from the initial list.
+--
+-- In the case that the specified 'Range' has an origin which is neither the
+-- lower bound nor the upper bound (and only in that case), this combination can
+-- have potentially confusing shrinking behaviour. For example, suppose we have
+-- a range @(0, 10)@ with origin 5. Then we could start by generating an
+-- intermediate list of length of 10 and then subsequently /drop/ 5 elements
+-- from that, resulting in an optimal list length. However, we might now shrink
+-- the /length/ from 10 to 2 (which is closer to 5, after all). Now we only have
+-- 2 elements to work with, and hence the generated list will now drop from 5
+-- elements to 2, even though we were already at the ideal list length. This is
+-- not necessarily a problem, because that length 2 can now subsequently shrink
+-- further towards closer to the origin (5), but nonetheless it might result in
+-- confusing intermediate shrinking steps.
 list :: Range Word -> Gen a -> Gen [a]
 list len gen = do
     -- We do /NOT/ mark this call to 'inRange' as 'withoutShrinking': it could
@@ -172,7 +190,7 @@ list len gen = do
                replicateM (fromIntegral n) $ mark gen
 
     -- Finally, generate the elements we want to keep
-    catMaybes <$> selectAllKept marks
+    catMaybes <$> Marked.selectAllKept marks
 
 -- | Choose random element
 --
@@ -303,7 +321,7 @@ frequencyLookup = \i xs ->
 -- have been swapped with an immediate neighbour.
 shuffle :: [a] -> Gen [a]
 shuffle xs =
-    flip List.applyPermutation xs <$>
+    flip Permutation.apply xs <$>
       permutation (fromIntegral $ length xs)
 
 -- | Generate permutation for a list of length @n@
@@ -320,11 +338,11 @@ shuffle xs =
 -- We make no attempt to make the permutation canonical; doing so makes it
 -- extremely difficult to get predicable shrinking behaviour.
 permutation :: Word -> Gen Permutation
-permutation 0 = return []
-permutation 1 = return []
+permutation 0 = return Permutation.identity
+permutation 1 = return Permutation.identity
 permutation n = do
     swaps <- mapM (mark . genSwap) [n - 1, n - 2 .. 1]
-    catMaybes <$> selectAllKept swaps
+    Permutation.fromSwaps . catMaybes <$> Marked.selectAllKept swaps
   where
     genSwap :: Word -> Gen (Word, Word)
     genSwap i = do
@@ -340,8 +358,9 @@ permutation n = do
 tree :: forall a. Range Word -> Gen a -> Gen (Tree a)
 tree size gen = do
     n <- inRange size
-    t <- Tree.keepAtLeast (Range.origin size) . Tree.propagate <$> go n
-    Tree.genKept t
+    t <- MarkedTree.keepAtLeast (Range.origin size) . MarkedTree.propagate <$>
+           go n
+    MarkedTree.apply t
   where
     go :: Word -> Gen (Tree (Marked Gen a))
     go 0 = return Leaf
@@ -360,20 +379,25 @@ tree size gen = do
 -- | Construct binary search tree
 --
 -- Shrinks by replacing entire subtrees by the empty tree.
-bst :: forall a b. Integral a => (a -> Gen b) -> Interval a -> Gen (Tree (a, b))
+bst :: forall a b.
+     Integral a
+  => (a -> Gen b) -- ^ Generate value given a key
+  -> (a, a)       -- ^ Inclusive range for the keys in the tree
+  -> Gen (Tree (a, b))
 bst gen = go >=> traverse (\a -> (a,) <$> gen a)
   where
-    go :: Interval a -> Gen (Tree a)
-    go i =
-        case Tree.inclusiveBounds i of
-          Nothing       -> pure Leaf
-          Just (lo, hi) -> firstThen id (const Leaf) <*> go' lo hi
+    go :: (a, a) -> Gen (Tree a)
+    go (lo, hi)
+      | lo == hi  = pure $ Branch lo Leaf Leaf
+      | lo > hi   = pure Leaf
+      | otherwise = firstThen id (const Leaf) <*> go' lo hi
 
     -- inclusive bounds, lo <= hi
     go' :: a -> a -> Gen (Tree a)
-    go' lo hi = Branch mid
-            <$> go (Interval (Inclusive lo) (Exclusive mid))
-            <*> go (Interval (Exclusive mid) (Inclusive hi))
+    go' lo hi =
+        Branch mid
+          <$> go (lo, pred mid)
+          <*> go (succ mid, hi)
       where
         -- Go through 'Integer' to avoid overflow
         mid' :: Integer
@@ -386,8 +410,6 @@ bst gen = go >=> traverse (\a -> (a,) <$> gen a)
   Shrink trees
 -------------------------------------------------------------------------------}
 
-type ShrinkTree = Rose.Tree
-
 -- | Generate semi-random path through the tree
 --
 -- Will only construct paths that satisfy the given predicate (typically, a
@@ -398,13 +420,13 @@ type ShrinkTree = Rose.Tree
 --
 -- See also 'pathAny'.
 path :: forall a p n.
-     (a -> IsValidShrink p n) -- ^ Predicate
+     (a -> Either n p) -- ^ Predicate
   -> ShrinkTree a
   -> Gen (Either n (NonEmpty p))
-path validShrink = \(Rose.Node a as) ->
+path validShrink = \(WrapShrinkTree (Rose.Node a as)) ->
     case validShrink a of
-      InvalidShrink n -> pure $ Left n
-      ValidShrink   p -> Right <$> go p as
+      Left  n -> pure $ Left n
+      Right p -> Right <$> go p as
   where
     -- We only want to pick a shrunk value that matches the predicate, but we
     -- potentially waste a /lot/ of work if we first evaluate the predicate for
@@ -431,10 +453,9 @@ path validShrink = \(Rose.Node a as) ->
     checkPred :: Rose.Tree a -> Maybe (p, [Rose.Tree a])
     checkPred (Rose.Node a as) =
        case validShrink a of
-         InvalidShrink _ -> Nothing
-         ValidShrink   b -> Just (b, as)
+         Left  _ -> Nothing
+         Right b -> Just (b, as)
 
 -- | Variation on 'path' without a predicate.
 pathAny :: ShrinkTree a -> Gen (NonEmpty a)
-pathAny = fmap (either absurd id) . path ValidShrink
-
+pathAny = fmap (either absurd id) . path Right

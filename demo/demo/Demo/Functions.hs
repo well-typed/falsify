@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Demo.Functions (tests) where
 
 import Data.Default
@@ -26,5 +28,3 @@ prop_listToBool = do
     Fn (f :: [Word8] -> Bool) <- gen $ Gen.fun (Gen.bool False)
     assert $ P.eq .$ ("lhs", f [3, 1, 4, 2])
                   .$ ("rhs", f [1, 6, 1, 8])
-
-
