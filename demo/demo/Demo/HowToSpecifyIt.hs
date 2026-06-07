@@ -92,8 +92,8 @@ tests = testGroup "Demo.HowToSpecifyIt" [
 
 forAllLists :: ([Int] -> Property a) -> Property a
 forAllLists p = do
-    xs <- gen $ Gen.list (Range.between (0, 100)) $
-            Gen.inRange (Range.between (0, 100))
+    xs <- gen $ Gen.list (Range.inclusive (0, 100)) $
+            Gen.inRange (Range.inclusive (0, 100))
     p xs
 
 prop_reverse_reverse :: Property ()
@@ -213,13 +213,13 @@ fromAscList = \xs ->
 -------------------------------------------------------------------------------}
 
 genBST :: forall k v. Ord k => Gen k -> Gen v -> Gen (BST k v)
-genBST k v = fromList <$> Gen.list (Range.between (0, 100)) ((,) <$> k <*> v)
+genBST k v = fromList <$> Gen.list (Range.inclusive (0, 100)) ((,) <$> k <*> v)
 
 genKey :: Gen Int
-genKey = Gen.inRange $ Range.between (0, 100)
+genKey = Gen.inRange $ Range.inclusive (0, 100)
 
 genValue :: Gen Int
-genValue = Gen.inRange $ Range.between (0, 100)
+genValue = Gen.inRange $ Range.inclusive (0, 100)
 
 {-------------------------------------------------------------------------------
   Section 4: "Approaches to Writing Properties"

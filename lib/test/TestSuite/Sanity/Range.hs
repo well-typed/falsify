@@ -43,7 +43,7 @@ test_between size = do
            ]
    where
      r :: Range Word
-     r = Range.between (0, size - 1)
+     r = Range.inclusive (0, size - 1)
 
      expected, tolerance :: Double
      expected  = 1 / fromIntegral size

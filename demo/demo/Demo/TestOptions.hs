@@ -55,7 +55,7 @@ tests = testGroup "Demo.Simple" [
 -- "Every value between 0 and 100 is between 0 and 100"
 prop_inRange :: Property ()
 prop_inRange = do
-    x :: Word <- gen $ Gen.inRange $ Range.between (0, 100)
+    x :: Word <- gen $ Gen.inRange $ Range.inclusive (0, 100)
     assert $ P.between 0 100 .$ ("x", x)
 
 -- | Invalid property (property that does not hold)
@@ -63,12 +63,12 @@ prop_inRange = do
 -- "Every value between 0 and 100 is even"
 prop_even :: Property ()
 prop_even = do
-    x :: Word <- gen $ Gen.inRange $ Range.between (0, 100)
+    x :: Word <- gen $ Gen.inRange $ Range.inclusive (0, 100)
     assert $ P.even .$ ("x", x)
 
 -- | Like 'prop_even', but discarding tests that fail.
 prop_even_discard :: Property ()
 prop_even_discard = do
-    x :: Word <- gen $ Gen.inRange $ Range.between (0, 100)
+    x :: Word <- gen $ Gen.inRange $ Range.inclusive (0, 100)
     when (odd x) discard
     assert $ P.even .$ ("x", x)

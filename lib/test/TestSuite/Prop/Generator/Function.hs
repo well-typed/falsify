@@ -114,7 +114,7 @@ prop_IntegerToBool =
 prop_IntToInt :: Property ()
 prop_IntToInt =
     testMinimum (P.satisfies ("expected", expected)) $ do
-      fn <- gen $ Gen.fun (Gen.inRange $ Range.between (0, 100))
+      fn <- gen $ Gen.fun (Gen.inRange $ Range.inclusive (0, 100))
       let Fn f = fn
       unless (f 0 == 0 && f 1 == 0) $ testFailed fn
   where

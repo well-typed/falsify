@@ -23,10 +23,14 @@
     - `Test.Falsify.Marked`
     - `Test.Falsify.SampleTree`
     - `Test.Falsify.ShrinkTree`
-* The signature of `path` has been simplified: it no logner uses `IsValidShrink`
+* The signature of `path` has been simplified: it no longer uses `IsValidShrink`
   (which is now internal API)
 * Simplified signature of `bst`, which now only accepts inclusive bounds (#91)
 * Remove deprecated functions `integral` and `enum`
+* Rename `Test.Falsify.Range.between` to `uniform` (#92).
+  This avoid confusion with `Test.Falsify.Predicate.between` (since the values
+  produced by the former do not necessarily satisfy the latter!). Also improved
+  documentation.
 
 ## 0.3.0 -- 2026-03-05
 

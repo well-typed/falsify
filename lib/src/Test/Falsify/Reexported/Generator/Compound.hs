@@ -205,7 +205,7 @@ elem = fmap (\(_before, x, _after) -> x) . pick
 pick :: NonEmpty a -> Gen ([a], a, [a])
 pick = \xs ->
     aux [] (NE.toList xs) <$>
-      inRange (Range.between (0, length xs - 1))
+      inRange (Range.inclusive (0, length xs - 1))
   where
     aux :: [a] -> [a] -> Int -> ([a], a, [a])
     aux _    []     _ = error "pick: impossible"
@@ -274,7 +274,7 @@ frequency gens =
       []    -> error "frequency: no generators with non-zero frequency"
       gens' -> do
         let r :: Range Word
-            r = Range.between (0, sum (map fst gens') - 1)
+            r = Range.inclusive (0, sum (map fst gens') - 1)
         (gen, genIx) <- (\i -> frequencyLookup i gens') <$> inRange r
         perturb genIx gen
   where
@@ -346,8 +346,8 @@ permutation n = do
   where
     genSwap :: Word -> Gen (Word, Word)
     genSwap i = do
-        i' <- inRange $ Range.between (1, i)
-        j  <- inRange $ Range.between (i, 0)
+        i' <- inRange $ Range.inclusive (1, i)
+        j  <- inRange $ Range.inclusive (i, 0)
         return (i', min i' j)
 
 {-------------------------------------------------------------------------------
