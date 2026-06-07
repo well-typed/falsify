@@ -86,14 +86,14 @@ tests = testGroup "TestSuite.Prop.Generator.Compound" [
 prop_list_towardsShorter_shrinking :: Property ()
 prop_list_towardsShorter_shrinking =
     testShrinkingOfGen (P.ge `P.on` P.fn ("length", length)) $
-       Gen.list (Range.between (10, 20)) $
-         Gen.int $ Range.between (0, 1)
+       Gen.list (Range.inclusive (10, 20)) $
+         Gen.int $ Range.inclusive (0, 1)
 
 prop_list_towardsShorter_minimum :: Property ()
 prop_list_towardsShorter_minimum =
     testMinimum (P.satisfies ("expectedLength", (== 10) . length)) $ do
-      xs <- gen $ Gen.list (Range.between (10, 20)) $
-                    Gen.int $ Range.between (0, 1)
+      xs <- gen $ Gen.list (Range.inclusive (10, 20)) $
+                    Gen.int $ Range.inclusive (0, 1)
       unless (pairwiseAll (<=) xs) $ testFailed xs
 
 -- In principle the filtered list can /grow/ in size during shrinking (if
@@ -102,7 +102,7 @@ prop_list_towardsShorterEven_shrinking_wrong :: Property ()
 prop_list_towardsShorterEven_shrinking_wrong =
     testShrinkingOfGen (P.ge `P.on` P.fn ("length", length)) $
        fmap (filter even) $
-         Gen.list (Range.between (10, 20)) $
+         Gen.list (Range.inclusive (10, 20)) $
            Gen.int $ Range.withOrigin (0, 10) 5
 
 -- Although [6,4] is the perfect counter-example here, we don't always get it,
@@ -111,28 +111,28 @@ prop_list_towardsShorterEven_minimum :: Property ()
 prop_list_towardsShorterEven_minimum =
     testMinimum (P.elem .$ ("expected", [[6,4],[8,6]])) $ do
       xs <- gen $ fmap (filter even) $
-                     Gen.list (Range.between (10, 20)) $
+                     Gen.list (Range.inclusive (10, 20)) $
                        Gen.int $ Range.withOrigin (0, 10) 5
       unless (pairwiseAll (<=) xs) $ testFailed xs
 
 prop_list_towardsLonger_shrinking :: Property ()
 prop_list_towardsLonger_shrinking =
     testShrinkingOfGen (P.le `P.on` P.fn ("length", length)) $
-       Gen.list (Range.between (10, 0)) $
-         Gen.int $ Range.between (0, 1)
+       Gen.list (Range.inclusive (10, 0)) $
+         Gen.int $ Range.inclusive (0, 1)
 
 prop_list_towardsLonger_minimum :: Property ()
 prop_list_towardsLonger_minimum =
     testMinimum (P.satisfies ("expectedLength", (== 10) . length)) $ do
-      xs <- gen $ Gen.list (Range.between (10, 0)) $
-                    Gen.int $ Range.between (0, 1)
+      xs <- gen $ Gen.list (Range.inclusive (10, 0)) $
+                    Gen.int $ Range.inclusive (0, 1)
       unless (pairwiseAll (<=) xs) $ testFailed xs
 
 prop_list_towardsOrigin_minimum :: Property ()
 prop_list_towardsOrigin_minimum =
     testMinimum (P.satisfies ("expectedLength", (== 5) . length)) $ do
       xs <- gen $ Gen.list (Range.withOrigin (0, 10) 5) $
-                    Gen.int $ Range.between (0, 1)
+                    Gen.int $ Range.inclusive (0, 1)
       unless (pairwiseAll (<=) xs) $ testFailed xs
 
 {-------------------------------------------------------------------------------
@@ -191,8 +191,8 @@ prop_perm_minimum n =
 prop_tree_towardsSmaller1 :: Property ()
 prop_tree_towardsSmaller1 =
     testMinimum (P.satisfies ("expected", expected)) $ do
-      t <- gen $ Gen.tree (Range.between (0, 100)) $
-                   Gen.int $ Range.between (0, 1)
+      t <- gen $ Gen.tree (Range.inclusive (0, 100)) $
+                   Gen.int $ Range.inclusive (0, 1)
       -- "Every tree is height balanced"
       unless (Tree.isHeightBalanced t) $ testFailed t
   where
@@ -205,8 +205,8 @@ prop_tree_towardsSmaller1 =
 prop_tree_towardsSmaller2 :: Property ()
 prop_tree_towardsSmaller2 =
     testMinimum (P.elem .$ ("expected", expected)) $ do
-      t <- gen $ Gen.tree (Range.between (0, 100)) $
-                   Gen.int $ Range.between (0, 1)
+      t <- gen $ Gen.tree (Range.inclusive (0, 100)) $
+                   Gen.int $ Range.inclusive (0, 1)
       -- "Every tree is weight balanced"
       unless (Tree.isWeightBalanced t) $ testFailed t
   where
@@ -307,15 +307,15 @@ propShrinkingList2 = aux
 genListFrequency :: Gen [Word]
 genListFrequency =
     Gen.frequency [
-        (1, replicateM 1 $ Gen.inRange $ Range.between (0, 10))
-      , (2, replicateM 2 $ Gen.inRange $ Range.between (0, 10))
-      , (3, replicateM 3 $ Gen.inRange $ Range.between (0, 10))
+        (1, replicateM 1 $ Gen.inRange $ Range.inclusive (0, 10))
+      , (2, replicateM 2 $ Gen.inRange $ Range.inclusive (0, 10))
+      , (3, replicateM 3 $ Gen.inRange $ Range.inclusive (0, 10))
       ]
 
 genListMonad :: Gen [Word]
 genListMonad = do
-    n <- Gen.inRange $ Range.between (1, 3)
-    replicateM n $ Gen.inRange $ Range.between (0, 10)
+    n <- Gen.inRange $ Range.inclusive (1, 3)
+    replicateM n $ Gen.inRange $ Range.inclusive (0, 10)
 
 prop_frequency_shrinking :: Property ()
 prop_frequency_shrinking =

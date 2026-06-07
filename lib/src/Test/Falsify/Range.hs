@@ -9,7 +9,7 @@ module Test.Falsify.Range (
     -- * Constructors
     -- ** Linear
   , uniform
-  , between
+  , inclusive
   , enum
   , withOrigin
     -- ** Non-linear
@@ -80,7 +80,7 @@ towards o (r:rs) = Smallest $ fmap aux (r :| rs)
 -- Shrinks towards zero.
 --
 -- If you don't need specific bounds, you should probably use 'uniform' instead
--- of 'between', especially for large bit sizes, because we can more easily
+-- of 'inclusive', especially for large bit sizes, because we can more easily
 -- guarantee a true uniform selection here.
 uniform :: forall a. (Integral a, FiniteBits a, Bounded a) => Range a
 uniform = FromWordN precision $ \x ->
@@ -117,18 +117,22 @@ uniform = FromWordN precision $ \x ->
         maxPos :: Word64
         maxPos = fromIntegral (maxBound :: a)
 
--- | Uniform selection between the given bounds, shrinking towards first bound
+-- | Uniform selection inclusive the given bounds, shrinking towards first bound
+--
+-- NOTE: There is /no/ requirement that the first bound is lower than the
+-- second; indeed, @uniform (0, -1)@ and @uniform (-1, 0)@ are /different/
+-- ranges: the former shrinks towards @0@, the latter towards @-1@.
 --
 -- See also 'uniform'.
-between :: forall a. (Integral a, FiniteBits a) => (a, a) -> Range a
-between = skewedBy 0
+inclusive :: forall a. (Integral a, FiniteBits a) => (a, a) -> Range a
+inclusive = skewedBy 0
 
--- | Variation on 'between' for types that are 'Enum' but not 'Integral'
+-- | Variation on 'inclusive' for types that are 'Enum' but not 'Integral'
 --
 -- This is useful for types such as 'Char'. However, since this relies on
 -- 'Enum', it's limited by the precision of 'Int'.
 enum :: Enum a => (a, a) -> Range a
-enum (x, y) = toEnum <$> between (fromEnum x, fromEnum y)
+enum (x, y) = toEnum <$> inclusive (fromEnum x, fromEnum y)
 
 -- | Selection within the given bounds, shrinking towards the specified origin
 --
@@ -145,10 +149,10 @@ withOrigin (x, y) o
   = Constant x
 
   | o == x
-  = between (x, y)
+  = inclusive (x, y)
 
   | o == y
-  = between (y, x)
+  = inclusive (y, x)
 
 -- Split the range into two halves. We are careful to do this only when needed:
 -- if we didn't (i.e., if the origin /equals/ one of the endpoints), that would
@@ -156,8 +160,8 @@ withOrigin (x, y) o
 -- would be at the origin, we would only ever produce that one value.
   | otherwise =
       towards o [
-          between (o, y)
-        , between (o, x)
+          inclusive (o, y)
+        , inclusive (o, x)
         ]
   where
     originInBounds :: Bool

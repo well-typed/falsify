@@ -49,7 +49,7 @@ test_issue81 = do
 test_issue89 :: Assertion
 test_issue89 = do
     replicateM_ 10 $ do
-      f <- sample (Gen.fun (Gen.inRange (Range.between (0 :: Int, 100))))
+      f <- sample (Gen.fun (Gen.inRange (Range.inclusive (0 :: Int, 100))))
       let x = 0 :: Int8
           y = applyFun f x
       assertBool "inRange" $ 0 <= y && y <= 100

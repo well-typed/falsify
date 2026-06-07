@@ -131,19 +131,19 @@ prop_bool_minimum target =
 
 prop_int_between_shrinking :: (Int, Int) -> Property ()
 prop_int_between_shrinking (x, y)
-  | x <= y    = testShrinkingOfGen P.ge $ Gen.inRange $ Range.between (x, y)
-  | otherwise = testShrinkingOfGen P.le $ Gen.inRange $ Range.between (x, y)
+  | x <= y    = testShrinkingOfGen P.ge $ Gen.inRange $ Range.inclusive (x, y)
+  | otherwise = testShrinkingOfGen P.le $ Gen.inRange $ Range.inclusive (x, y)
 
 prop_int_between_minimum :: (Int, Int) -> Int -> Property ()
 prop_int_between_minimum (x, y) _target | x == y =
     testMinimum (P.expect x) $ do
-      n <- gen $ Gen.inRange $ Range.between (x, y)
+      n <- gen $ Gen.inRange $ Range.inclusive (x, y)
       -- The only value we can produce here is @x@, so no point looking for
       -- anything these (that would just result in all tests being discarded)
       testFailed n
 prop_int_between_minimum (x, y) target =
     testMinimum (P.expect expected) $ do
-      n <- gen $ Gen.inRange $ Range.between (x, y)
+      n <- gen $ Gen.inRange $ Range.inclusive (x, y)
       unless (n == target) $ testFailed n
   where
     expected :: Int

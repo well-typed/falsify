@@ -67,7 +67,7 @@ instance (IsList l, GenDefault tag (Item l), KnownNat mn, KnownNat mx) => GenDef
   genDefault p =
     let bn = fromInteger (natVal (Proxy @mn))
         bx = fromInteger (natVal (Proxy @mx))
-    in fmap (ViaList . fromList) (Gen.list (Range.between (bn, bx)) (genDefault p))
+    in fmap (ViaList . fromList) (Gen.list (Range.inclusive (bn, bx)) (genDefault p))
 
 -- | DerivingVia wrapper for FromString types
 newtype ViaString s (mn :: Nat) (mx :: Nat) = ViaString {unViaString :: s}
@@ -76,7 +76,7 @@ instance (IsString s, GenDefault tag Char, KnownNat mn, KnownNat mx) => GenDefau
   genDefault p =
     let bn = fromInteger (natVal (Proxy @mn))
         bx = fromInteger (natVal (Proxy @mx))
-    in fmap (ViaString . fromString) (Gen.list (Range.between (bn, bx)) (genDefault p))
+    in fmap (ViaString . fromString) (Gen.list (Range.inclusive (bn, bx)) (genDefault p))
 
 {-------------------------------------------------------------------------------
   Generics

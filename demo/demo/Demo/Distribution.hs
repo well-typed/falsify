@@ -45,7 +45,7 @@ prop_fraction p = do
 
 prop_integral :: Word -> Property ()
 prop_integral total = do
-    x <- gen $ Gen.inRange (Range.between (0, total - 1))
+    x <- gen $ Gen.inRange (Range.inclusive (0, total - 1))
     collect "x" [x]
 
 prop_frequency :: Word -> Word -> Word -> Property ()
