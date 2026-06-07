@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module TestSuite.Prop.Generator.Selective (tests) where
 
 import Control.Monad

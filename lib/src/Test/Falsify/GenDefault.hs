@@ -1,29 +1,37 @@
 {-# LANGUAGE UndecidableInstances #-}
 
--- | This module defines something similar to QuickCheck's Arbitrary class along with
--- some DerivingVia helpers. Our version, 'GenDefault', allows one to choose between
--- sets of default generators with a user-defined tag. See 'Test.Falsify.GenDefault.Std' for
--- the standard tag with a few useful instances.
+-- | Default generators
 module Test.Falsify.GenDefault
-  ( GenDefault (..)
-  , ViaTag (..)
-  , ViaIntegral (..)
-  , ViaEnum (..)
-  , ViaList (..)
-  , ViaString (..)
-  , ViaGeneric (..)
+  ( GenDefault(..)
+  , ViaTag(..)
+  , ViaIntegral(..)
+  , ViaEnum(..)
+  , ViaList(..)
+  , ViaString(..)
+  , ViaGeneric(..)
+  , GGenDefault -- opaque
   ) where
 
-import qualified Control.Applicative as Ap
-import Data.Proxy (Proxy (..))
-import GHC.Generics (Generic (..), K1 (..), M1 (..), U1 (..), (:+:) (..), (:*:) (..))
-import Test.Falsify.Generator (Gen)
-import qualified Test.Falsify.Generator as Gen
-import qualified Test.Falsify.Range as Range
 import Data.Bits (FiniteBits)
+import Data.Proxy
 import GHC.Exts (IsList (..), IsString (..))
+import GHC.Generics
 import GHC.TypeLits (KnownNat, natVal, Nat)
 
+import qualified Control.Applicative as Ap
+
+import Test.Falsify.Generator (Gen)
+
+import qualified Test.Falsify.Generator as Gen
+import qualified Test.Falsify.Range     as Range
+
+-- | Default generators
+--
+-- 'GenDefault' is similar to QuickCheck's 'Test.QuickCheck.Arbitrary' class
+-- along with some @deriving via@ helpers. Unlike @Arbitrary@, 'GenDefault'
+-- allows one to choose between sets of default generators with user-defined
+-- tags. See "Test.Falsify.GenDefault.Std" for the standard tag with a few
+-- useful instances.
 class GenDefault tag a where
   -- | Default generator for @a@
   --
@@ -35,6 +43,10 @@ newtype ViaTag tag' a = ViaTag {unViaTag :: a}
 
 instance GenDefault tag' a => GenDefault tag (ViaTag tag' a) where
   genDefault _ = fmap ViaTag (genDefault @tag' Proxy)
+
+{-------------------------------------------------------------------------------
+  Deriving-via helpers for types of specific shape
+-------------------------------------------------------------------------------}
 
 -- | DerivingVia wrapper for Integral types
 newtype ViaIntegral a = ViaIntegral {unViaIntegral :: a}
@@ -66,8 +78,17 @@ instance (IsString s, GenDefault tag Char, KnownNat mn, KnownNat mx) => GenDefau
         bx = fromInteger (natVal (Proxy @mx))
     in fmap (ViaString . fromString) (Gen.list (Range.between (bn, bx)) (genDefault p))
 
+{-------------------------------------------------------------------------------
+  Generics
+-------------------------------------------------------------------------------}
+
+-- | Generic generator construction
+--
+-- For use with t'ViaGeneric'.
 class GGenDefault tag f where
+  {-# MINIMAL #-}
   ggenDefault :: Proxy tag -> Gen (f a)
+  ggenDefault _ = error "ggenDefault not implemented"
 
 instance GGenDefault tag U1 where
   ggenDefault _ = pure U1

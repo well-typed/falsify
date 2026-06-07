@@ -6,7 +6,9 @@ module Test.Falsify.Internal.Range (
 
 import Data.List.NonEmpty (NonEmpty)
 
-import Test.Falsify.Reexported.Generator.Precision
+import Data.Falsify.WordN (WordN)
+
+import qualified Data.Falsify.WordN as WordN
 
 {-------------------------------------------------------------------------------
   Definition
@@ -17,14 +19,14 @@ data Range a where
   -- | Constant (point) range
   Constant :: a -> Range a
 
-  -- | Construct value from 'WordN' of the given precision
+  -- | Construct value from t'WordN' of the given precision
   --
   -- This is the main constructor for 'Range'.
   --
-  -- Typically this 'WordN' is used to construct a fraction which is then used
-  -- to index the range (see 'fromProperFraction'), though some generators use
-  -- the 'WordN' directly.
-  FromWordN :: Precision -> (WordN -> a) -> Range a
+  -- Typically this t'WordN' is used to construct a fraction which is then used
+  -- to index the range (see 'Test.Falsify.Range.fromProperFraction'), though
+  -- some generators use the t'WordN' directly.
+  FromWordN :: WordN.Precision -> (WordN -> a) -> Range a
 
   -- | Evaluate each range and choose the \"smallest\"
   --

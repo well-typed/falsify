@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module TestSuite.Prop.Generator.Prim (tests) where
 
 import Prelude hiding (pred)
@@ -380,4 +382,3 @@ prop_stream_minimum =
     testMinimum (P.expect [0, 0]) $ do
       xs <- gen genStreamPrefix
       unless (pairwiseAll (<) xs) $ testFailed xs
-

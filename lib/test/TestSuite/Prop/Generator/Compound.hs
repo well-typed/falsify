@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module TestSuite.Prop.Generator.Compound (tests) where
 
 import Control.Monad
@@ -7,18 +9,19 @@ import Data.Word
 import Test.Tasty
 import Test.Tasty.Falsify
 
-import qualified Data.Tree as Rose
-
+import Data.Falsify.Permutation (Permutation)
+import Data.Falsify.Tree (Tree(..))
 import Test.Falsify.Predicate (Predicate, (.$))
-import Test.Falsify.Generator (ShrinkTree, Permutation, Tree(..))
+import Test.Falsify.ShrinkTree (ShrinkTree)
 
-import qualified Test.Falsify.Generator as Gen
-import qualified Test.Falsify.Predicate as P
-import qualified Test.Falsify.Range     as Range
+import qualified Data.Falsify.Permutation as Permutation
+import qualified Data.Falsify.Tree        as Tree
+import qualified Test.Falsify.Generator   as Gen
+import qualified Test.Falsify.Predicate   as P
+import qualified Test.Falsify.Range       as Range
+import qualified Test.Falsify.ShrinkTree  as ShrinkTree
 
 import TestSuite.Util.List
-
-import qualified TestSuite.Util.Tree as Tree
 
 tests :: TestTree
 tests = testGroup "TestSuite.Prop.Generator.Compound" [
@@ -40,7 +43,8 @@ tests = testGroup "TestSuite.Prop.Generator.Compound" [
             ]
         ]
     , testGroup "perm" [
-          testProperty "shrinking" prop_perm_shrinking
+          testProperty "invariant" prop_perm_invariant
+        , testProperty "shrinking" prop_perm_shrinking
         , testGroup "minimum" [
               testPropertyWith def{overrideMaxRatio = Just 1000}
                 (show n) $ prop_perm_minimum n
@@ -137,17 +141,26 @@ prop_list_towardsOrigin_minimum =
 
 validPermShrink :: Predicate [Permutation, Permutation]
 validPermShrink = mconcat [
-      P.ge `P.on` P.fn ("numSwaps", length  )
+      P.ge `P.on` P.fn ("numSwaps", Permutation.size  )
     , P.ge `P.on` P.fn ("distance", distance)
     ]
   where
     distance :: Permutation -> Word
-    distance = sum . map weighted
+    distance = sum . map weighted . Permutation.toSwaps
 
+    -- This base 10 is justified only because we are generating permutations
+    -- for lists of length 10.
     weighted :: (Word, Word) -> Word
     weighted (i, j)
       | i < j     = error "unexpected swap"
       | otherwise = (10 ^ i) * (i - j)
+
+prop_perm_invariant :: Property ()
+prop_perm_invariant = do
+    perm <- gen $ Gen.permutation 10
+    assert $
+         P.satisfies ("invariant", Permutation.invariant)
+      .$ ("perm", perm)
 
 prop_perm_shrinking :: Property ()
 prop_perm_shrinking =
@@ -158,12 +171,12 @@ prop_perm_minimum :: Word -> Property ()
 prop_perm_minimum n =
     testMinimum (P.satisfies ("suffixIsUnchanged", suffixIsUnchanged)) $ do
       perm <- gen $ Gen.permutation 10
-      let shuffled = Gen.applyPermutation perm [0 .. 9]
+      let shuffled = Permutation.apply perm [0 .. 9]
       when (shuffled !! fromIntegral n /= n) $ testFailed perm
   where
     suffixIsUnchanged :: Permutation -> Bool
     suffixIsUnchanged perm =
-        case perm of
+        case Permutation.toSwaps perm of
           [(i, j)]   -> i == j + 1 && (i == n || j == n)
           _otherwise -> False
 
@@ -244,7 +257,7 @@ prop_pathAny =
   where
     -- Infinite ShrinkTree containing all strings containing lowercase letters
     st :: ShrinkTree String
-    st = Rose.unfoldTree (\xs -> (xs, map (:xs) ['a' .. 'z'])) ""
+    st = ShrinkTree.unfold "" (\xs -> map (:xs) ['a' .. 'z'])
 
 prop_toShrinkTree :: Property ()
 prop_toShrinkTree =

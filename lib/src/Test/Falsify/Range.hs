@@ -17,8 +17,6 @@ module Test.Falsify.Range (
     -- * Queries
   , origin
     -- * Primitive constructors
-  , ProperFraction(..)
-  , Precision(..)
   , constant
   , fromProperFraction
   , towards
@@ -34,9 +32,11 @@ import Data.Word
 
 import qualified Data.List.NonEmpty as NE
 
-import Test.Falsify.Internal.ProperFraction
+import Data.Falsify.ProperFraction (ProperFraction(..))
+import Data.Falsify.WordN (WordN)
 import Test.Falsify.Internal.Range
-import Test.Falsify.Reexported.Generator.Precision
+
+import qualified Data.Falsify.WordN as WordN
 
 {-------------------------------------------------------------------------------
   Primitive ranges
@@ -52,8 +52,8 @@ constant = Constant
 --
 -- * for all @x <= y@, @f x <= f y@, /or/
 -- * for all @x <= y@, @f y <= f x@
-fromProperFraction :: Precision -> (ProperFraction -> a) -> Range a
-fromProperFraction p f = FromWordN p $ f . mkFraction
+fromProperFraction :: WordN.Precision -> (ProperFraction -> a) -> Range a
+fromProperFraction p f = FromWordN p $ f . WordN.toProperFraction
 
 -- | Generate value in any of the specified ranges, then choose the one
 -- that is closest to the specified origin
@@ -83,13 +83,13 @@ towards o (r:rs) = Smallest $ fmap aux (r :| rs)
 -- of 'between', especially for large bit sizes, because we can more easily
 -- guarantee a true uniform selection here.
 uniform :: forall a. (Integral a, FiniteBits a, Bounded a) => Range a
-uniform = FromWordN precision $ \(WordN _ x) ->
+uniform = FromWordN precision $ \x ->
     if isUnsigned
-      then toUnsigned x
-      else toSigned   x
+      then toUnsigned (WordN.forgetPrecision x)
+      else toSigned   (WordN.forgetPrecision x)
   where
-    precision :: Precision
-    precision = Precision $ fromIntegral $ finiteBitSize (undefined :: a)
+    precision :: WordN.Precision
+    precision = WordN.Precision $ fromIntegral $ finiteBitSize (undefined :: a)
 
     isUnsigned :: Bool
     isUnsigned = signum (-1 :: a) == 1
@@ -317,7 +317,10 @@ skewedBy s (x, y)
 -- This lower bound is verified in "TestSuite.Sanity.Range", which verifies that
 -- for small ranges, the expected distribution is never off by more than 1%
 -- from the actual distribution.
-precisionRequiredToRepresent :: forall a. FiniteBits a => a -> Precision
+--
+-- TODO: it would be nicer to move this to "Data.Falsify.WordN", but this
+-- lower bound of 7 bits is quite hacky. Ideally we'd have a better story here.
+precisionRequiredToRepresent :: forall a. FiniteBits a => a -> WordN.Precision
 precisionRequiredToRepresent x = fromIntegral $
     7 `max` (finiteBitSize (undefined :: a) - countLeadingZeros x)
 
@@ -327,7 +330,7 @@ precisionRequiredToRepresent x = fromIntegral $
 
 -- | Origin of the range (value we shrink towards)
 origin ::  Range a -> a
-origin = runIdentity . eval (\p -> Identity $ WordN p 0)
+origin = runIdentity . eval (\p -> Identity $ WordN.zero p)
 
 {-------------------------------------------------------------------------------
   Evaluation
@@ -338,7 +341,7 @@ origin = runIdentity . eval (\p -> Identity $ WordN p 0)
 -- Most users will probably never need to call this function.
 eval :: forall f a.
      Applicative f
-  => (Precision -> f WordN) -> Range a -> f a
+  => (WordN.Precision -> f WordN) -> Range a -> f a
 eval genWordN = go
   where
     go :: forall x. Range x -> f x

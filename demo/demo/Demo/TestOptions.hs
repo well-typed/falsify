@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Demo.TestOptions (tests) where
 
 import Control.Monad
@@ -70,4 +72,3 @@ prop_even_discard = do
     x :: Word <- gen $ Gen.inRange $ Range.between (0, 100)
     when (odd x) discard
     assert $ P.even .$ ("x", x)
-

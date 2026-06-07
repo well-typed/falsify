@@ -5,6 +5,7 @@ module Test.Falsify.Internal.Generator.Shrinking (
   , ShrinkExplanation(..)
   , ShrinkHistory(..)
   , IsValidShrink(..)
+  , isValidShrink
   , limitShrinkSteps
   , shrinkHistory
   , shrinkOutcome
@@ -15,7 +16,7 @@ import Data.Either
 import Data.List.NonEmpty (NonEmpty((:|)))
 
 import Test.Falsify.Internal.Generator.Definition
-import Test.Falsify.Internal.SampleTree (SampleTree(..))
+import Test.Falsify.SampleTree (SampleTree(..))
 
 {-------------------------------------------------------------------------------
   Explanation
@@ -128,6 +129,10 @@ data IsValidShrink p n =
     ValidShrink p
   | InvalidShrink n
   deriving stock (Show)
+
+isValidShrink :: IsValidShrink p n -> Either n p
+isValidShrink (ValidShrink p)   = Right p
+isValidShrink (InvalidShrink n) = Left n
 
 -- | Find smallest value that the generator can produce and still satisfies
 -- the predicate.

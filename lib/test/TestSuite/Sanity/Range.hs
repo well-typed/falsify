@@ -11,9 +11,10 @@ import Text.Printf
 
 import qualified Data.Map as Map
 
-import Test.Falsify.Generator (WordN(..))
-import Test.Falsify.Range (Range, Precision(..))
+import Data.Falsify.WordN (WordN)
+import Test.Falsify.Range (Range)
 
+import qualified Data.Falsify.WordN as WordN
 import qualified Test.Falsify.Range as Range
 
 tests :: TestTree
@@ -67,10 +68,13 @@ stats :: forall a. Ord a => Range a -> [(a, Percentage)]
 stats r =
     count Map.empty $ Range.eval genWordN r
   where
-    genWordN :: Precision -> [WordN]
-    genWordN (Precision p)
+    genWordN :: WordN.Precision -> [WordN]
+    genWordN (WordN.Precision p)
       | p >= 16   = error $ "stats: precision " ++ show p ++ " too high"
-      | otherwise = [WordN (Precision p) x | x <- [0 .. (2 :: Word64) ^ p - 1]]
+      | otherwise = [
+            WordN.unsafeFromWord64 (WordN.Precision p) x
+          | x <- [0 .. (2 :: Word64) ^ p - 1]
+          ]
 
     count :: Map a Word -> [a] -> [(a, Percentage)]
     count acc (x:xs) = count (Map.alter (Just . (+1) . fromMaybe 0) x acc) xs
@@ -81,5 +85,3 @@ stats r =
 
         asPct :: Word -> Percentage
         asPct c = Percentage (fromIntegral c / fromIntegral total) (c == 0)
-
-

@@ -5,8 +5,7 @@ import Data.Word
 import Test.Tasty
 import Test.Tasty.Falsify
 
-import Test.Falsify.Range (Precision(..))
-
+import qualified Data.Falsify.WordN     as WordN
 import qualified Test.Falsify.Generator as Gen
 import qualified Test.Falsify.Range     as Range
 
@@ -39,7 +38,7 @@ prop_prim total = do
     bucketSize :: Word64
     bucketSize = maxBound `div` fromIntegral total
 
-prop_fraction :: Precision -> Property ()
+prop_fraction :: WordN.Precision -> Property ()
 prop_fraction p = do
     x <- gen $ Gen.properFraction p
     collect "x" [x]
@@ -69,4 +68,3 @@ bucket bucketSize = go 0
     go b value
       | value <= bucketSize = b
       | otherwise           = go (succ b) (value - bucketSize)
-

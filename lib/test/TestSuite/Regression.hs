@@ -12,7 +12,7 @@ import Test.Falsify.Generator (Gen)
 import Test.Falsify.Interactive
 
 import qualified Test.Falsify.Generator as Gen
-import qualified Test.Falsify.Range as Range
+import qualified Test.Falsify.Range     as Range
 
 {-------------------------------------------------------------------------------
   Lists of tests
@@ -51,5 +51,5 @@ test_issue89 = do
     replicateM_ 10 $ do
       f <- sample (Gen.fun (Gen.inRange (Range.between (0 :: Int, 100))))
       let x = 0 :: Int8
-          y = Gen.applyFun f x
+          y = applyFun f x
       assertBool "inRange" $ 0 <= y && y <= 100

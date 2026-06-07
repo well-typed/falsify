@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module TestSuite.Prop.Generator.Shrinking (tests) where
 
 import Control.Monad
@@ -160,6 +162,3 @@ prop_shrinkWith_minimum_list listLength =
       xs <- gen $ Gen.shrinkWith (QuickCheck.shrinkList shrinkWord) $
               replicateM listLength Gen.prim
       unless (pairwiseAll (<=) xs) $ testFailed xs
-
-
-

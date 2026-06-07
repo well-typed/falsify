@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module TestSuite.Prop.Generator.Simple (tests) where
 
 import Control.Monad (unless)
@@ -186,4 +188,3 @@ prop_char_enum_shrinking :: (Char, Char) -> Property ()
 prop_char_enum_shrinking (x, y)
   | x <= y    = testShrinkingOfGen P.ge $ Gen.inRange $ Range.enum (x, y)
   | otherwise = testShrinkingOfGen P.le $ Gen.inRange $ Range.enum (x, y)
-

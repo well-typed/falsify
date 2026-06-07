@@ -1,32 +1,37 @@
+-- | Binary trees
+--
+-- Intended for qualified import.
+--
+-- > import Data.Falsify.Tree (Tree(..))
+-- > import qualified Data.Falsify.Tree as Tree
 module Data.Falsify.Tree (
     Tree(Leaf, Branch)
-    -- * Dealing with marks
-  , propagate
-  , genKept
-  , keepAtLeast
-    -- * Binary search trees
-  , Interval(..)
-  , Endpoint(..)
-  , inclusiveBounds
+    -- * Properties
+  , size
+  , weight
+  , height
+    -- * BST
   , lookup
+    -- * Balancing
+  , isWeightBalanced
+  , isHeightBalanced
     -- * Debugging
-  , drawTree
+  , render
   ) where
 
-import Prelude hiding (drop, lookup)
+import Prelude hiding (lookup)
 
-import Control.Selective (Selective, ifS)
-import Control.Monad.State
 import GHC.Show
 
 import qualified Data.Tree as Rose
-
-import Data.Falsify.Marked
 
 {-------------------------------------------------------------------------------
   Definition
 -------------------------------------------------------------------------------}
 
+-- | Binary tree
+--
+-- Each branch caches the size of the subtree, so that 'size' can be @O(1)@.
 data Tree a =
     Leaf
 
@@ -35,7 +40,7 @@ data Tree a =
   deriving stock (Eq, Functor, Foldable, Traversable)
 
 {-------------------------------------------------------------------------------
-  Tree stats
+  Properties
 -------------------------------------------------------------------------------}
 
 -- | Size of the tree
@@ -44,6 +49,24 @@ data Tree a =
 size :: Tree a -> Word
 size Leaf              = 0
 size (Branch_ s _ _ _) = s
+
+-- | Weight of the tree
+--
+-- The weight of a tree is simply its size plus one.
+--
+-- @O(1)@
+weight :: Tree a -> Word
+weight = succ . size
+
+-- | Height of the tree
+--
+-- The height of a tree is the maximum length from the root to any of the leafs.
+--
+-- @O(1)@
+height :: Tree a -> Word
+height Leaf           = 0
+height (Branch _ l r) = 1 + max (height l) (height r)
+
 
 {-------------------------------------------------------------------------------
   Pattern synonyms that hide the size argument
@@ -78,96 +101,8 @@ instance Show a => Show (Tree a) where
       . showsPrec appPrec1 r
 
 {-------------------------------------------------------------------------------
-  Dealing with marks
--------------------------------------------------------------------------------}
-
--- | Propagate 'Drop' marker down the tree
---
--- This is useful in conjunction with 'genKept', which truncates entire
--- subtrees.
-propagate :: Tree (Marked f a) -> Tree (Marked f a)
-propagate = keep
-  where
-    keep :: Tree (Marked f a) -> Tree (Marked f a)
-    keep Leaf                         = Leaf
-    keep (Branch (Marked Keep x) l r) = Branch (Marked Keep x) (keep l) (keep r)
-    keep (Branch (Marked Drop x) l r) = Branch (Marked Drop x) (drop l) (drop r)
-
-    drop :: Tree (Marked f a) -> Tree (Marked f a)
-    drop = fmap $ \(Marked _ x) -> Marked Drop x
-
--- | Generate those values we want to keep
---
--- Whenever we meet an element marked 'Drop', that entire subtree is dropped.
-genKept :: forall f a. Selective f => Tree (Marked f a) -> f (Tree a)
-genKept = go
-  where
-    go :: Tree (Marked f a) -> f (Tree a)
-    go Leaf                      = pure Leaf
-    go (Branch (Marked m g) l r) = ifS (pure $ m == Keep)
-                                     (Branch <$> g <*> go l <*> go r)
-                                     (pure Leaf)
-
--- | Change enough nodes currently marked as 'Drop' to 'Keep' to ensure at
--- least @n@ nodes are marked 'Keep'.
---
--- Precondition: any 'Drop' marks must have been propagated; see 'propagate'.
--- Postcondition: this property is preserved.
-keepAtLeast :: Word -> Tree (Marked f a) -> Tree (Marked f a)
-keepAtLeast = \n t ->
-    let kept = countKept t
-    in if kept >= n
-         then t
-         else evalState (go t) (n - kept)
-  where
-    go :: Tree (Marked f a) -> State Word (Tree (Marked f a))
-    go   Leaf                         = return Leaf
-    go   (Branch (Marked Keep x) l r) = Branch (Marked Keep x) <$> go l <*> go r
-    go t@(Branch (Marked Drop x) l r) = get >>= \case
-         0 ->
-           -- Nothing left to drop
-           return t
-         n | size t <= n -> do
-          -- We can keep the entire subtree
-          put $ n - size t
-          return $ fmap (Marked Keep . unmark) t
-         n ->  do
-          -- We cannot delete the entire subtree. In order to preserve the
-          -- "drop property", we /must/ mark this node as 'Keep'
-          put $ n - 1
-          Branch (Marked Keep x) <$> go l <*> go r
-
-{-------------------------------------------------------------------------------
   BST
 -------------------------------------------------------------------------------}
-
-data Endpoint a = Inclusive a | Exclusive a
-data Interval a = Interval (Endpoint a) (Endpoint a)
-
--- | Compute interval with inclusive bounds, without exceeding range
---
--- Returns 'Nothing' if the interval is empty, and @Just@ the inclusive
--- lower and upper bound otherwise.
-inclusiveBounds :: forall a. (Ord a, Enum a) => Interval a -> Maybe (a, a)
-inclusiveBounds = \(Interval lo hi) -> go lo hi
-  where
-    -- The inequality checks in @go@ justify the use of @pred@ or @succ@
-    go :: Endpoint a -> Endpoint a -> Maybe (a, a)
-    go (Inclusive lo) (Inclusive hi)
-      | lo <= hi  = Just (lo, hi)
-      | otherwise = Nothing
-    go (Exclusive lo) (Inclusive hi)
-      | lo < hi   = Just (succ lo, hi)
-      | otherwise = Nothing
-    go (Inclusive lo) (Exclusive hi)
-      | lo < hi   = Just (lo, pred hi)
-      | otherwise = Nothing
-    go (Exclusive lo) (Exclusive hi)
-      | lo < hi   = if succ lo > pred hi
-                      then Nothing
-                      else Just (succ lo, pred hi)
-      | otherwise = Nothing
-
 
 -- | Look value up in BST
 --
@@ -181,11 +116,59 @@ lookup a' (Branch (a, b) l r)
 lookup _ Leaf = Nothing
 
 {-------------------------------------------------------------------------------
+  Balancing
+-------------------------------------------------------------------------------}
+
+-- | Check if the tree is weight-balanced
+--
+-- A tree is weight-balanced if the weights of the subtrees does not differ
+-- by more than a factor 3.
+--
+-- See "Balancing weight-balanced trees", Hirai and Yamamoto, JFP 21(3), 2011.
+isWeightBalanced :: Tree a -> Bool
+isWeightBalanced = checkBalanceCondition isBalanced
+  where
+    delta :: Word
+    delta = 3
+
+    isBalanced :: Tree a -> Tree a -> Bool
+    isBalanced a b = and [
+          delta * weight a >= weight b
+        , delta * weight b >= weight a
+        ]
+
+-- | Check if a tree is height-balanced
+--
+-- A tree is height balanced if the heights of its subtrees do not differ
+-- by more than one.
+isHeightBalanced :: Tree a -> Bool
+isHeightBalanced = checkBalanceCondition isBalanced
+  where
+    isBalanced :: Tree a -> Tree a -> Bool
+    isBalanced a b = or [
+          (height a <= height b) && (height b - height a <= 1)
+        , (height b <= height a) && (height a - height b <= 1)
+        ]
+
+-- | Internal auxiliary: check given tree balance condition
+--
+-- Property @p l r@ will be checked at every branch in the tree.
+checkBalanceCondition :: forall a. (Tree a -> Tree a -> Bool) -> Tree a -> Bool
+checkBalanceCondition p = go
+  where
+    go :: Tree a -> Bool
+    go Leaf           = True
+    go (Branch _ l r) = and [p l r, go l, go r]
+
+{-------------------------------------------------------------------------------
   Debugging
 -------------------------------------------------------------------------------}
 
-drawTree :: Tree String -> String
-drawTree = Rose.drawTree . conv
+-- | Render tree
+--
+-- This is intended for debugging only.
+render :: Tree String -> String
+render = Rose.drawTree . conv
   where
     conv :: Tree String -> Rose.Tree String
     conv Leaf           = Rose.Node "*" []

@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module TestSuite.Prop.Generator.Function (tests) where
 
 import Control.Monad
@@ -8,11 +10,11 @@ import Test.Tasty.Falsify
 
 import qualified Data.Set as Set
 
-import Test.Falsify.Generator (Fun)
+import Test.Falsify.Fun
 
 import qualified Test.Falsify.Generator as Gen
 import qualified Test.Falsify.Predicate as P
-import qualified Test.Falsify.Range as Range
+import qualified Test.Falsify.Range     as Range
 
 tests :: TestTree
 tests = testGroup "TestSuite.Prop.Generator.Function" [

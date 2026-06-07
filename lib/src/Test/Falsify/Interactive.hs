@@ -8,9 +8,10 @@ module Test.Falsify.Interactive (
     -- * Re-exports
   , module Test.Falsify.Property
     -- ** Functions
-  , pattern Gen.Fn
-  , pattern Gen.Fn2
-  , pattern Gen.Fn3
+  , applyFun
+  , pattern Fn
+  , pattern Fn2
+  , pattern Fn3
   ) where
 
 import Data.Bifunctor
@@ -20,15 +21,15 @@ import System.Random.SplitMix
 
 import qualified Data.List.NonEmpty as NE
 
+import Test.Falsify.Fun
 import Test.Falsify.Internal.Driver.ReplaySeed
 import Test.Falsify.Internal.Generator
 import Test.Falsify.Internal.Generator.Shrinking
 import Test.Falsify.Internal.Property
 import Test.Falsify.Property
 
-import qualified Test.Falsify.Generator           as Gen
-import qualified Test.Falsify.Internal.Driver     as Driver
-import qualified Test.Falsify.Internal.SampleTree as SampleTree
+import qualified Test.Falsify.Internal.Driver as Driver
+import qualified Test.Falsify.SampleTree      as SampleTree
 
 -- | Sample generator
 sample :: Gen a -> IO a

@@ -2,8 +2,6 @@
 module Test.Falsify.Reexported.Generator.Simple (
     bool
   , inRange
-  , integral
-  , enum
   , int
   ) where
 
@@ -14,10 +12,11 @@ import Data.Word
 
 import Test.Falsify.Internal.Generator
 import Test.Falsify.Internal.Range
-import Test.Falsify.Internal.SampleTree (Sample(..), sampleValue)
 import Test.Falsify.Reexported.Generator.Precision
+import Test.Falsify.SampleTree (Sample(..))
 
-import qualified Test.Falsify.Range as Range
+import qualified Test.Falsify.Range      as Range
+import qualified Test.Falsify.SampleTree as SampleTree
 
 {-------------------------------------------------------------------------------
   Simple generators
@@ -27,7 +26,7 @@ import qualified Test.Falsify.Range as Range
 --
 -- Chooses with equal probability between 'True' and 'False'.
 bool :: Bool -> Gen Bool
-bool target = aux . sampleValue <$> primWith shrinker
+bool target = aux . SampleTree.sampleValue <$> primWith shrinker
   where
     aux :: Word64 -> Bool
     aux x | msbSet x  = not target
@@ -48,17 +47,6 @@ bool target = aux . sampleValue <$> primWith shrinker
 inRange :: Range a -> Gen a
 inRange r = Range.eval wordN r
 
--- | Deprecated alias for 'inRange'
-integral :: Range a -> Gen a
-{-# DEPRECATED integral "Use inRange instead" #-}
-integral = inRange
-
--- | Deprecated alias for 'inRange'
-enum :: Range a -> Gen a
-{-# DEPRECATED enum "Use inRange instead" #-}
-enum = inRange
-
 -- | Type-specialization of 'inRange'
 int :: Range Int -> Gen Int
 int = inRange
-

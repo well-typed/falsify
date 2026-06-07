@@ -1,4 +1,4 @@
-module Data.Falsify.Integer (
+module Data.Falsify.Internal.Integer (
     -- * Encoding
     Bit(..)
   , encIntegerEliasG

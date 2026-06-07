@@ -1,3 +1,6 @@
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TypeApplications  #-}
+
 -- | Examples from "How to Specify It!: A Guide to Writing Properties of Pure
 -- Functions", John Hughes, 2020, LNCS 12053.
 module Demo.HowToSpecifyIt (tests) where
@@ -526,7 +529,7 @@ prop_measureWith key = do
     t <- genWith (Just . showBST) $ genBST key genValue
     k <- gen key
     collect "present" [k `elem` keys t]
-    collect "where" $ if
+    collect @String "where" $ if
       | t == nil            -> ["empty"]
       | keys t == [k]       -> ["just k"]
       | all (>= k) (keys t) -> ["at start"]

@@ -16,13 +16,13 @@ module Test.Tasty.Falsify (
     -- ** Generators
   , Gen
     -- ** Functions
-  , pattern Gen.Fn
-  , pattern Gen.Fn2
-  , pattern Gen.Fn3
+  , applyFun
+  , pattern Fn
+  , pattern Fn2
+  , pattern Fn3
   ) where
 
+import Test.Falsify.Fun
 import Test.Falsify.Generator (Gen)
 import Test.Falsify.Internal.Driver.Tasty
 import Test.Falsify.Property
-
-import qualified Test.Falsify.Reexported.Generator.Function as Gen

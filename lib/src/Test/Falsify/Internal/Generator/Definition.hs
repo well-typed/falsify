@@ -23,10 +23,11 @@ import Optics.Core (Lens', (%))
 
 import qualified Optics.Core as Optics
 
-import Data.Falsify.Integer (Bit(..), encIntegerEliasG)
-import Test.Falsify.Internal.SampleTree (SampleTree(..), Sample (..), pattern Inf)
+import Data.Falsify.Internal.Integer (Bit(..), encIntegerEliasG)
 import Test.Falsify.Internal.Search
+import Test.Falsify.SampleTree (SampleTree(..), pattern Inf, Sample(..))
 
+import qualified Test.Falsify.SampleTree          as SampleTree
 import qualified Test.Falsify.Internal.SampleTree as SampleTree
 
 {-------------------------------------------------------------------------------
@@ -60,9 +61,9 @@ import qualified Test.Falsify.Internal.SampleTree as SampleTree
 -- 'Test.Falsify.Generator.Compound.list' generator for this purpose, which
 -- improves on this in a few ways).
 --
--- NOTE: 'Gen' is /NOT/ an instance of 'Alternative'; this would not be
--- compatible with the generation of infinite data structures. For the same
--- reason, we do not have a monad transformer version of Gen either.
+-- NOTE: t'Gen' is /NOT/ an instance of 'Control.Applicative.Alternative'; this
+-- would not be compatible with the generation of infinite data structures. For
+-- the same reason, we do not have a monad transformer version of t'Gen' either.
 newtype Gen a = Gen { runGen :: SampleTree -> (a, [SampleTree]) }
   deriving stock (Functor)
 
@@ -132,7 +133,7 @@ bindWithoutShortcut x f = Gen $ \(Inf s l r) ->
 
 -- | Get the value produced by the generator on the minimal sample tree.
 --
--- Having `Gen a` is a proof that `a` is inhabited, so this function
+-- Having @Gen a@ is a proof that @a@ is inhabited, so this function
 -- gives access to a witness.
 minimalValue :: Gen a -> a
 minimalValue g = fst (runGen g Minimal)

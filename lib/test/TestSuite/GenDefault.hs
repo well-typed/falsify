@@ -73,7 +73,7 @@ genCases =
 
 testGenCase :: GenCase -> TestTree
 testGenCase (GenCase name gen) = testCase name $ do
-  xs <- fmap Set.fromList (replicateM 10 (FI.sample gen))
+  xs <- fmap Set.fromList (replicateM 20 (FI.sample gen))
   assertBool "generates more than one value" (Set.size xs > 1)
 
 tests :: TestTree
