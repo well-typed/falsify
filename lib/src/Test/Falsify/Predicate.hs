@@ -7,9 +7,184 @@
 -- > import Test.Falsify.Predicate (Predicate, (.$))
 -- > import qualified Test.Falsify.Predicate as P
 --
--- = Overview
+-- = Motivation
 --
--- TODO
+-- Testing libraries must have a way to assert and check intended-to-be-true
+-- facts. For example, suppose we have
+--
+-- > x, y :: Int
+-- > x = 5
+-- > y = 10
+--
+-- and we want to assert that @x@ and @y@ are equal. The simplest form that this
+-- might take is simply a boolean predicate; for example, @tasty-hunit@ offers
+-- [`assertBool`](https://hackage-content.haskell.org/package/tasty-hunit-0.10.2/docs/Test-Tasty-HUnit.html#v:assertBool),
+-- and in @QuickCheck@ we have a
+-- [`Testable`](https://hackage-content.haskell.org/package/QuickCheck-2.18.0.0/docs/Test-QuickCheck.html#t:Testable)
+-- instance for 'Bool'. This allows us to write
+--
+-- > test_hunit_bool :: HUnit.Assertion
+-- > test_hunit_bool = HUnit.assertBool "uhoh" $ x == y
+-- >
+-- > test_qc_bool :: QuickCheck.Property
+-- > test_qc_bool = QuickCheck.property $ x == y
+--
+-- However, when such a property fails we don't get very useful output; we are
+-- merely told /that/ the property failed. Both @tasty-hunit@ and @QuickCheck@
+-- offer limited support for producing nicer test ouput; in the specific case of
+-- equality, we can write
+--
+-- > test_hunit_equal :: HUnit.Assertion
+-- > test_hunit_equal = HUnit.assertEqual "uhoh" x y
+-- >
+-- > test_qc_equal :: QuickCheck.Property
+-- > test_qc_equal = QuickCheck.property $ x QuickCheck.=== y
+--
+-- instead, which would produce output
+--
+-- > uhoh
+-- > expected: 5
+-- >  but got: 10 (expected failure)
+--
+-- and
+--
+-- > *** Failed! Falsified (after 1 test):
+-- > 5 /= 10
+--
+-- respectively, where we are not only told that the property failed, but also
+-- /how/; in this case, what the values of @x@ and @y@ are. /Predicates/ in
+-- @falsify@ as a generalization of this concept.
+--
+-- = Introduction to predicates
+--
+-- Think of a predicate of type 'Predicate' @'[a, b, ..]@ as a function
+-- @a -> b -> .. -> Bool@, which can additionally produce useful test output
+-- when the predicate does not hold. In order be able to produce that output, a
+-- predicate is equipped with a function to generate a description of the
+-- failure, given a description of the inputs; those inputs are described by
+-- /expressions/ ('Expr'). For example, here is a very simple way in which we
+-- might define a predicate to check that its argument is 'even':
+--
+-- > even1 :: Integral a => Predicate '[a]
+-- > even1 = P.unary even $ \a -> "not even: " ++ P.prettyExpr a
+--
+-- When a predicate is applied to an argument, it must be told how to /name/
+-- that argument, how to /render/ the argument, and the /value/ of the argument.
+-- For example,
+--
+-- > test_even1 :: Property ()
+-- > test_even1 = assert $ even1 `P.at` ("x", show x, x)
+--
+-- will result in
+--
+-- >  even1:   FAIL
+-- >    failed after 0 shrinks
+-- >    not even: x
+-- >    x: 5
+--
+-- Typically we will use 'show' to render the argument, in which case we can
+-- use '.$':
+--
+-- > test_even2 :: Property ()
+-- > test_even2 = assert $ even1 .$ ("x", x)
+--
+-- This scales nicely to any number of arguments; for example, to come back the
+-- equality example from the previous section:
+--
+-- > test_equal :: Property ()
+-- > test_equal = assert $
+-- >     P.eq .$ ("x", x)
+-- >          .$ ("y", y)
+--
+-- will produce
+--
+-- > equal:   FAIL
+-- >   failed after 0 shrinks
+-- >   x /= y
+-- >   x: 5
+-- >   y: 10
+--
+-- = Compositionality
+--
+-- Suppose that we want to verify that @x@ and @y@ have the same polarity (both
+-- are even or both are odd). We /could/ use 'eq' again:
+--
+-- > test_samePolarity1 :: Property ()
+-- > test_samePolarity1 = assert $
+-- >     P.eq .$ ("even x", even x)
+-- >          .$ ("even y", even y)
+--
+-- but if we run that, we get
+--
+-- >  samePolarity1: FAIL
+-- >    failed after 0 shrinks
+-- >    even x /= even y
+-- >    even x: False
+-- >    even y: True
+--
+-- In order to debug the problem, we might like to the value of @x@ and @y@, not
+-- just whether they are even or not. We could instead define a custom predicate
+-- specifically for this purpose:
+--
+-- > samePolarity :: Integral a => Predicate '[a, a]
+-- > samePolarity =
+-- >     P.binary
+-- >       (\a b -> even a == even b)
+-- >       (\a b -> P.prettyExpr a ++ " and " ++ P.prettyExpr b ++ " have different polarity")
+-- >
+-- > test_samePolarity2 :: Property ()
+-- > test_samePolarity2 = assert $ samePolarity .$ ("x", x) .$ ("y", y)
+--
+-- which would produce
+--
+-- > samePolarity2: FAIL
+-- >   failed after 0 shrinks
+-- >   x and y have different polarity
+-- >   x: 5
+-- >   y: 10
+--
+-- but now we have the opposite problem: we see the values of @x@ and @y@, but
+-- not their polarity. Fortunately, we can take advantage of the
+-- compositionality of predicates, and state very directly that the function
+-- 'even', applied 'on' both arguments, must produce the same result:
+--
+-- > samePolarity' :: Integral a => Predicate '[a, a]
+-- > samePolarity' = P.eq `P.on` P.fn ("even", even)
+-- >
+-- > test_samePolarity3 :: Property ()
+-- > test_samePolarity3 = assert $
+-- >     samePolarity'
+-- >       .$ ("x", x)
+-- >       .$ ("y", y)
+--
+-- produces
+--
+-- > samePolarity3: FAIL
+-- >   failed after 0 shrinks
+-- >   (even x) /= (even y)
+-- >   x     : 5
+-- >   y     : 10
+-- >   even x: False
+-- >   even y: True
+--
+-- Occassionally it is useful to suppress the results of functions applications;
+-- for example, suppose we have
+--
+-- > newtype T = WrapT Int
+-- >   deriving stock (Show)
+-- >
+-- > unwrapT :: T -> Int
+-- > unwrapT (WrapT a) = a
+--
+-- and we want to check whether @X 5@ and @X 10@ have the same polarity; in this
+-- case, there isn't much point explicitly including the output of @unwrapT@,
+-- so we can suppress it with 'transparent':
+--
+-- > test_samePolarity4 :: Property ()
+-- > test_samePolarity4 = assert $
+-- >     samePolarity' `P.on` P.transparent unwrapT
+-- >       .$ ("x", WrapT 5)
+-- >       .$ ("y", WrapT 10)
 module Test.Falsify.Predicate (
     Predicate -- opaque
     -- * Expressions
@@ -266,7 +441,7 @@ data Predicate :: [Type] -> Type where
   -- | Function compostion
   Dot :: Predicate (x' : xs) -> Fn x x' -> Predicate (x : xs)
 
-  -- | Analogue of 'Control.Arrow.(***)'
+  -- | Analogue of '(Control.Arrow.***)'
   Split :: Predicate (x' : y' : xs) -> (Fn x x', Fn y y') -> Predicate (x : y : xs)
 
   -- | Analogue of 'Prelude.flip'
