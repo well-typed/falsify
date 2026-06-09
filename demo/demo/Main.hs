@@ -6,6 +6,7 @@ import qualified Demo.Blogpost
 import qualified Demo.Distribution
 import qualified Demo.Functions
 import qualified Demo.HowToSpecifyIt
+import qualified Demo.Predicates
 import qualified Demo.TestOptions
 import qualified Demo.TestShrinking
 
@@ -17,4 +18,5 @@ main = defaultMain $ testGroup "demo" [
     , Demo.Distribution.tests
     , Demo.HowToSpecifyIt.tests
     , Demo.Blogpost.tests
+    , Demo.Predicates.tests
     ]

@@ -321,14 +321,14 @@ prop_selective_either_shrinking_wrong =
 
 prop_captureLocalTree_shrinking1 :: Property ()
 prop_captureLocalTree_shrinking1 =
-    testShrinkingOfGen P.alwaysFail $
+    testShrinkingOfGen (P.fail "Fail") $
       Gen.captureLocalTree
 
 -- Check that we /still/ cannot shrink (i.e., monadic bind is not
 -- introducing a bug somewhere)
 prop_captureLocalTree_shrinking2 :: Property ()
 prop_captureLocalTree_shrinking2 =
-    testShrinkingOfGen P.alwaysFail $ do
+    testShrinkingOfGen (P.fail "Fail") $ do
       t1 <- Gen.captureLocalTree
       t2 <- Gen.captureLocalTree
       return (t1, t2)
@@ -359,7 +359,7 @@ genStreamPrefix = prefix <$> genStream <*> Gen.exhaustive 10
 -- | Check that we can test shrinking of infinite structures /at all/
 prop_stream_shrinking1 :: Property ()
 prop_stream_shrinking1 =
-    testShrinkingOfGen P.alwaysPass $
+    testShrinkingOfGen P.pass $
       genStreamPrefix
 
 -- | Check that we shrink in the way we expect

@@ -38,6 +38,10 @@ common lang
       NumericUnderscores
       ScopedTypeVariables
 
+  if (impl(ghc >= 9.2))
+    ghc-options:
+      -Wunused-packages
+
 executable demo
   import:
       lang
@@ -50,6 +54,7 @@ executable demo
       Demo.Distribution
       Demo.Functions
       Demo.HowToSpecifyIt
+      Demo.Predicates
       Demo.TestOptions
       Demo.TestShrinking
   build-depends:
@@ -60,7 +65,9 @@ executable demo
     , selective
     , splitmix
     , tasty
+    , tasty-expected-failure
     , tasty-hunit
+    , tasty-quickcheck
     , vector
 
 executable template
