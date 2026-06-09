@@ -2,9 +2,9 @@
 --
 -- Intended for qualified import.
 --
--- > import Data.Falsify.Concrete ((:->)(..))
--- > import qualified Data.Falsify.Concrete as Concrete
-module Data.Falsify.Concrete (
+-- > import Data.Falsify.ConcreteFun ((:->)(..))
+-- > import qualified Data.Falsify.ConcreteFun as ConcreteFun
+module Data.Falsify.ConcreteFun (
     (:->)(..)
     -- * Construction
   , map

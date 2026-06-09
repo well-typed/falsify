@@ -102,7 +102,7 @@ library
       Test.Tasty.Falsify
 
       -- General purpose datatypes
-      Data.Falsify.Concrete
+      Data.Falsify.ConcreteFun
       Data.Falsify.Permutation
       Data.Falsify.ProperFraction
       Data.Falsify.Tree

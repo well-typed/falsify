@@ -17,13 +17,13 @@ import Numeric.Natural
 
 import qualified Data.Ratio as Ratio
 
-import Data.Falsify.Concrete ((:->)(..))
+import Data.Falsify.ConcreteFun ((:->)(..))
 import Test.Falsify.Fun
 import Test.Falsify.Internal.Generator (Gen)
 import Test.Falsify.Reexported.Generator.Compound
 import Test.Falsify.Reexported.Generator.Shrinking
 
-import qualified Data.Falsify.Concrete as Concrete
+import qualified Data.Falsify.ConcreteFun as ConcreteFun
 
 {-------------------------------------------------------------------------------
   Functions that can be shrunk and shown
@@ -77,7 +77,7 @@ class Function a where
   function :: Gen b -> Gen (a :-> b)
 
   default function :: (Generic a, GFunction (Rep a)) => Gen b -> Gen (a :-> b)
-  function gen = Concrete.map from to <$> gFunction gen
+  function gen = ConcreteFun.map from to <$> gFunction gen
 
 instance Function Word8 where function = table
 instance Function Int8  where function = table
@@ -97,7 +97,7 @@ instance Function Float  where function = realFrac
 instance Function Double where function = realFrac
 
 instance (Integral a, Function a) => Function (Ratio a) where
-  function = fmap (Concrete.map toPair fromPair) . function
+  function = fmap (ConcreteFun.map toPair fromPair) . function
     where
       toPair :: Ratio a -> (a, a)
       toPair r = (Ratio.numerator r, Ratio.denominator r)
@@ -106,7 +106,7 @@ instance (Integral a, Function a) => Function (Ratio a) where
       fromPair (n, d) = n Ratio.% d
 
 instance Function Char where
-  function = fmap (Concrete.map ord chr) . function
+  function = fmap (ConcreteFun.map ord chr) . function
 
 -- instances that depend on generics
 
@@ -184,7 +184,7 @@ instance
 
 integral :: Integral a => Gen b -> Gen (a :-> b)
 integral =
-      fmap (Concrete.map
+      fmap (ConcreteFun.map
              (fmap bytes  . toSignedNatural   . toInteger)
              (fromInteger . fromSignedNatural . fmap unbytes)
            )
@@ -199,7 +199,7 @@ integral =
     unbytes (w:ws) = fromIntegral w + 256 * unbytes ws
 
 realFrac :: RealFrac a => Gen b -> Gen (a :-> b)
-realFrac = fmap (Concrete.map toRational fromRational) . function
+realFrac = fmap (ConcreteFun.map toRational fromRational) . function
 
 data Signed a = Pos a | Neg a
   deriving stock (Show, Functor, Generic)
@@ -227,13 +227,13 @@ class GFunction f where
   gFunction = error "gFunction not implemented"
 
 instance GFunction f => GFunction (M1 i c f) where
-  gFunction = fmap (Concrete.map unM1 M1) . gFunction @f
+  gFunction = fmap (ConcreteFun.map unM1 M1) . gFunction @f
 
 instance GFunction V1 where
   gFunction _ = pure Nil
 
 instance GFunction U1 where
-  gFunction = fmap (Concrete.map unwrap wrap) . unit
+  gFunction = fmap (ConcreteFun.map unwrap wrap) . unit
     where
       unwrap :: U1 p -> ()
       unwrap _ = ()
@@ -242,7 +242,7 @@ instance GFunction U1 where
       wrap _ = U1
 
 instance (GFunction f, GFunction g) => GFunction (f :*: g) where
-  gFunction = fmap (Concrete.map unwrap wrap) . prod (gFunction @f) (gFunction @g)
+  gFunction = fmap (ConcreteFun.map unwrap wrap) . prod (gFunction @f) (gFunction @g)
     where
       unwrap :: (f :*: g) p -> (f p, g p)
       unwrap (x :*: y) = (x, y)
@@ -252,7 +252,7 @@ instance (GFunction f, GFunction g) => GFunction (f :*: g) where
 
 instance (GFunction f, GFunction g) => GFunction (f :+: g) where
   gFunction =
-      fmap (Concrete.map unwrap wrap) . sum (gFunction @f) (gFunction @g)
+      fmap (ConcreteFun.map unwrap wrap) . sum (gFunction @f) (gFunction @g)
     where
       unwrap :: (f :+: g) p -> Either (f p) (g p)
       unwrap (L1 x) = Left  x
@@ -263,4 +263,4 @@ instance (GFunction f, GFunction g) => GFunction (f :+: g) where
       wrap (Right y) = R1 y
 
 instance Function a => GFunction (K1 i a) where
-  gFunction = fmap (Concrete.map unK1 K1) . function @a
+  gFunction = fmap (ConcreteFun.map unK1 K1) . function @a
