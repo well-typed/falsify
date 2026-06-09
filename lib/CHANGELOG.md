@@ -31,6 +31,11 @@
   This avoid confusion with `Test.Falsify.Predicate.between` (since the values
   produced by the former do not necessarily satisfy the latter!). Also improved
   documentation.
+* Predicates `alwaysPass` and `alwaysFail` have been renamed to `pass` and
+  `fail` respectively, and `fail` now takes an error messages. The new names
+  are a more natural fit when used together with `lam` to construct predicates
+  of arbitrary arity. To consider the old `alwaysFail`, use `Fail "Fail"`.
+* Predicate documentation has been significantly improved.
 
 ## 0.3.0 -- 2026-03-05
 

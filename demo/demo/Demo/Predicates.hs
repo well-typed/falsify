@@ -47,6 +47,9 @@ tests = Tasty.expectFail $ testGroup "Demo.Predicates" [
         , Falsify.testProperty "samePolarity3" test_samePolarity3
         , Falsify.testProperty "samePolarity4" test_samePolarity4
         ]
+    , testGroup "Other" [
+          Falsify.testProperty "realVsModel" test_realVsModel
+        ]
     ]
 
 {-------------------------------------------------------------------------------
@@ -127,3 +130,45 @@ test_samePolarity4 = assert $
     samePolarity' `P.on` P.transparent unwrapT
       .$ ("x", WrapT 5)
       .$ ("y", WrapT 10)
+
+{-------------------------------------------------------------------------------
+  N-ary predicates
+-------------------------------------------------------------------------------}
+
+type Policy    = String
+type Operation = String
+type Resource  = String
+type Actor     = String
+
+policy :: Policy
+policy = "strict"
+
+operation :: Operation
+operation = "delete"
+
+resource :: Resource
+resource = "db"
+
+actor :: Actor
+actor = "joe"
+
+applyReal, applyModel :: Policy -> Operation -> Resource -> Actor -> Bool
+applyReal  _ _ _ _ = False
+applyModel _ _ _ _ = True
+
+realVsModel :: Predicate '[Policy, Operation, Resource, Actor]
+realVsModel = P.lam $ \p -> P.lam $ \o -> P.lam $ \r -> P.lam $ \a ->
+    let real  = applyReal  p o r a
+        model = applyModel p o r a
+    in if real == model then
+         P.pass
+       else
+         P.fail $ "real says " ++ show real ++ ", model says " ++ show model
+
+test_realVsModel :: Property ()
+test_realVsModel = assert $
+    realVsModel
+      .$ ( "policy"    , policy    )
+      .$ ( "operation" , operation )
+      .$ ( "resource"  , resource  )
+      .$ ( "actor"     , actor     )

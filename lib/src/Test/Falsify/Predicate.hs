@@ -185,6 +185,52 @@
 -- >     samePolarity' `P.on` P.transparent unwrapT
 -- >       .$ ("x", WrapT 5)
 -- >       .$ ("y", WrapT 10)
+--
+-- = N-ary predicates
+--
+-- Most predicates are either 'unary' or 'binary'; these can usually easily be
+-- defined using 'satisfies' and 'relatedBy' respectively, which will take care
+-- of producing a nice error message. In the general case you can construct
+-- predicates of arbitrary arity using 'lam', 'pass' and 'fail', though in that
+-- case you will be responsible for constructing your own error messages.
+--
+-- For example, suppose we have a "real" implementation of some kind of security
+-- policy implementation as well as a "model" implementation:
+--
+-- > applyReal, applyModel :: Policy -> Operation -> Resource -> Actor -> Bool
+--
+-- Then we could define a predicate that compares these two as follows:
+--
+-- > realVsModel :: Predicate '[Policy, Operation, Resource, Actor]
+-- > realVsModel = P.lam $ \p -> P.lam $ \o -> P.lam $ \r -> P.lam $ \a ->
+-- >     let real  = applyReal  p o r a
+-- >         model = applyModel p o r a
+-- >     in if real == model then
+-- >          P.pass
+-- >        else
+-- >          P.fail $ "real says " ++ show real ++ ", model says " ++ show model
+--
+-- Such a predicate can then be used like any other, and rendering of the
+-- arguments /to/ the predicate is handled automatically. For example:
+--
+-- > test_realVsModel :: Property ()
+-- > test_realVsModel = assert $
+-- >     realVsModel
+-- >       .$ ( "policy"    , policy    )
+-- >       .$ ( "operation" , operation )
+-- >       .$ ( "resource"  , resource  )
+-- >       .$ ( "actor"     , actor     )
+--
+-- (Usually of course these inputs would be randomly generated.) This property
+-- might result in
+--
+-- > realVsModel: FAIL
+-- >   failed after 0 shrinks
+-- >   real says False, model says True
+-- >   policy   : "strict"
+-- >   operation: "delete"
+-- >   resource : "db"
+-- >   actor    : "joe"
 module Test.Falsify.Predicate (
     Predicate -- opaque
     -- * Expressions
@@ -197,8 +243,8 @@ module Test.Falsify.Predicate (
   , fnWith
   , transparent
     -- * Construction
-  , alwaysPass
-  , alwaysFail
+  , pass
+  , fail
   , unary
   , binary
     -- * Auxiliary construction
@@ -211,6 +257,7 @@ module Test.Falsify.Predicate (
   , flip
   , matchEither
   , matchBool
+  , lam
     -- * Evaluation and partial evaluation
   , VarName -- opaque
   , Err
@@ -233,7 +280,7 @@ module Test.Falsify.Predicate (
   , pairwise
   ) where
 
-import Prelude hiding (all, flip, even, odd, pred, elem)
+import Prelude hiding (all, flip, even, odd, pred, elem, fail)
 import qualified Prelude
 
 import Data.Bifunctor
@@ -427,7 +474,7 @@ data Predicate :: [Type] -> Type where
   Pass :: Predicate xs
 
   -- | Predicate that always fails
-  Fail :: Predicate xs
+  Fail :: Err -> Predicate xs
 
   -- | Conjunction
   Both :: Predicate xs -> Predicate xs -> Predicate xs
@@ -475,12 +522,12 @@ prim = Prim
 -------------------------------------------------------------------------------}
 
 -- | Constant 'True'
-alwaysPass :: Predicate xs
-alwaysPass = Pass
+pass :: Predicate xs
+pass = Pass
 
 -- | Constant 'False'
-alwaysFail :: Predicate xs
-alwaysFail = Fail
+fail :: Err -> Predicate xs
+fail = Fail
 
 -- | Unary predicate
 --
@@ -568,6 +615,9 @@ matchBool t f =
     fromBool :: Bool -> Either () ()
     fromBool True  = Left  ()
     fromBool False = Right ()
+
+lam :: (x -> Predicate xs) -> Predicate (x : xs)
+lam k = Lam $ \Input{inputValue} -> k inputValue
 
 {-------------------------------------------------------------------------------
   Failures
@@ -668,7 +718,7 @@ evalChoice t f (x :* xs) =
 evalAt :: SListI xs => Predicate xs -> NP Input xs -> Either Failure ()
 evalAt (Prim p err)       xs = evalPrim p err xs
 evalAt Pass               _  = return ()
-evalAt Fail               xs = Left $ Failure "Fail" (renderInputs xs)
+evalAt (Fail err)         xs = Left $ Failure err (renderInputs xs)
 evalAt (Both p1 p2)       xs = evalAt p1 xs >> evalAt p2 xs
 evalAt (Lam f)            xs = evalLam f xs
 evalAt (p `At` x)         xs = evalAt p (x :* xs)
