@@ -13,9 +13,9 @@ module Test.Falsify.Fun (
   , pattern Fn3
   ) where
 
-import Data.Falsify.Concrete ((:->)(..))
+import Data.Falsify.ConcreteFun ((:->)(..))
 
-import qualified Data.Falsify.Concrete as Concrete
+import qualified Data.Falsify.ConcreteFun as ConcreteFun
 
 {-------------------------------------------------------------------------------
   Definition
@@ -40,7 +40,7 @@ data Fun a b = Fun {
 
 instance (Show a, Show b) => Show (Fun a b) where
   show Fun{concrete, defaultValue, isFullyShrunk}
-    | isFullyShrunk = Concrete.render concrete defaultValue
+    | isFullyShrunk = ConcreteFun.render concrete defaultValue
     | otherwise     = "<fun>"
 
 {-------------------------------------------------------------------------------
@@ -53,7 +53,7 @@ instance (Show a, Show b) => Show (Fun a b) where
 --
 -- See also the 'Fn', 'Fn2', and 'Fn3' patter synonyms.
 applyFun :: Fun a b -> a -> b
-applyFun Fun{concrete, defaultValue} = Concrete.apply concrete defaultValue
+applyFun Fun{concrete, defaultValue} = ConcreteFun.apply concrete defaultValue
 
 -- | Like 'applyFun', but for binary functions
 applyFun2 :: Fun (a, b) c -> (a -> b -> c)
