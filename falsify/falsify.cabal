@@ -112,24 +112,17 @@ library
       Test.Falsify.Internal.Driver.ReplaySeed
       Test.Falsify.Internal.Fun
       Test.Falsify.Internal.Generator
-      Test.Falsify.Internal.Generator.Definition
+      Test.Falsify.Internal.Generator.Compound
+      Test.Falsify.Internal.Generator.Function
+      Test.Falsify.Internal.Generator.Precision
       Test.Falsify.Internal.Generator.Shrinking
+      Test.Falsify.Internal.Generator.Simple
       Test.Falsify.Internal.Marked.Tree
       Test.Falsify.Internal.Property
       Test.Falsify.Internal.Range
       Test.Falsify.Internal.SampleTree
       Test.Falsify.Internal.Search
-
-      -- /All/ definitions in these @Reexported.*@ modules are re-exported as
-      -- part of "Test.Falsify.Generator", alongside selected definitions from
-      -- "Test.Falsify.Internal.Generator".
-      --
-      -- TODO: This distinction isn't particularly useful anymore.
-      Test.Falsify.Reexported.Generator.Compound
-      Test.Falsify.Reexported.Generator.Function
-      Test.Falsify.Reexported.Generator.Precision
-      Test.Falsify.Reexported.Generator.Shrinking
-      Test.Falsify.Reexported.Generator.Simple
+      Test.Falsify.Internal.Shrinking
 
       Data.Falsify.Internal.Integer
       Data.Falsify.Internal.List

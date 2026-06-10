@@ -32,7 +32,7 @@ import qualified Data.List.NonEmpty as NE
 
 import Test.Falsify.Internal.Driver
 import Test.Falsify.Internal.Driver.ReplaySeed
-import Test.Falsify.Internal.Generator.Shrinking
+import Test.Falsify.Internal.Shrinking
 
 {-------------------------------------------------------------------------------
   Additional public accessors for 'TestOutcome'

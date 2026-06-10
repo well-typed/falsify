@@ -48,13 +48,12 @@ import GHC.Stack
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
-import Test.Falsify.Internal.Generator (Gen)
-import Test.Falsify.Internal.Generator.Shrinking
+import Test.Falsify.Internal.Generator
+import Test.Falsify.Internal.Shrinking
 import Test.Falsify.Predicate (Predicate, (.$))
 
-import qualified Test.Falsify.Generator          as Gen
-import qualified Test.Falsify.Internal.Generator as Gen
-import qualified Test.Falsify.Predicate          as P
+import qualified Test.Falsify.Generator as Gen
+import qualified Test.Falsify.Predicate as P
 
 {-------------------------------------------------------------------------------
   Information about a test run
@@ -405,7 +404,7 @@ testMinimum :: forall e.
   -> Property' String ()
 testMinimum p prop = do
     st <- genWith (const Nothing) $ Gen.captureLocalTree
-    case Gen.runGen (runProperty prop) st of
+    case runGen (runProperty prop) st of
       ((TestPassed (), _run), _shrunk) ->
         -- The property passed; nothing to test
         discard

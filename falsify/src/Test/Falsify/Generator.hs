@@ -5,8 +5,9 @@
 -- > import Test.Falsify
 -- > import qualified Test.Falsify.Generator as Gen
 module Test.Falsify.Generator (
+    Gen -- opaque
     -- * Simple (non-compound) generators
-    bool
+  , bool
   , inRange
   , int
     -- * Compound generators
@@ -62,8 +63,8 @@ module Test.Falsify.Generator (
 import Prelude hiding (either, elem, properFraction)
 
 import Test.Falsify.Internal.Generator
-import Test.Falsify.Reexported.Generator.Compound
-import Test.Falsify.Reexported.Generator.Function
-import Test.Falsify.Reexported.Generator.Precision
-import Test.Falsify.Reexported.Generator.Shrinking
-import Test.Falsify.Reexported.Generator.Simple
+import Test.Falsify.Internal.Generator.Compound
+import Test.Falsify.Internal.Generator.Function
+import Test.Falsify.Internal.Generator.Precision
+import Test.Falsify.Internal.Generator.Shrinking
+import Test.Falsify.Internal.Generator.Simple

@@ -57,8 +57,8 @@ module Test.Falsify (
 
 import Test.Falsify.GenDefault
 import Test.Falsify.GenDefault.Std
+import Test.Falsify.Generator (Gen)
 import Test.Falsify.Internal.Fun (Fun)
-import Test.Falsify.Internal.Generator (Gen)
 import Test.Falsify.Internal.Property (Property', Property)
 import Test.Falsify.Internal.Range (Range)
 import Test.Falsify.Marked (Mark(..), Marked(..))

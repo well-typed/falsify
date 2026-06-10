@@ -27,8 +27,7 @@ import GHC.TypeLits (KnownNat, natVal, Nat)
 
 import qualified Control.Applicative as Ap
 
-import Test.Falsify.Internal.Generator (Gen)
-
+import Test.Falsify.Generator (Gen)
 import qualified Test.Falsify.Generator as Gen
 import qualified Test.Falsify.Range     as Range
 

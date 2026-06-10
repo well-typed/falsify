@@ -1,4 +1,4 @@
-module Test.Falsify.Reexported.Generator.Function (
+module Test.Falsify.Internal.Generator.Function (
     fun
   , Function(..)
   , GFunction -- opaque
@@ -20,8 +20,8 @@ import qualified Data.Ratio as Ratio
 import Data.Falsify.ConcreteFun ((:->)(..))
 import Test.Falsify.Internal.Fun
 import Test.Falsify.Internal.Generator (Gen)
-import Test.Falsify.Reexported.Generator.Compound
-import Test.Falsify.Reexported.Generator.Shrinking
+import Test.Falsify.Internal.Generator.Compound
+import Test.Falsify.Internal.Generator.Shrinking
 
 import qualified Data.Falsify.ConcreteFun as ConcreteFun
 
