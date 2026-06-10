@@ -4,7 +4,7 @@
 --
 -- Intended for qualified import.
 --
--- > import Test.Falsify.Predicate (Predicate, (.$))
+-- > import Test.Falsify
 -- > import qualified Test.Falsify.Predicate as P
 --
 -- = Motivation
@@ -18,9 +18,9 @@
 --
 -- and we want to assert that @x@ and @y@ are equal. The simplest form that this
 -- might take is simply a boolean predicate; for example, @tasty-hunit@ offers
--- [`assertBool`](https://hackage-content.haskell.org/package/tasty-hunit-0.10.2/docs/Test-Tasty-HUnit.html#v:assertBool),
+-- [@assertBool@](https://hackage-content.haskell.org/package/tasty-hunit-0.10.2/docs/Test-Tasty-HUnit.html#v:assertBool),
 -- and in @QuickCheck@ we have a
--- [`Testable`](https://hackage-content.haskell.org/package/QuickCheck-2.18.0.0/docs/Test-QuickCheck.html#t:Testable)
+-- [@Testable@](https://hackage-content.haskell.org/package/QuickCheck-2.18.0.0/docs/Test-QuickCheck.html#t:Testable)
 -- instance for 'Bool'. This allows us to write
 --
 -- > test_hunit_bool :: HUnit.Assertion
@@ -616,6 +616,9 @@ matchBool t f =
     fromBool True  = Left  ()
     fromBool False = Right ()
 
+-- | Lambda abstraction
+--
+-- See module documentation of "Test.Falsify.Predicate" for discussion.
 lam :: (x -> Predicate xs) -> Predicate (x : xs)
 lam k = Lam $ \Input{inputValue} -> k inputValue
 

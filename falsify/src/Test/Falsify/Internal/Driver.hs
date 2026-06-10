@@ -10,14 +10,15 @@ module Test.Falsify.Internal.Driver (
     -- * Results
   , Success(..)
   , Failure(..)
-  , TotalDiscarded(..)
+  , TestOutcome'(..)
+  , TestOutcome
     -- * Test driver
   , falsify
     -- * Process results
   , Verbose(..)
   , ExpectFailure(..)
-  , RenderedTestResult(..)
-  , renderTestResult
+  , RenderedTestOutcome(..)
+  , renderTestOutcome
   ) where
 
 import Prelude hiding (log)
@@ -88,29 +89,40 @@ data Failure e = Failure {
     }
   deriving (Show)
 
-newtype TotalDiscarded = TotalDiscarded Word
+-- | Result of running @falsify@
+--
+-- This is an opaque type; see 'renderTestOutcome' and the additional accessors
+-- provided in "Test.Falsify.Driver".
+data TestOutcome' e a = TestOutcome{
+      -- | Initial replay seed (each test also records its own seed)
+      testReplaySeed :: ReplaySeed
+
+      -- | Successful tests
+    , testSuccesses :: [Success a]
+
+      -- | Number of discarded tests
+    , testDiscarded :: Word
+
+      -- | Failed test (if any)
+    , testFailure :: Maybe (Failure e)
+    }
+
+-- | t'TestOutcome' specialized to 'String' for errors
+--
+-- This mimicks the 'Property'' vs 'Property' distinction.
+type TestOutcome = TestOutcome' String
 
 -- | Run a test: attempt to falsify the given property
---
--- We return
---
--- * initial replay seed (each test also records its own seed)
--- * successful tests
--- * how many tests we discarded
--- * the failed test (if any).
-falsify :: forall e a.
-     Options
-  -> Property' e a
-  -> IO (ReplaySeed, [Success a], TotalDiscarded, Maybe (Failure e))
+falsify :: forall e a. Options -> Property' e a -> IO (TestOutcome' e a)
 falsify opts prop = do
     acc <- initDriverState opts
     (successes, discarded, mFailure) <- go acc
-    return (
-        splitmixReplaySeed (prng acc)
-      , successes
-      , TotalDiscarded discarded
-      , mFailure
-      )
+    return TestOutcome{
+        testReplaySeed = splitmixReplaySeed (prng acc)
+      , testSuccesses  = successes
+      , testDiscarded  = discarded
+      , testFailure    = mFailure
+      }
   where
     go :: DriverState a -> IO ([Success a], Word, Maybe (Failure e))
     go acc | todo acc == 0 = return (successes acc, discardedTotal acc, Nothing)
@@ -248,21 +260,32 @@ data Verbose = Verbose | NotVerbose
 -- rather than a goal.
 data ExpectFailure = ExpectFailure | DontExpectFailure
 
--- | Test result as it should be shown to the user
-data RenderedTestResult = RenderedTestResult {
+-- | Test outcome as it should be shown to the user
+--
+-- The rendered test outcome can usually be used directly in test framework
+-- integration. For example, the @tasty@ integration uses
+--
+-- > toTastyResult :: RenderedTestOutcome -> Tasty.Result
+-- > toTastyResult RenderedTestOutcome{testPassed, testOutput}
+-- >   | testPassed = Tasty.testPassed testOutput
+-- >   | otherwise  = Tasty.testFailed testOutput
+data RenderedTestOutcome = RenderedTestOutcome {
       testPassed :: Bool
     , testOutput :: String
     }
 
-renderTestResult ::
+-- | Render test outcome
+--
+-- See t'RenderedTestOutcome' for discussion.
+renderTestOutcome ::
      Verbose
   -> ExpectFailure
-  -> (ReplaySeed, [Success ()], TotalDiscarded, Maybe (Failure String))
-  -> RenderedTestResult
-renderTestResult
+  -> TestOutcome ()
+  -> RenderedTestOutcome
+renderTestOutcome
       verbose
       expectFailure
-      (initSeed, successes, TotalDiscarded discarded, mFailure) =
+      (TestOutcome initSeed successes discarded mFailure) =
     case (verbose, expectFailure, mFailure) of
 
       --
@@ -272,7 +295,7 @@ renderTestResult
       -- discarded tests).
       --
 
-      (_, DontExpectFailure, Nothing) | null successes -> RenderedTestResult {
+      (_, DontExpectFailure, Nothing) | null successes -> RenderedTestOutcome {
             testPassed = False
           , testOutput = unlines [
                 concat [
@@ -289,7 +312,7 @@ renderTestResult
       -- succeed.
       --
 
-      (NotVerbose, DontExpectFailure, Nothing) -> RenderedTestResult {
+      (NotVerbose, DontExpectFailure, Nothing) -> RenderedTestOutcome {
              testPassed = True
            , testOutput = unlines [
                  concat [
@@ -300,7 +323,7 @@ renderTestResult
                ]
            }
 
-      (Verbose, DontExpectFailure, Nothing) -> RenderedTestResult {
+      (Verbose, DontExpectFailure, Nothing) -> RenderedTestOutcome {
              testPassed = True
            , testOutput = unlines [
                  concat [
@@ -314,7 +337,7 @@ renderTestResult
                ]
            }
 
-      (NotVerbose, ExpectFailure, Nothing) -> RenderedTestResult {
+      (NotVerbose, ExpectFailure, Nothing) -> RenderedTestOutcome {
              testPassed = False
            , testOutput = unlines [
                  "Expected failure, but " ++ countAll ++ " passed"
@@ -322,7 +345,7 @@ renderTestResult
                ]
            }
 
-      (Verbose, ExpectFailure, Nothing) -> RenderedTestResult {
+      (Verbose, ExpectFailure, Nothing) -> RenderedTestOutcome {
              testPassed = False
            , testOutput = unlines [
                  "Expected failure, but " ++ countAll ++ " passed"
@@ -343,7 +366,7 @@ renderTestResult
       -- logs independent of verbosity.
       --
 
-      (NotVerbose, ExpectFailure, Just e) -> RenderedTestResult {
+      (NotVerbose, ExpectFailure, Just e) -> RenderedTestOutcome {
              testPassed = True
            , testOutput = unlines [
                  concat [
@@ -357,7 +380,7 @@ renderTestResult
          where
            history = shrinkHistory (failureRun e)
 
-      (Verbose, ExpectFailure, Just e) -> RenderedTestResult {
+      (Verbose, ExpectFailure, Just e) -> RenderedTestOutcome {
              testPassed = True
            , testOutput = unlines [
                  concat [
@@ -373,7 +396,7 @@ renderTestResult
          where
            history = shrinkHistory (failureRun e)
 
-      (NotVerbose, DontExpectFailure, Just e) -> RenderedTestResult {
+      (NotVerbose, DontExpectFailure, Just e) -> RenderedTestOutcome {
              testPassed = False
            , testOutput = unlines [
                  "failed after " ++ countHistory history
@@ -386,7 +409,7 @@ renderTestResult
          where
            history = shrinkHistory (failureRun e)
 
-      (Verbose, DontExpectFailure, Just e) -> RenderedTestResult {
+      (Verbose, DontExpectFailure, Just e) -> RenderedTestOutcome {
              testPassed = False
            , testOutput = unlines [
                  "failed after " ++ countHistory history

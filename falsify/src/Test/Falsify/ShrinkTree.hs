@@ -2,7 +2,7 @@
 --
 -- Intended for qualified import.
 --
--- > import Test.Falsify.ShrinkTree (ShrinkTree(..))
+-- > import Test.Falsify
 -- > import qualified Test.Falsify.ShrinkTree as ShrinkTree
 module Test.Falsify.ShrinkTree (
     ShrinkTree(..)

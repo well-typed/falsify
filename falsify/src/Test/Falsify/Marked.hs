@@ -2,7 +2,7 @@
 --
 -- Intended for qualified import.
 --
--- > import Test.Falsify.Marked (Mark(..), Marked(..))
+-- > import Test.Falsify
 -- > import qualified Test.Falsify.Marked as Marked
 module Test.Falsify.Marked (
     Mark(..)

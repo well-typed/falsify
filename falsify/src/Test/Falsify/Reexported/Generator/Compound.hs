@@ -42,8 +42,8 @@ import Data.Falsify.Permutation (Permutation)
 import Data.Falsify.Tree (Tree(..))
 import Test.Falsify.Internal.Generator
 import Test.Falsify.Internal.Generator.Shrinking (IsValidShrink(..))
+import Test.Falsify.Internal.Range
 import Test.Falsify.Marked (Mark(..), Marked(..))
-import Test.Falsify.Range (Range)
 import Test.Falsify.Reexported.Generator.Shrinking
 import Test.Falsify.Reexported.Generator.Simple
 import Test.Falsify.ShrinkTree (ShrinkTree(..))

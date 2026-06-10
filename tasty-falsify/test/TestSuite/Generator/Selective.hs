@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module TestSuite.Prop.Generator.Selective (tests) where
+module TestSuite.Generator.Selective (tests) where
 
 import Control.Monad
 import Control.Selective
@@ -9,6 +9,7 @@ import Data.Word
 import Test.Tasty
 import Test.Tasty.Falsify
 
+import Test.Falsify
 import qualified Test.Falsify.Generator as Gen
 import qualified Test.Falsify.Predicate as P
 
@@ -26,6 +27,7 @@ tests = testGroup "TestSuite.Prop.Generator.Selective" [
           expectFailure    = ExpectFailure
         , overrideNumTests = Just 10_000
         }
+
 
 {-------------------------------------------------------------------------------
   Either

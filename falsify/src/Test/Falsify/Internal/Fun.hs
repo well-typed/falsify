@@ -1,10 +1,9 @@
--- | Random functions
+-- | Generated functions
 --
 -- Intended for unqualified import.
---
--- > import Test.Falsify.Fun
-module Test.Falsify.Fun (
+module Test.Falsify.Internal.Fun (
     Fun(..)
+    -- * Patterns
   , applyFun
   , applyFun2
   , applyFun3
@@ -14,7 +13,6 @@ module Test.Falsify.Fun (
   ) where
 
 import Data.Falsify.ConcreteFun ((:->)(..))
-
 import qualified Data.Falsify.ConcreteFun as ConcreteFun
 
 {-------------------------------------------------------------------------------

@@ -179,6 +179,7 @@ jobs:
         run: |
           touch cabal.project
           echo "packages: $GITHUB_WORKSPACE/source/falsify" >> cabal.project
+          echo "packages: $GITHUB_WORKSPACE/source/tasty-falsify" >> cabal.project
           echo "packages: $GITHUB_WORKSPACE/source/demo" >> cabal.project
           cat cabal.project
       - name: sdist
@@ -193,22 +194,31 @@ jobs:
         run: |
           PKGDIR_falsify="$(find "$GITHUB_WORKSPACE/unpacked" -maxdepth 1 -type d -regex '.*/falsify-[0-9.]*')"
           echo "PKGDIR_falsify=${PKGDIR_falsify}" >> "$GITHUB_ENV"
+          PKGDIR_tasty_falsify="$(find "$GITHUB_WORKSPACE/unpacked" -maxdepth 1 -type d -regex '.*/tasty-falsify-[0-9.]*')"
+          echo "PKGDIR_tasty_falsify=${PKGDIR_tasty_falsify}" >> "$GITHUB_ENV"
           PKGDIR_demo="$(find "$GITHUB_WORKSPACE/unpacked" -maxdepth 1 -type d -regex '.*/demo-[0-9.]*')"
           echo "PKGDIR_demo=${PKGDIR_demo}" >> "$GITHUB_ENV"
           rm -f cabal.project cabal.project.local
           touch cabal.project
           touch cabal.project.local
           echo "packages: ${PKGDIR_falsify}" >> cabal.project
+          echo "packages: ${PKGDIR_tasty_falsify}" >> cabal.project
           echo "packages: ${PKGDIR_demo}" >> cabal.project
           echo "package falsify" >> cabal.project
+          echo "    ghc-options: -Werror=missing-methods -Werror=missing-fields" >> cabal.project
+          echo "package tasty-falsify" >> cabal.project
           echo "    ghc-options: -Werror=missing-methods -Werror=missing-fields" >> cabal.project
           echo "package demo" >> cabal.project
           echo "    ghc-options: -Werror=missing-methods -Werror=missing-fields" >> cabal.project
           if [ $((HCNUMVER >= 90400)) -ne 0 ] ; then echo "package falsify" >> cabal.project ; fi
           if [ $((HCNUMVER >= 90400)) -ne 0 ] ; then echo "    ghc-options: -Werror=unused-packages" >> cabal.project ; fi
+          if [ $((HCNUMVER >= 90400)) -ne 0 ] ; then echo "package tasty-falsify" >> cabal.project ; fi
+          if [ $((HCNUMVER >= 90400)) -ne 0 ] ; then echo "    ghc-options: -Werror=unused-packages" >> cabal.project ; fi
           if [ $((HCNUMVER >= 90400)) -ne 0 ] ; then echo "package demo" >> cabal.project ; fi
           if [ $((HCNUMVER >= 90400)) -ne 0 ] ; then echo "    ghc-options: -Werror=unused-packages" >> cabal.project ; fi
           if [ $((HCNUMVER >= 90000)) -ne 0 ] ; then echo "package falsify" >> cabal.project ; fi
+          if [ $((HCNUMVER >= 90000)) -ne 0 ] ; then echo "    ghc-options: -Werror=incomplete-patterns -Werror=incomplete-uni-patterns" >> cabal.project ; fi
+          if [ $((HCNUMVER >= 90000)) -ne 0 ] ; then echo "package tasty-falsify" >> cabal.project ; fi
           if [ $((HCNUMVER >= 90000)) -ne 0 ] ; then echo "    ghc-options: -Werror=incomplete-patterns -Werror=incomplete-uni-patterns" >> cabal.project ; fi
           if [ $((HCNUMVER >= 90000)) -ne 0 ] ; then echo "package demo" >> cabal.project ; fi
           if [ $((HCNUMVER >= 90000)) -ne 0 ] ; then echo "    ghc-options: -Werror=incomplete-patterns -Werror=incomplete-uni-patterns" >> cabal.project ; fi
@@ -216,13 +226,19 @@ jobs:
           package falsify
             tests: true
 
+          package tasty-falsify
+            tests: true
+
           package falsify
+            ghc-options: -Werror
+
+          package tasty-falsify
             ghc-options: -Werror
 
           package demo
             ghc-options: -Werror
           EOF
-          $HCPKG list --simple-output --names-only | perl -ne 'for (split /\s+/) { print "constraints: any.$_ installed\n" unless /^(demo|falsify)$/; }' >> cabal.project.local
+          $HCPKG list --simple-output --names-only | perl -ne 'for (split /\s+/) { print "constraints: any.$_ installed\n" unless /^(demo|falsify|tasty-falsify)$/; }' >> cabal.project.local
           cat cabal.project
           cat cabal.project.local
       - name: dump install plan

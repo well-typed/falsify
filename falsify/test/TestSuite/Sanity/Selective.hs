@@ -7,7 +7,7 @@ import Test.Tasty
 import Test.Tasty.HUnit
 
 import Data.Falsify.Tree (Tree(..))
-import Test.Falsify.Generator (Gen)
+import Test.Falsify
 import Test.Falsify.Interactive (sample, shrink')
 
 import qualified Test.Falsify.Generator as Gen

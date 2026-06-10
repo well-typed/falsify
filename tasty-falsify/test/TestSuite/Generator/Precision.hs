@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module TestSuite.Prop.Generator.Precision (tests) where
+module TestSuite.Generator.Precision (tests) where
 
 import Control.Monad
 
@@ -8,6 +8,7 @@ import Data.Falsify.ProperFraction (ProperFraction(..))
 import Test.Tasty
 import Test.Tasty.Falsify
 
+import Test.Falsify
 import qualified Data.Falsify.WordN     as WordN
 import qualified Test.Falsify.Generator as Gen
 import qualified Test.Falsify.Predicate as P

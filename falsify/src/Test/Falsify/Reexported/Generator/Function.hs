@@ -18,7 +18,7 @@ import Numeric.Natural
 import qualified Data.Ratio as Ratio
 
 import Data.Falsify.ConcreteFun ((:->)(..))
-import Test.Falsify.Fun
+import Test.Falsify.Internal.Fun
 import Test.Falsify.Internal.Generator (Gen)
 import Test.Falsify.Reexported.Generator.Compound
 import Test.Falsify.Reexported.Generator.Shrinking

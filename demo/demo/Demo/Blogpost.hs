@@ -15,9 +15,7 @@ import Test.Tasty.HUnit (Assertion, testCase, assertFailure)
 
 import qualified System.Random.SplitMix as SplitMix
 
-import Test.Falsify.Predicate ((.$))
-import Test.Falsify.Range (Range)
-
+import Test.Falsify
 import qualified Test.Falsify.Generator as Gen
 import qualified Test.Falsify.Predicate as P
 import qualified Test.Falsify.Range     as Range

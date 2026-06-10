@@ -1,8 +1,15 @@
 {-# LANGUAGE UndecidableInstances #-}
 
 -- | Default generators
-module Test.Falsify.GenDefault
-  ( GenDefault(..)
+--
+-- 'GenDefault' (as well as 'Test.Falsify.GenDefault.Std') are exported from
+-- "Test.Falsify", so you will only need to import this module if you want to
+-- make use of the deriving-via support.
+--
+-- Intended for unqualified import.
+module Test.Falsify.GenDefault (
+    GenDefault(..)
+    -- * Deriving-via support
   , ViaTag(..)
   , ViaIntegral(..)
   , ViaEnum(..)
@@ -20,7 +27,7 @@ import GHC.TypeLits (KnownNat, natVal, Nat)
 
 import qualified Control.Applicative as Ap
 
-import Test.Falsify.Generator (Gen)
+import Test.Falsify.Internal.Generator (Gen)
 
 import qualified Test.Falsify.Generator as Gen
 import qualified Test.Falsify.Range     as Range

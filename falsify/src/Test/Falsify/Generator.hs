@@ -2,13 +2,11 @@
 --
 -- Intended for qualified import.
 --
--- > import Test.Falsify.Generator (Gen)
+-- > import Test.Falsify
 -- > import qualified Test.Falsify.Generator as Gen
 module Test.Falsify.Generator (
-    -- * Definition
-    Gen -- opaque
     -- * Simple (non-compound) generators
-  , bool
+    bool
   , inRange
   , int
     -- * Compound generators
