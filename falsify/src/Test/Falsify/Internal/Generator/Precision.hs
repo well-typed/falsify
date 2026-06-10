@@ -1,5 +1,5 @@
 -- | Fixed precision generators
-module Test.Falsify.Reexported.Generator.Precision (
+module Test.Falsify.Internal.Generator.Precision (
     wordN
   , properFraction
   ) where

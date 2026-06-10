@@ -1,174 +1,131 @@
 module Test.Falsify.Internal.Generator.Shrinking (
-    -- * Shrinking
-    shrinkFrom
-    -- * With full history
-  , ShrinkExplanation(..)
-  , ShrinkHistory(..)
-  , IsValidShrink(..)
-  , isValidShrink
-  , limitShrinkSteps
-  , shrinkHistory
-  , shrinkOutcome
+    -- * User-specified shrinking
+    shrinkToOneOf
+  , firstThen
+  , shrinkWith
+    -- * Support for shrink trees
+  , fromShrinkTree
+  , toShrinkTree
   ) where
 
-import Data.Bifunctor
-import Data.Either
-import Data.List.NonEmpty (NonEmpty((:|)))
+import Prelude hiding (properFraction)
 
-import Test.Falsify.Internal.Generator.Definition
-import Test.Falsify.SampleTree (SampleTree(..))
+import Data.Word
+
+import qualified Data.Tree as Rose
+
+import Test.Falsify.Internal.Generator
+import Test.Falsify.SampleTree (SampleTree(..), Sample(..))
+import Test.Falsify.ShrinkTree (ShrinkTree(..))
+
+import qualified Test.Falsify.ShrinkTree as ShrinkTree
 
 {-------------------------------------------------------------------------------
-  Explanation
+  Specialized shrinking behaviour
 -------------------------------------------------------------------------------}
 
--- | Shrink explanation
+-- | Start with @x@, then shrink to one of the @xs@
 --
--- @p@ is the type of \"positive\" elements that satisfied the predicate (i.e.,
--- valid shrinks), and @n@ is the type of \"negative\" which didn't.
-data ShrinkExplanation p n = ShrinkExplanation {
-      -- | The value we started, before shrinking
-      initial :: p
+-- Once shrunk, will not shrink again.
+--
+-- Minimal value is the first shrunk value, if it exists, and the original
+-- otherwise.
+shrinkToOneOf :: forall a. a -> [a] -> Gen a
+shrinkToOneOf x xs =
+    aux <$> primWith shrinker
+  where
+    aux :: Sample -> a
+    aux (NotShrunk _) = x
+    aux (Shrunk    i) = index i xs
 
-      -- | The full shrink history
-    , history :: ShrinkHistory p n
-    }
-  deriving (Show)
-
--- | Shrink explanation
-data ShrinkHistory p n =
-    -- | We successfully executed a single shrink step
-    ShrunkTo p (ShrinkHistory p n)
-
-    -- | We could no shrink any further
+    -- When we shrink, we will try a bunch of new sample trees; we must ensure
+    -- that we can try /any/ of the possible shrunk values.
     --
-    -- We also record all rejected next steps. This is occasionally useful when
-    -- trying to figure out why a value didn't shrink any further (what did it
-    -- try to shrink to?)
-  | ShrinkingDone [n]
+    -- We use this to implement 'fromShrinkTree'. Here, we explore a rose tree
+    -- of possibilities; at every level in the tree, once we make a choice,
+    -- we should commit to that choice and not consider it over and over again.
+    -- Thus, once shrunk, we should not shrink any further.
+    shrinker :: Sample -> [Word64]
+    shrinker (Shrunk _)    = []
+    shrinker (NotShrunk _) = zipWith const [0..] xs
 
-    -- | We stopped shrinking early
+    -- Index the list of possible shrunk values. This is a bit like @(!!)@ from
+    -- the prelude, but with some edge cases.
     --
-    -- This is used when the number of shrink steps is limited.
-  | ShrinkingStopped
-  deriving (Show)
+    -- - If the list is empty, we return the unshrunk value.
+    -- - Otherwise, if the index exceeds the bounds, we return the last element.
+    --
+    -- These two special cases can arise in one of two circumstances:
+    --
+    -- - When we run the generator against the 'Minimal' tree. This will give us
+    --   a @Shrunk 0@ value, independent of what the specified shrinking
+    --   function does, and it is important that we produce the right value.
+    -- - When the generator is run against a sample tree that was shrunk wrt to
+    --   a /different/ generator. In this case the value could be anything;
+    --   we return the final ("least preferred") element, and then rely on
+    --   later shrinking to replace this with a more preferred element.
+    index :: Word64 -> [a] -> a
+    index _ []     = x
+    index _ [y]    = y
+    index 0 (y:_)  = y
+    index n (_:ys) = index (n - 1) ys
 
-limitShrinkSteps :: Maybe Word -> ShrinkExplanation p n -> ShrinkExplanation p n
-limitShrinkSteps Nothing      = id
-limitShrinkSteps (Just limit) = \case
-    ShrinkExplanation{initial, history} ->
-      ShrinkExplanation{
-          initial
-        , history = go limit history
-        }
-  where
-    go :: Word -> ShrinkHistory p n -> ShrinkHistory p n
-    go 0 (ShrunkTo _ _)      = ShrinkingStopped
-    go n (ShrunkTo x xs)     = ShrunkTo x (go (pred n) xs)
-    go _ (ShrinkingDone rej) = ShrinkingDone rej
-    go _ ShrinkingStopped    = ShrinkingStopped
+-- | Generator that always produces @x@ as initial value, and shrinks to @y@
+firstThen :: forall a. a -> a -> Gen a
+firstThen x y = x `shrinkToOneOf` [y]
 
--- | Simplify the shrink explanation to keep only the shrink history
-shrinkHistory :: ShrinkExplanation p n -> NonEmpty p
-shrinkHistory = \(ShrinkExplanation unshrunk shrunk) ->
-    unshrunk :| go shrunk
-  where
-    go :: ShrinkHistory p n -> [p]
-    go (ShrunkTo x xs)   = x : go xs
-    go (ShrinkingDone _) = []
-    go ShrinkingStopped  = []
-
--- | The final shrunk value, as well as all rejected /next/ shrunk steps
+-- | Shrink with provided shrinker
 --
--- The list of rejected next steps is
+-- This provides compatibility with QuickCheck-style manual shrinking.
 --
--- * @Nothing@ if shrinking was terminated early ('limitShrinkSteps')
--- * @Just []@ if the final value truly is minimal (typically, it is only
---   minimal wrt to a particular properly, but not the minimal value that a
---   generator can produce).
-shrinkOutcome :: forall p n. ShrinkExplanation p n -> (p, Maybe [n])
-shrinkOutcome = \ShrinkExplanation{initial, history} ->
-    go initial history
-  where
-    go :: p -> ShrinkHistory p n -> (p, Maybe [n])
-    go _ (ShrunkTo p h)     = go p h
-    go p (ShrinkingDone ns) = (p, Just ns)
-    go p  ShrinkingStopped  = (p, Nothing)
+-- Defined in terms of 'fromShrinkTree'; see discussion there for some
+-- notes on performance.
+shrinkWith :: forall a. (a -> [a]) -> Gen a -> Gen a
+shrinkWith f gen = do
+    -- It is critical that we do not apply normal shrinking of the 'SampleTree'
+    -- here (not even to 'Minimal'). If we did, then the resulting shrink tree
+    -- would change, and we would be unable to iteratively construct a path
+    -- through the shrink tree.
+    --
+    -- Of course, it can still happen that the generator gets reapplied in a
+    -- different context; we must take this case into account in
+    -- 'shrinkToOneOf'.
+    x <- withoutShrinking gen
+    fromShrinkTree $ ShrinkTree.unfold x f
 
 {-------------------------------------------------------------------------------
-  Mapping
+  Shrink trees
 -------------------------------------------------------------------------------}
 
-instance Functor (ShrinkExplanation p) where
-  fmap = second
-
-instance Functor (ShrinkHistory p) where
-  fmap = second
-
-instance Bifunctor ShrinkExplanation where
-  bimap f g ShrinkExplanation{initial, history} = ShrinkExplanation{
-        initial = f initial
-      , history = bimap f g history
-      }
-
-instance Bifunctor ShrinkHistory where
-  bimap f g = \case
-      ShrunkTo truncated history ->
-        ShrunkTo (f truncated) (bimap f g history)
-      ShrinkingDone rejected ->
-        ShrinkingDone (map g rejected)
-      ShrinkingStopped ->
-        ShrinkingStopped
-
-{-------------------------------------------------------------------------------
-  Shrinking
--------------------------------------------------------------------------------}
-
--- | Does a given shrunk value represent a valid shrink step?
-data IsValidShrink p n =
-    ValidShrink p
-  | InvalidShrink n
-  deriving stock (Show)
-
-isValidShrink :: IsValidShrink p n -> Either n p
-isValidShrink (ValidShrink p)   = Right p
-isValidShrink (InvalidShrink n) = Left n
-
--- | Find smallest value that the generator can produce and still satisfies
--- the predicate.
+-- | Construct generator from shrink tree
 --
--- Returns the full shrink history.
+-- This provides compatibility with Hedgehog-style integrated shrinking.
 --
--- To avoid boolean blindness, we use different types for values that satisfy
--- the property and values that do not.
+-- This is O(n^2) in the number of shrink steps: as this shrinks, the generator
+-- is growing a path of indices which locates a particular value in the shrink
+-- tree (resulting from unfolding the provided shrinking function). At each
+-- step during the shrinking process the shrink tree is re-evaluated and the
+-- next value in the tree is located; since this path throws linearly, the
+-- overall cost is O(n^2).
 --
--- This is lazy in the shrink history; see 'limitShrinkSteps' to limit the
--- number of shrinking steps.
-shrinkFrom :: forall a p n.
-     (a -> IsValidShrink p n)
-  -> Gen a
-  -> (p, [SampleTree]) -- ^ Initial result of the generator
-  -> ShrinkExplanation p n
-shrinkFrom prop gen = \(p, shrunk) ->
-    ShrinkExplanation p $ go shrunk
+-- The O(n^2) cost is only incurred on /locating/ the next element to be tested;
+-- the property is not reevaluated at already-shrunk values.
+fromShrinkTree :: forall a. ShrinkTree a -> Gen a
+fromShrinkTree = go . unwrapShrinkTree
   where
-    go :: [SampleTree] -> ShrinkHistory p n
-    go shrunk =
-        -- Shrinking is a greedy algorithm: we go with the first candidate that
-        -- works, and discard the others.
-        --
-        -- NOTE: 'partitionEithers' is lazy enough:
-        --
-        -- > head . fst $ partitionEithers [Left True, undefined] == True
-        case partitionEithers candidates of
-          ([], rejected)      -> ShrinkingDone rejected
-          ((p, shrunk'):_, _) -> ShrunkTo p $ go shrunk'
-      where
-        candidates :: [Either (p, [SampleTree]) n]
-        candidates = map consider $ map (runGen gen) shrunk
+    go :: Rose.Tree a -> Gen a
+    go (Rose.Node x xs) = do
+        next <- Nothing `shrinkToOneOf` map Just xs
+        case next of
+          Nothing -> return x
+          Just x' -> go x'
 
-    consider :: (a, [SampleTree]) -> Either (p, [SampleTree]) n
-    consider (a, shrunk) =
-        case prop a of
-          ValidShrink p   -> Left (p, shrunk)
-          InvalidShrink n -> Right n
+-- | Expose the full shrink tree of a generator
+--
+-- This generator does not shrink.
+toShrinkTree :: forall a. Gen a -> Gen (ShrinkTree a)
+toShrinkTree gen =
+    WrapShrinkTree . Rose.unfoldTree aux . runGen gen <$> captureLocalTree
+  where
+    aux :: (a, [SampleTree]) -> (a, [(a, [SampleTree])])
+    aux (x, shrunk) = (x, map (runGen gen) shrunk)

@@ -50,6 +50,10 @@ The module hierarchy has been improved.
   - `Test.Falsify.SampleTree`
   - `Test.Falsify.ShrinkTree`
 
+The internal (private) module hierarchy has been simplified as well; the
+`Reexported.*` module hierarchy is no longer used (the distinction had lost its
+purpose).
+
 ### Newtypes
 
 A number of type aliases have been replaced by newtypes.

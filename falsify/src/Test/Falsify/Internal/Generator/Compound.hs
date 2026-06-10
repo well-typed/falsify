@@ -1,5 +1,5 @@
 -- | Compound generators
-module Test.Falsify.Reexported.Generator.Compound (
+module Test.Falsify.Internal.Generator.Compound (
     -- * Taking advantage of 'Control.Selective.Selective'
     choose
   , oneof
@@ -41,11 +41,11 @@ import qualified Data.Tree          as Rose
 import Data.Falsify.Permutation (Permutation)
 import Data.Falsify.Tree (Tree(..))
 import Test.Falsify.Internal.Generator
-import Test.Falsify.Internal.Generator.Shrinking (IsValidShrink(..))
+import Test.Falsify.Internal.Generator.Shrinking
+import Test.Falsify.Internal.Generator.Simple
 import Test.Falsify.Internal.Range
+import Test.Falsify.Internal.Shrinking (IsValidShrink(..))
 import Test.Falsify.Marked (Mark(..), Marked(..))
-import Test.Falsify.Reexported.Generator.Shrinking
-import Test.Falsify.Reexported.Generator.Simple
 import Test.Falsify.ShrinkTree (ShrinkTree(..))
 
 import qualified Data.Falsify.Internal.List        as List

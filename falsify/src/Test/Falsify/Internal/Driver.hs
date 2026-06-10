@@ -39,8 +39,8 @@ import qualified Data.Set           as Set
 
 import Test.Falsify.Internal.Driver.ReplaySeed
 import Test.Falsify.Internal.Generator
-import Test.Falsify.Internal.Generator.Shrinking
 import Test.Falsify.Internal.Property
+import Test.Falsify.Internal.Shrinking
 import Test.Falsify.SampleTree (SampleTree)
 
 import qualified Test.Falsify.SampleTree as SampleTree
