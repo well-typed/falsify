@@ -1,4 +1,7 @@
-packages: falsify, demo
+packages: falsify, tasty-falsify, demo
 
 package falsify
+  tests: true
+
+package tasty-falsify
   tests: true

@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module TestSuite.Prop.Generator.Marking (tests) where
+module TestSuite.Generator.Marking (tests) where
 
 import Control.Monad
 import Data.Map (Map)
@@ -12,8 +12,7 @@ import Test.Tasty.Falsify
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
-import Test.Falsify.Marked (Mark(..), Marked(..))
-
+import Test.Falsify
 import qualified Test.Falsify.Generator as Gen hiding (mark)
 import qualified Test.Falsify.Marked    as Marked
 import qualified Test.Falsify.Predicate as P

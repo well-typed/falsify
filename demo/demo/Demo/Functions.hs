@@ -7,8 +7,7 @@ import Data.Word
 import Test.Tasty
 import Test.Tasty.Falsify
 
-import Test.Falsify.Predicate ((.$))
-
+import Test.Falsify
 import qualified Test.Falsify.Generator as Gen
 import qualified Test.Falsify.Predicate as P
 

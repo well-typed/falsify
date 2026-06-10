@@ -1,4 +1,3 @@
-{-# LANGUAGE CPP               #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 -- | Properties
@@ -7,6 +6,7 @@
 module Test.Falsify.Internal.Property (
     -- * Property
     Property' -- opaque
+  , Property
   , runProperty
     -- * Test results
   , TestResult(..)
@@ -48,11 +48,7 @@ import GHC.Stack
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
-#if !MIN_VERSION_base(4,13,0)
-import Control.Monad.Fail (MonadFail(..))
-#endif
-
-import Test.Falsify.Generator (Gen)
+import Test.Falsify.Internal.Generator (Gen)
 import Test.Falsify.Internal.Generator.Shrinking
 import Test.Falsify.Predicate (Predicate, (.$))
 
@@ -181,6 +177,12 @@ newtype Property' e a = WrapProperty {
       unwrapProperty :: TestResultT e (StateT TestRun Gen) a
     }
   deriving newtype (Functor, Applicative, Monad)
+
+-- | Property that uses strings as errors
+--
+-- Most of @falsify@'s internal functions work with 'Property'', but most
+-- user-facing functions use 'Property' instead.
+type Property = Property' String
 
 -- | Construct property
 --

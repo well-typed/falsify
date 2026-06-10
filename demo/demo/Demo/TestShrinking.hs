@@ -4,6 +4,7 @@ import Data.Default
 import Test.Tasty
 import Test.Tasty.Falsify
 
+import Test.Falsify
 import qualified Test.Falsify.Generator as Gen
 import qualified Test.Falsify.Predicate as P
 
@@ -36,5 +37,3 @@ prop_mod2 =
     testShrinking P.ge $ do
       x <- (`mod` 100) <$> gen Gen.prim
       testFailed x
-
-

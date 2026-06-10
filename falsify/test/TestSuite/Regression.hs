@@ -6,10 +6,8 @@ import Data.Word
 import Test.Tasty
 import Test.Tasty.HUnit
 
-import Test.Falsify.GenDefault
-import Test.Falsify.GenDefault.Std
-import Test.Falsify.Generator (Gen)
-import Test.Falsify.Interactive
+import Test.Falsify
+import Test.Falsify.Interactive (sample)
 
 import qualified Test.Falsify.Generator as Gen
 import qualified Test.Falsify.Range     as Range

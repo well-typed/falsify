@@ -12,8 +12,8 @@ import Text.Printf
 import qualified Data.Map as Map
 
 import Data.Falsify.WordN (WordN)
-import Test.Falsify.Range (Range)
 
+import Test.Falsify
 import qualified Data.Falsify.WordN as WordN
 import qualified Test.Falsify.Range as Range
 

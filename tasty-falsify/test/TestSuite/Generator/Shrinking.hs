@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module TestSuite.Prop.Generator.Shrinking (tests) where
+module TestSuite.Generator.Shrinking (tests) where
 
 import Control.Monad
 import Data.Bits
@@ -13,6 +13,7 @@ import Test.Tasty.Falsify
 
 import qualified Test.QuickCheck as QuickCheck
 
+import Test.Falsify
 import qualified Test.Falsify.Generator as Gen
 import qualified Test.Falsify.Predicate as P
 import qualified Test.Falsify.Range as Range

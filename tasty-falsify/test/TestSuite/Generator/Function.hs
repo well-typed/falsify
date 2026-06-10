@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module TestSuite.Prop.Generator.Function (tests) where
+module TestSuite.Generator.Function (tests) where
 
 import Control.Monad
 import Data.Default
@@ -10,8 +10,7 @@ import Test.Tasty.Falsify
 
 import qualified Data.Set as Set
 
-import Test.Falsify.Fun
-
+import Test.Falsify
 import qualified Test.Falsify.Generator as Gen
 import qualified Test.Falsify.Predicate as P
 import qualified Test.Falsify.Range     as Range

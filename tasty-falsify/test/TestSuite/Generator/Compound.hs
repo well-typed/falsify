@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module TestSuite.Prop.Generator.Compound (tests) where
+module TestSuite.Generator.Compound (tests) where
 
 import Control.Monad
 import Data.Default
@@ -11,8 +11,8 @@ import Test.Tasty.Falsify
 
 import Data.Falsify.Permutation (Permutation)
 import Data.Falsify.Tree (Tree(..))
-import Test.Falsify.Predicate (Predicate, (.$))
-import Test.Falsify.ShrinkTree (ShrinkTree)
+
+import Test.Falsify
 
 import qualified Data.Falsify.Permutation as Permutation
 import qualified Data.Falsify.Tree        as Tree

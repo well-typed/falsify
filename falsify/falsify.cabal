@@ -13,9 +13,10 @@ description:        This library provides property based testing with support
 
                     Most users will probably want to use the integration with
                     @<https://hackage.haskell.org/package/tasty tasty>@,
-                    and use "Test.Tasty.Falsify" as their main entrypoint
-                    into the library. The "Test.Falsify.Interactive" module
-                    can be used to experiment with the library in @ghci@.
+                    and use "Test.Tasty.Falsify" from the @tasty-falsify@
+                    package as their main entrypoint into the library.
+                    The "Test.Falsify.Interactive" module can be used to
+                    experiment with the library in @ghci@.
 
 license:            BSD-3-Clause
 license-file:       LICENSE
@@ -81,25 +82,24 @@ common lang
       TypeOperators
       ViewPatterns
 
+  if impl(ghc >= 9.2)
+    ghc-options: -Wunused-packages
+
 library
   import:
       lang
   exposed-modules:
-      Test.Falsify.Fun
+      Test.Falsify
+      Test.Falsify.Driver
       Test.Falsify.GenDefault
       Test.Falsify.GenDefault.Std
       Test.Falsify.Generator
       Test.Falsify.Interactive
       Test.Falsify.Marked
       Test.Falsify.Predicate
-      Test.Falsify.Property
       Test.Falsify.Range
       Test.Falsify.SampleTree
       Test.Falsify.ShrinkTree
-
-      -- For consistency with the other tasty runners, we places these modules
-      -- in the @Test.Tasty.*@ hiearchy instead of @Test.Falsify.*@.
-      Test.Tasty.Falsify
 
       -- General purpose datatypes
       Data.Falsify.ConcreteFun
@@ -110,7 +110,7 @@ library
   other-modules:
       Test.Falsify.Internal.Driver
       Test.Falsify.Internal.Driver.ReplaySeed
-      Test.Falsify.Internal.Driver.Tasty
+      Test.Falsify.Internal.Fun
       Test.Falsify.Internal.Generator
       Test.Falsify.Internal.Generator.Definition
       Test.Falsify.Internal.Generator.Shrinking
@@ -123,6 +123,8 @@ library
       -- /All/ definitions in these @Reexported.*@ modules are re-exported as
       -- part of "Test.Falsify.Generator", alongside selected definitions from
       -- "Test.Falsify.Internal.Generator".
+      --
+      -- TODO: This distinction isn't particularly useful anymore.
       Test.Falsify.Reexported.Generator.Compound
       Test.Falsify.Reexported.Generator.Function
       Test.Falsify.Reexported.Generator.Precision
@@ -134,23 +136,20 @@ library
   hs-source-dirs:
       src
   build-depends:
-    , base16-bytestring    >= 1.0  && < 1.1
-    , binary               >= 0.8  && < 0.9
-    , bytestring           >= 0.10 && < 0.13
-    , containers           >= 0.6  && < 0.9
-    , data-default         >= 0.7  && < 0.9
-    , mtl                  >= 2.2  && < 2.4
-    , optics-core          >= 0.3  && < 0.5
-    , optparse-applicative >= 0.16 && < 0.20
-    , selective            >= 0.4  && < 0.8
-    , sop-core             >= 0.5  && < 0.6
-    , splitmix             >= 0.1  && < 0.2
-    , tagged               >= 0.8  && < 0.9
-    , tasty                >= 1.3  && < 1.6
-    , vector               >= 0.12 && < 0.14
-  other-extensions:
-    CPP
+    , base16-bytestring >= 1.0  && < 1.1
+    , binary            >= 0.8  && < 0.9
+    , bytestring        >= 0.10 && < 0.13
+    , containers        >= 0.6  && < 0.9
+    , data-default      >= 0.7  && < 0.9
+    , mtl               >= 2.2  && < 2.4
+    , optics-core       >= 0.3  && < 0.5
+    , selective         >= 0.4  && < 0.8
+    , sop-core          >= 0.5  && < 0.6
+    , splitmix          >= 0.1  && < 0.2
+    , vector            >= 0.12 && < 0.14
 
+-- NOTE: We test the /generators/ as part of the @tasty-falsify@ test suite,
+-- since we need the @tasty@ integration.
 test-suite test-falsify
   import:
       lang
@@ -162,26 +161,15 @@ test-suite test-falsify
       Main.hs
   other-modules:
       TestSuite.GenDefault
-      TestSuite.Prop.Generator.Compound
-      TestSuite.Prop.Generator.Function
-      TestSuite.Prop.Generator.Marking
-      TestSuite.Prop.Generator.Precision
-      TestSuite.Prop.Generator.Prim
-      TestSuite.Prop.Generator.Selective
-      TestSuite.Prop.Generator.Shrinking
-      TestSuite.Prop.Generator.Simple
       TestSuite.Regression
       TestSuite.Sanity.Predicate
       TestSuite.Sanity.Range
       TestSuite.Sanity.Selective
-      TestSuite.Util.List
   build-depends:
-    , QuickCheck  >= 2.14 && < 2.19
-    , tasty-hunit >= 0.10 && < 0.11
-
-      -- Inherit bounds from the main library
+      -- Inherited bounds from the main library
     , containers
-    , data-default
     , falsify
     , selective
-    , tasty
+  build-depends:
+    , tasty       >= 1.3  && < 1.6
+    , tasty-hunit >= 0.10 && < 0.11

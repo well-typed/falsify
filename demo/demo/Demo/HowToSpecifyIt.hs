@@ -19,8 +19,7 @@ import qualified Data.List   as L
 import qualified Data.Tree   as Rose
 import qualified Data.Vector as V
 
-import Test.Falsify.Predicate ((.$))
-
+import Test.Falsify
 import qualified Test.Falsify.Generator as Gen
 import qualified Test.Falsify.Range     as Range
 import qualified Test.Falsify.Predicate as P

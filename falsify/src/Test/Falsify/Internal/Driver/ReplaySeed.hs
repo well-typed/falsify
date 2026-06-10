@@ -1,5 +1,3 @@
-{-# LANGUAGE CPP #-}
-
 -- | Replay seeds
 --
 -- We need a seed/gamma pair to initialize a splitmix PRNG. This is however a
@@ -11,7 +9,6 @@
 module Test.Falsify.Internal.Driver.ReplaySeed (
     ReplaySeed(..)
   , parseReplaySeed
-  , safeReadReplaySeed
   , splitmixReplaySeed
   ) where
 
@@ -23,6 +20,13 @@ import System.Random.SplitMix
 import qualified Data.ByteString.Base16.Lazy as Lazy.Base16
 import qualified Data.ByteString.Lazy.Char8  as Lazy.Char8
 
+-- | Replay seed
+--
+-- By default, when we falsify a property we start with a PRNG initialized using
+-- a random seed (produced using the system entropy; this relies on
+-- 'System.Random.SplitMix.initSMGen' in @splitmix@). When a property /fails/,
+-- we will report the exact seed used, so that the user can re-run the exact
+-- same test again, if desired.
 data ReplaySeed =
     ReplaySplitmix Word64 Word64
 
@@ -49,25 +53,20 @@ instance Show ReplaySeed where
   show = Lazy.Char8.unpack . Lazy.Base16.encode . encode
 
 instance IsString ReplaySeed where
-  fromString = aux . safeReadReplaySeed
+  fromString = aux . parseReplaySeed
     where
-      aux :: Maybe ReplaySeed -> ReplaySeed
-      aux Nothing  = error "ReplaySeed: invalid seed"
-      aux (Just s) = s
+      aux :: Either String ReplaySeed -> ReplaySeed
+      aux (Left  err)  = error $ "ReplaySeed: invalid seed: " ++ err
+      aux (Right seed) = seed
 
-safeReadReplaySeed :: String -> Maybe ReplaySeed
-safeReadReplaySeed = parseReplaySeed
-
-#if MIN_VERSION_base(4,13,0)
-parseReplaySeed :: forall m. MonadFail m => String -> m ReplaySeed
-#else
-parseReplaySeed :: forall m. Monad m => String -> m ReplaySeed
-#endif
-
+-- | Parse 'ReplaySeed'
+--
+-- Returns 'Left' an error message if parsing failed.
+parseReplaySeed :: String -> Either String ReplaySeed
 parseReplaySeed str = do
     raw <- case Lazy.Base16.decode (Lazy.Char8.pack str) of
-             Left err -> fail err
-             Right x  -> return x
+             Left err -> Left err
+             Right x  -> Right x
     case decodeOrFail raw of
-      Left  (_, _, err) -> fail err
+      Left  (_, _, err) -> Left err
       Right (_, _, x)   -> return x

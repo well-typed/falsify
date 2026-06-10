@@ -7,15 +7,13 @@ module Demo.Predicates (tests) where
 
 import Control.Monad
 import Test.Tasty
+import Test.Tasty.Falsify
 
 import qualified Test.Tasty.ExpectedFailure as Tasty
-import qualified Test.Tasty.Falsify         as Falsify
 import qualified Test.Tasty.HUnit           as HUnit
 import qualified Test.Tasty.QuickCheck      as QuickCheck
 
-import Test.Tasty.Falsify
-import Test.Falsify.Predicate (Predicate, (.$))
-
+import Test.Falsify
 import qualified Test.Falsify.Predicate as P
 
 {-------------------------------------------------------------------------------
@@ -34,21 +32,21 @@ tests = Tasty.expectFail $ testGroup "Demo.Predicates" [
             , QuickCheck.testProperty "equal" test_qc_equal
             ]
         , testGroup "falsify" [
-              Falsify.testProperty "bool"  test_falsify_bool
-            , Falsify.testProperty "equal" test_falsify_equal
+              testProperty "bool"  test_falsify_bool
+            , testProperty "equal" test_falsify_equal
             ]
         ]
     , testGroup "Introduction" [
-          Falsify.testProperty "even1"         test_even1
-        , Falsify.testProperty "even2"         test_even2
-        , Falsify.testProperty "equal"         test_equal
-        , Falsify.testProperty "samePolarity1" test_samePolarity1
-        , Falsify.testProperty "samePolarity2" test_samePolarity2
-        , Falsify.testProperty "samePolarity3" test_samePolarity3
-        , Falsify.testProperty "samePolarity4" test_samePolarity4
+          testProperty "even1"         test_even1
+        , testProperty "even2"         test_even2
+        , testProperty "equal"         test_equal
+        , testProperty "samePolarity1" test_samePolarity1
+        , testProperty "samePolarity2" test_samePolarity2
+        , testProperty "samePolarity3" test_samePolarity3
+        , testProperty "samePolarity4" test_samePolarity4
         ]
     , testGroup "Other" [
-          Falsify.testProperty "realVsModel" test_realVsModel
+          testProperty "realVsModel" test_realVsModel
         ]
     ]
 
@@ -72,11 +70,11 @@ test_qc_bool = QuickCheck.property $ x == y
 test_qc_equal :: QuickCheck.Property
 test_qc_equal = QuickCheck.property $ x QuickCheck.=== y
 
-test_falsify_bool :: Falsify.Property ()
-test_falsify_bool = when (x /= y) $ Falsify.testFailed "uhoh"
+test_falsify_bool :: Property ()
+test_falsify_bool = when (x /= y) $ testFailed "uhoh"
 
-test_falsify_equal :: Falsify.Property ()
-test_falsify_equal = Falsify.assert $ P.eq .$ ("x", x) .$ ("y", y)
+test_falsify_equal :: Property ()
+test_falsify_equal = assert $ P.eq .$ ("x", x) .$ ("y", y)
 
 {-------------------------------------------------------------------------------
   Introduction to predicates

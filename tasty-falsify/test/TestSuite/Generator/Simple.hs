@@ -1,21 +1,20 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module TestSuite.Prop.Generator.Simple (tests) where
+module TestSuite.Generator.Simple (tests) where
 
 import Control.Monad (unless)
+import Data.Bits
 import Data.List (intercalate)
+import Data.Proxy
+import Data.Typeable
 import Data.Word
 import Test.Tasty
 import Test.Tasty.Falsify
 
-import Test.Falsify.Predicate ((.$))
-
+import Test.Falsify
 import qualified Test.Falsify.Generator as Gen
 import qualified Test.Falsify.Predicate as P
 import qualified Test.Falsify.Range     as Range
-import Data.Bits
-import Data.Proxy
-import Data.Typeable
 
 tests :: TestTree
 tests = testGroup "TestSuite.Prop.Generator.Simple" [
