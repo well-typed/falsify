@@ -81,6 +81,8 @@ A number of type aliases have been replaced by newtypes.
   are a more natural fit when used together with `lam` to construct predicates
   of arbitrary arity. To consider the old `alwaysFail`, use `Fail "Fail"`.
 * Predicate documentation has been significantly improved.
+* `Test.Falsify.Interactive` now offers a pure function `sampleUsing` (#65),
+  using `ReplaySeed` to initialize the PRNG. `ReplaySeed` is no longer opaque.
 * Dropped support for GHC < 8.10.7
 
 ## 0.3.0 -- 2026-03-05

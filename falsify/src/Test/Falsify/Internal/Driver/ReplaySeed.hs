@@ -27,25 +27,30 @@ import qualified Data.ByteString.Lazy.Char8  as Lazy.Char8
 -- 'System.Random.SplitMix.initSMGen' in @splitmix@). When a property /fails/,
 -- we will report the exact seed used, so that the user can re-run the exact
 -- same test again, if desired.
-data ReplaySeed =
-    ReplaySplitmix Word64 Word64
+--
+-- The definition of t'ReplaySeed' is part of @falsify's@ public API, to make it
+-- possible to use custom drivers.
+data ReplaySeed = ReplaySeed{
+      replaySeed  :: Word64 -- ^ Seed
+    , replayGamma :: Word64 -- ^ Gamma (must be odd)
+    }
 
 splitmixReplaySeed :: SMGen -> ReplaySeed
-splitmixReplaySeed = uncurry ReplaySplitmix . unseedSMGen
+splitmixReplaySeed = uncurry ReplaySeed . unseedSMGen
 
 instance Binary ReplaySeed where
-  put (ReplaySplitmix seed gamma) = do
+  put ReplaySeed{replaySeed, replayGamma} = do
       putWord8 1
-      put seed
-      put gamma
+      put replaySeed
+      put replayGamma
 
   get = do
       tag <- getWord8
       case tag of
-        1 -> do seed  <- get
-                gamma <- get
-                if odd gamma
-                  then return $ ReplaySplitmix seed gamma
+        1 -> do replaySeed  <- get
+                replayGamma <- get
+                if odd replayGamma
+                  then return $ ReplaySeed{replaySeed, replayGamma}
                   else fail $ "ReplaySeed: expected odd gamma for splitmix"
         n -> fail $ "ReplaySeed: invalid tag: " ++ show n
 
@@ -59,7 +64,7 @@ instance IsString ReplaySeed where
       aux (Left  err)  = error $ "ReplaySeed: invalid seed: " ++ err
       aux (Right seed) = seed
 
--- | Parse 'ReplaySeed'
+-- | Parse t'ReplaySeed'
 --
 -- Returns 'Left' an error message if parsing failed.
 parseReplaySeed :: String -> Either String ReplaySeed

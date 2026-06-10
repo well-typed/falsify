@@ -9,7 +9,7 @@ module Test.Falsify.Driver (
     falsify
     -- * Options
   , Options(..)
-  , ReplaySeed -- opaque
+  , ReplaySeed(..)
   , ExpectFailure(..)
   , Verbose(..)
   , parseReplaySeed
