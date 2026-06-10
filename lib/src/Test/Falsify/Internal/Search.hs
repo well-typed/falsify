@@ -50,7 +50,7 @@ binarySearch = go 0 . deltas
 -- | Binary search without parity bias
 --
 -- For some cases the parity (even or odd) of a number is very important, and
--- unfotunately standard binary search is not very good at allowing search to
+-- unfortunately standard binary search is not very good at allowing search to
 -- flip between even and odd. For example, if we start with 'maxBound',
 -- /every/ possibly shrink value computed by 'binarySearch' is even. The
 -- situation is less extreme for other numbers, but it's nonetheless something
