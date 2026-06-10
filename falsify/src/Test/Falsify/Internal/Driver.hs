@@ -212,8 +212,8 @@ data DriverState a = DriverState {
 initDriverState :: Options -> IO (DriverState a)
 initDriverState opts = do
     prng <- case replay opts of
-              Just (ReplaySplitmix seed gamma) ->
-                return $ seedSMGen seed gamma
+              Just ReplaySeed{replaySeed, replayGamma} ->
+                return $ seedSMGen replaySeed replayGamma
               Nothing ->
                 initSMGen
     return $ DriverState {
