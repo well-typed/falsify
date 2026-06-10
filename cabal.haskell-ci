@@ -1,3 +1,4 @@
 branches: main
 copy-fields: all
+local-ghc-options: -Werror
 cabal-check: False
