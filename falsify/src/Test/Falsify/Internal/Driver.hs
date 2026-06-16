@@ -37,12 +37,14 @@ import qualified Data.List.NonEmpty as NE
 import qualified Data.Map           as Map
 import qualified Data.Set           as Set
 
+import Test.Falsify.Internal.Context (Context(Context))
 import Test.Falsify.Internal.Driver.ReplaySeed
 import Test.Falsify.Internal.Generator
 import Test.Falsify.Internal.Property
 import Test.Falsify.Internal.Shrinking
 import Test.Falsify.SampleTree (SampleTree)
 
+import qualified Test.Falsify.Internal.Context as Context
 import qualified Test.Falsify.SampleTree as SampleTree
 
 {-------------------------------------------------------------------------------
@@ -125,9 +127,20 @@ falsify opts prop = do
       }
   where
     go :: DriverState a -> IO ([Success a], Word, Maybe (Failure e))
-    go acc | todo acc == 0 = return (successes acc, discardedTotal acc, Nothing)
+    go acc | thisTest acc > tests opts
+           = return (successes acc, discardedTotal acc, Nothing)
     go acc = do
-        let now, later :: SMGen
+        let ctx :: Context
+            ctx = Context{
+                tests       = tests opts
+              , thisTest    = thisTest acc
+              , maxShrinks  = maxShrinks opts
+              , thisShrink  = Nothing
+              , finalShrink = False
+              , maxRatio    = maxRatio opts
+              }
+
+            now, later :: SMGen
             (now, later) = splitSMGen (prng acc)
 
             st :: SampleTree
@@ -136,7 +149,7 @@ falsify opts prop = do
             result :: TestResult e a
             run    :: TestRun
             shrunk :: [SampleTree]
-            ((result, run), shrunk) = runGen (runProperty prop) st
+            ((result, run), shrunk) = runGen (runProperty prop ctx) st
 
         case result of
           -- Test passed
@@ -159,13 +172,23 @@ falsify opts prop = do
           -- We ignore the failure message here, because this is the failure
           -- message before shrinking, which we are typically not interested in.
           TestFailed e -> do
-            let explanation :: ShrinkExplanation (e, TestRun) TestRun
+            let explanation, explanation' :: ShrinkExplanation (e, TestRun) TestRun
                 explanation =
-                    limitShrinkSteps (maxShrinks opts) . second snd $
+                    second snd $
                       shrinkFrom
+                        (maxShrinks opts)
                         resultIsValidShrink
                         (runProperty prop)
+                        ctx
                         ((e, run), shrunk)
+
+                explanation' = case history explanation of
+                    ShrunkTo _ _ -> explanation
+                    _            -> explanation{initial = finalInitial}
+
+                finalInitial :: (e, TestRun)
+                finalInitial =
+                  finalShrink resultIsValidShrink (runProperty prop) ctx st
 
                 -- We have to be careful here: if the user specifies a seed, we
                 -- will first /split/ it to run the test (call to splitSMGen,
@@ -174,7 +197,7 @@ falsify opts prop = do
                 failure :: Failure e
                 failure = Failure {
                       failureSeed = splitmixReplaySeed (prng acc)
-                    , failureRun  = explanation
+                    , failureRun  = explanation'
                     }
 
             return (successes acc, discardedTotal acc, Just failure)
@@ -198,14 +221,14 @@ data DriverState a = DriverState {
       -- | Accumulated successful tests
     , successes :: [Success a]
 
-      -- | Number of tests still to execute
-    , todo :: Word
-
       -- | Number of tests we discarded so far (for this test)
     , discardedForTest :: Word
 
       -- | Number of tests we discarded (in total)
     , discardedTotal :: Word
+
+      -- | Current test number
+    , thisTest :: Word
     }
   deriving (Show)
 
@@ -219,27 +242,27 @@ initDriverState opts = do
     return $ DriverState {
         prng
       , successes        = []
-      , todo             = tests opts
       , discardedForTest = 0
       , discardedTotal   = 0
+      , thisTest         = 1
       }
 
 withSuccess :: SMGen -> Success a -> DriverState a -> DriverState a
 withSuccess next success acc = DriverState {
       prng             = next
     , successes        = success : successes acc
-    , todo             = pred (todo acc)
     , discardedForTest = 0 -- reset for the next test
     , discardedTotal   = discardedTotal acc
+    , thisTest         = succ (thisTest acc)
     }
 
 withDiscard :: SMGen -> DriverState a -> DriverState a
 withDiscard next acc = DriverState {
       prng             = next
     , successes        = successes acc
-    , todo             = todo acc
     , discardedForTest = succ $ discardedForTest acc
     , discardedTotal   = succ $ discardedTotal acc
+    , thisTest         = thisTest acc
     }
 
 {-------------------------------------------------------------------------------

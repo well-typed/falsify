@@ -25,6 +25,7 @@ module Test.Falsify.Internal.Property (
   , discard
   , label
   , collect
+  , getContext
     -- * Testing shrinking
   , testShrinking
   , testMinimum
@@ -37,6 +38,7 @@ module Test.Falsify.Internal.Property (
 import Prelude hiding (log)
 
 import Control.Monad
+import Control.Monad.Reader
 import Control.Monad.State
 import Data.Foldable (toList)
 import Data.List.NonEmpty (NonEmpty)
@@ -48,10 +50,12 @@ import GHC.Stack
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
+import Test.Falsify.Internal.Context (Context(Context))
 import Test.Falsify.Internal.Generator
 import Test.Falsify.Internal.Shrinking
 import Test.Falsify.Predicate (Predicate, (.$))
 
+import qualified Test.Falsify.Internal.Context as Context
 import qualified Test.Falsify.Generator as Gen
 import qualified Test.Falsify.Predicate as P
 
@@ -101,7 +105,7 @@ initTestRun = TestRun {
 -- This is an internal function, used when testing shrinking to include the runs
 -- from an unshrunk test and a shrunk test.
 appendLog :: Log -> Property' e ()
-appendLog (Log log') = mkProperty $ \run@TestRun{runLog = Log log} -> return (
+appendLog (Log log') = mkProperty $ \_ctx run@TestRun{runLog = Log log} -> return (
       TestPassed ()
     , run{runLog = Log $ log' ++ log}
     )
@@ -173,7 +177,7 @@ instance Monad m => Monad (TestResultT e m) where
 -- In most cases, you will probably want to use t'Test.Falsify.Property.Property'
 -- instead, which fixes @e@ at 'String'.
 newtype Property' e a = WrapProperty {
-      unwrapProperty :: TestResultT e (StateT TestRun Gen) a
+      unwrapProperty :: TestResultT e (ReaderT Context (StateT TestRun Gen)) a
     }
   deriving newtype (Functor, Applicative, Monad)
 
@@ -186,12 +190,13 @@ type Property = Property' String
 -- | Construct property
 --
 -- This is a low-level function for internal use only.
-mkProperty :: (TestRun -> Gen (TestResult e a, TestRun)) -> Property' e a
-mkProperty = WrapProperty . TestResultT . StateT
+mkProperty :: (Context -> TestRun -> Gen (TestResult e a, TestRun)) -> Property' e a
+mkProperty f = WrapProperty $ TestResultT $ ReaderT $ \ctx -> StateT (f ctx)
 
 -- | Run property
-runProperty :: Property' e a -> Gen (TestResult e a, TestRun)
-runProperty = flip runStateT initTestRun . runTestResultT . unwrapProperty
+runProperty :: Property' e a -> Context -> Gen (TestResult e a, TestRun)
+runProperty p ctx =
+    flip runStateT initTestRun $ flip runReaderT ctx $ runTestResultT $ unwrapProperty p
 
 {-------------------------------------------------------------------------------
   'Property' features
@@ -199,18 +204,18 @@ runProperty = flip runStateT initTestRun . runTestResultT . unwrapProperty
 
 -- | Test failure
 testFailed :: e -> Property' e a
-testFailed err = mkProperty $ \run -> return (TestFailed err, run)
+testFailed err = mkProperty $ \_ctx run -> return (TestFailed err, run)
 
 -- | Discard this test
 discard :: Property' e a
-discard = mkProperty $ \run -> return (TestDiscarded, run)
+discard = mkProperty $ \_ctx run -> return (TestDiscarded, run)
 
 -- | Log some additional information about the test
 --
 -- This will be shown in verbose mode.
 info :: String -> Property' e ()
 info msg =
-    mkProperty $ \run@TestRun{runLog = Log log} -> return (
+    mkProperty $ \_ctx run@TestRun{runLog = Log log} -> return (
         TestPassed ()
       , run{runLog = Log $ Info msg : log}
       )
@@ -227,7 +232,7 @@ assert p =
 -- See 'collect' for detailed discussion.
 label :: String -> [String] -> Property' e ()
 label lbl vals =
-    mkProperty $ \run@TestRun{runLabels} -> return (
+    mkProperty $ \_ctx run@TestRun{runLabels} -> return (
         TestPassed ()
       , run{runLabels = Map.alter addValues lbl runLabels}
       )
@@ -299,6 +304,11 @@ collect l = label l . map show
 instance MonadFail (Property' String) where
   fail = testFailed
 
+
+-- | Get the context for the current test run
+getContext :: Property' e Context
+getContext = mkProperty $ \ctx run -> return (TestPassed ctx, run)
+
 {-------------------------------------------------------------------------------
   Running generators
 -------------------------------------------------------------------------------}
@@ -309,7 +319,7 @@ genWithCallStack :: forall e a.
                          -- (users don't care that 'gen' uses 'genWith').
   -> (a -> Maybe String) -- ^ Entry to add to the log (if any)
   -> Gen a -> Property' e a
-genWithCallStack stack f g = mkProperty $ \run -> aux run <$> g
+genWithCallStack stack f g = mkProperty $ \_ctx run -> aux run <$> g
   where
     aux :: TestRun -> a -> (TestResult e a, TestRun)
     aux run@TestRun{runLog = Log log} x = (
@@ -338,8 +348,16 @@ genWith = genWithCallStack callStack
 -- | Construct random path through the property's shrink tree
 genShrinkPath :: Property' e () -> Property' e' [(e, TestRun)]
 genShrinkPath prop = do
+    let ctx = Context {
+              tests = 1
+            , thisTest = 1
+            , maxShrinks = Nothing
+            , thisShrink = Nothing
+            , finalShrink = False
+            , maxRatio = 100
+            }
     st    <- genWith (const Nothing) $
-               Gen.toShrinkTree (runProperty prop)
+               Gen.toShrinkTree (runProperty prop ctx)
     mPath <- genWith (const Nothing) $
                Gen.path (isValidShrink . resultIsValidShrink) st
     aux mPath
@@ -403,8 +421,16 @@ testMinimum :: forall e.
   -> Property' e ()
   -> Property' String ()
 testMinimum p prop = do
+    let ctx = Context {
+              tests       = 1
+            , thisTest    = 1
+            , maxShrinks  = Nothing
+            , thisShrink  = Nothing
+            , finalShrink = False
+            , maxRatio    = 100
+            }
     st <- genWith (const Nothing) $ Gen.captureLocalTree
-    case runGen (runProperty prop) st of
+    case runGen (runProperty prop ctx) st of
       ((TestPassed (), _run), _shrunk) ->
         -- The property passed; nothing to test
         discard
@@ -412,16 +438,27 @@ testMinimum p prop = do
         -- The property needs to be discarded; discard this one, too
         discard
       ((TestFailed initErr, initRun), shrunk) -> do
-        let explanation :: ShrinkExplanation (e, TestRun) (Maybe (), TestRun)
+        let explanation, explanation' ::
+              ShrinkExplanation (e, TestRun) (Maybe (), TestRun)
             explanation = shrinkFrom
+                            Nothing
                             resultIsValidShrink
                             (runProperty prop)
+                            ctx
                             ((initErr, initRun), shrunk)
+
+            explanation' = case history explanation of
+                ShrunkTo _ _ -> explanation
+                _            -> explanation{initial = finalInitial}
+
+            finalInitial :: (e, TestRun)
+            finalInitial =
+              finalShrink resultIsValidShrink (runProperty prop) ctx st
 
             minErr    :: e
             minRun    :: TestRun
             mRejected :: Maybe [(Maybe (), TestRun)]
-            ((minErr, minRun), mRejected) = shrinkOutcome explanation
+            ((minErr, minRun), mRejected) = shrinkOutcome explanation'
 
             rejected :: [TestRun]
             rejected  = maybe [] (map snd) mRejected
@@ -453,7 +490,7 @@ testGen p = testGen' $ \a -> P.eval $ p .$ ("generated", a)
 
 -- | Generalization of 'testGen'
 testGen' :: forall e a b. (a -> Either e b) -> Gen a -> Property' e b
-testGen' p g = WrapProperty $ TestResultT $ StateT $ \run ->
+testGen' p g = WrapProperty $ TestResultT $ ReaderT $ \_ctx -> StateT $ \run ->
     -- We do not use bind here to avoid introducing new shrinking shortcuts
     aux run <$> g
   where

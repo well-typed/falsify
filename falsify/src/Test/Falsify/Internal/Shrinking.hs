@@ -6,7 +6,7 @@ module Test.Falsify.Internal.Shrinking (
   , ShrinkHistory(..)
   , IsValidShrink(..)
   , isValidShrink
-  , limitShrinkSteps
+  , finalShrink
   , shrinkHistory
   , shrinkOutcome
   ) where
@@ -15,8 +15,11 @@ import Data.Bifunctor
 import Data.Either
 import Data.List.NonEmpty (NonEmpty((:|)))
 
+import Test.Falsify.Internal.Context (Context)
 import Test.Falsify.Internal.Generator
 import Test.Falsify.SampleTree (SampleTree(..))
+
+import qualified Test.Falsify.Internal.Context as Context
 
 {-------------------------------------------------------------------------------
   Explanation
@@ -52,21 +55,6 @@ data ShrinkHistory p n =
     -- This is used when the number of shrink steps is limited.
   | ShrinkingStopped
   deriving (Show)
-
-limitShrinkSteps :: Maybe Word -> ShrinkExplanation p n -> ShrinkExplanation p n
-limitShrinkSteps Nothing      = id
-limitShrinkSteps (Just limit) = \case
-    ShrinkExplanation{initial, history} ->
-      ShrinkExplanation{
-          initial
-        , history = go limit history
-        }
-  where
-    go :: Word -> ShrinkHistory p n -> ShrinkHistory p n
-    go 0 (ShrunkTo _ _)      = ShrinkingStopped
-    go n (ShrunkTo x xs)     = ShrunkTo x (go (pred n) xs)
-    go _ (ShrinkingDone rej) = ShrinkingDone rej
-    go _ ShrinkingStopped    = ShrinkingStopped
 
 -- | Simplify the shrink explanation to keep only the shrink history
 shrinkHistory :: ShrinkExplanation p n -> NonEmpty p
@@ -134,6 +122,28 @@ isValidShrink :: IsValidShrink p n -> Either n p
 isValidShrink (ValidShrink p)   = Right p
 isValidShrink (InvalidShrink n) = Left n
 
+-- | Rerun the final shrink with the context flag 'Test.Falsify.Context.finalShrink'
+-- asserted
+finalShrink :: forall a p n.
+     (a -> IsValidShrink p n)
+  -> (Context -> Gen a)
+  -> Context
+  -> SampleTree
+  -> p
+finalShrink prop gen ctx st =
+    case prop a of
+      ValidShrink p -> p
+      _             -> error finalErrorMsg
+  where
+    a =
+      fst $
+        runGen
+          (gen ctx{Context.finalShrink = True})
+          st
+
+    finalErrorMsg :: String
+    finalErrorMsg = "Inconsistent test: failing test did not fail with finalShrink True"
+
 -- | Find smallest value that the generator can produce and still satisfies
 -- the predicate.
 --
@@ -142,33 +152,45 @@ isValidShrink (InvalidShrink n) = Left n
 -- To avoid boolean blindness, we use different types for values that satisfy
 -- the property and values that do not.
 --
--- This is lazy in the shrink history; see 'limitShrinkSteps' to limit the
--- number of shrinking steps.
+-- This is lazy in the shrink history.
 shrinkFrom :: forall a p n.
-     (a -> IsValidShrink p n)
-  -> Gen a
+     Maybe Word -- ^ Limit amount of shrinking steps
+  -> (a -> IsValidShrink p n)
+  -> (Context -> Gen a)
+  -> Context
   -> (p, [SampleTree]) -- ^ Initial result of the generator
   -> ShrinkExplanation p n
-shrinkFrom prop gen = \(p, shrunk) ->
-    ShrinkExplanation p $ go shrunk
+shrinkFrom limit prop gen ctx = \(p, shrunk) ->
+    ShrinkExplanation p $ go 1 shrunk
   where
-    go :: [SampleTree] -> ShrinkHistory p n
-    go shrunk =
+    go i shrunk =
         -- Shrinking is a greedy algorithm: we go with the first candidate that
         -- works, and discard the others.
-        --
+        if | ([], rejected) <- candidates
+           -> ShrinkingDone rejected
+           | Just li <- limit
+           , i > li
+           -> ShrinkingStopped
+           | ((st, p, shrunk'):_, _) <- candidates
+           -> let next :: ShrinkHistory p n
+                  next = go (succ i) shrunk'
+              in case next of
+                   ShrunkTo _ _ -> ShrunkTo p next
+                   _            -> ShrunkTo (finalShrink prop gen ctx' st) next
+      where
         -- NOTE: 'partitionEithers' is lazy enough:
         --
         -- > head . fst $ partitionEithers [Left True, undefined] == True
-        case partitionEithers candidates of
-          ([], rejected)      -> ShrinkingDone rejected
-          ((p, shrunk'):_, _) -> ShrunkTo p $ go shrunk'
-      where
-        candidates :: [Either (p, [SampleTree]) n]
-        candidates = map consider $ map (runGen gen) shrunk
+        candidates :: ([(SampleTree, p, [SampleTree])], [n])
+        candidates = partitionEithers $ map consider shrunk
 
-    consider :: (a, [SampleTree]) -> Either (p, [SampleTree]) n
-    consider (a, shrunk) =
-        case prop a of
-          ValidShrink p   -> Left (p, shrunk)
-          InvalidShrink n -> Right n
+        consider :: SampleTree -> Either (SampleTree, p, [SampleTree]) n
+        consider st =
+            case prop a of
+              ValidShrink p   -> Left (st, p, shrunk')
+              InvalidShrink n -> Right n
+          where
+            (a, shrunk') = runGen (gen ctx') st
+
+        ctx' :: Context
+        ctx' = ctx{Context.thisShrink = Just i}

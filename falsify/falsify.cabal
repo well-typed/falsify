@@ -90,6 +90,7 @@ library
       lang
   exposed-modules:
       Test.Falsify
+      Test.Falsify.Context
       Test.Falsify.Driver
       Test.Falsify.GenDefault
       Test.Falsify.GenDefault.Std
@@ -108,6 +109,7 @@ library
       Data.Falsify.Tree
       Data.Falsify.WordN
   other-modules:
+      Test.Falsify.Internal.Context
       Test.Falsify.Internal.Driver
       Test.Falsify.Internal.Driver.ReplaySeed
       Test.Falsify.Internal.Fun
