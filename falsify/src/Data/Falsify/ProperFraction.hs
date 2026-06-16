@@ -3,8 +3,12 @@
 -- Intended for qualified import.
 --
 -- > import Data.Falsify.ProperFraction (ProperFraction(..))
+-- > import qualified Data.Falsify.ProperFraction as ProperFraction
 module Data.Falsify.ProperFraction (
     ProperFraction(ProperFraction)
+    -- * Use
+  , scaleIntegral
+  , scaleFractional
   ) where
 
 import Prelude hiding (properFraction)
@@ -38,3 +42,14 @@ pattern ProperFraction f <- (getProperFraction -> f)
     ProperFraction = mkProperFraction
 
 {-# COMPLETE ProperFraction #-}
+
+{-------------------------------------------------------------------------------
+  Use
+-------------------------------------------------------------------------------}
+
+scaleIntegral :: Integral a => a -> ProperFraction -> a
+scaleIntegral x (ProperFraction f) = round $ fromIntegral x * f
+
+scaleFractional :: Fractional a => a -> ProperFraction -> a
+scaleFractional x (ProperFraction f) = x * realToFrac f
+

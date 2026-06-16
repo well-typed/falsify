@@ -16,8 +16,12 @@ import qualified Test.Falsify.Generator as Gen
 import qualified Test.Falsify.Predicate as P
 import qualified Test.Falsify.Range     as Range
 
+{-------------------------------------------------------------------------------
+  List of tests
+-------------------------------------------------------------------------------}
+
 tests :: TestTree
-tests = testGroup "TestSuite.Prop.Generator.Simple" [
+tests = testGroup "TestSuite.Generator.Simple" [
     testGroup "prim" [
         testProperty "shrinking" prop_prim_shrinking
       , testGroup "minimum" [

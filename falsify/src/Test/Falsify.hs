@@ -29,10 +29,15 @@ module Test.Falsify (
   , Property.label
   , Property.collect
   , Property.info
+  , Property.getContext
+  , Property.sized
     -- ** Testing generators
   , Property.testMinimum
+  , Property.testMinimumForIteration
   , Property.testShrinking
+  , Property.testShrinkingForIteration
   , Property.testShrinkingOfGen
+  , Property.testShrinkingOfGenForIteration
   , Property.testGen
   , Property.testGen'
     -- ** Functions

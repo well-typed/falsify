@@ -37,12 +37,14 @@ import qualified Data.List.NonEmpty as NE
 import qualified Data.Map           as Map
 import qualified Data.Set           as Set
 
+import Test.Falsify.Context (Context(Context))
 import Test.Falsify.Internal.Driver.ReplaySeed
 import Test.Falsify.Internal.Generator
 import Test.Falsify.Internal.Property
 import Test.Falsify.Internal.Shrinking
 import Test.Falsify.SampleTree (SampleTree)
 
+import qualified Test.Falsify.Context    as Context
 import qualified Test.Falsify.SampleTree as SampleTree
 
 {-------------------------------------------------------------------------------
@@ -77,15 +79,16 @@ instance Default Options where
 -------------------------------------------------------------------------------}
 
 data Success a = Success {
-      successResult :: a
-    , successSeed   :: ReplaySeed
-    , successRun    :: TestRun
+      successIteration :: Context.Iteration
+    , successResult    :: a
+    , successSeed      :: ReplaySeed
+    , successRun       :: TestRun
     }
   deriving (Show)
 
 data Failure e = Failure {
       failureSeed :: ReplaySeed
-    , failureRun  :: ShrinkExplanation (e, TestRun) TestRun
+    , failureRun  :: ShrinkExplanation (Counterexample e) TestRun
     }
   deriving (Show)
 
@@ -124,10 +127,29 @@ falsify opts prop = do
       , testFailure    = mFailure
       }
   where
+    static :: Context.Static
+    static = Context.Static{
+          tests      = tests      opts
+        , maxShrinks = maxShrinks opts
+        , maxRatio   = maxRatio   opts
+        }
+
     go :: DriverState a -> IO ([Success a], Word, Maybe (Failure e))
-    go acc | todo acc == 0 = return (successes acc, discardedTotal acc, Nothing)
+    go acc | thisTest acc > tests opts = return (
+          reverse $ successes acc
+        , discardedTotal acc
+        , Nothing
+        )
     go acc = do
-        let now, later :: SMGen
+        let iteration :: Context.Iteration
+            iteration = Context.Iteration{
+                  thisTest = thisTest acc
+                }
+
+            initContext :: Context
+            initContext = Context static iteration Context.Initial
+
+            now, later :: SMGen
             (now, later) = splitSMGen (prng acc)
 
             st :: SampleTree
@@ -136,16 +158,17 @@ falsify opts prop = do
             result :: TestResult e a
             run    :: TestRun
             shrunk :: [SampleTree]
-            ((result, run), shrunk) = runGen (runProperty prop) st
+            ((result, run), shrunk) = runGen (runProperty prop initContext) st
 
         case result of
           -- Test passed
           TestPassed x -> do
             let success :: Success a
                 success = Success {
-                    successResult = x
-                  , successSeed   = splitmixReplaySeed now
-                  , successRun    = run
+                    successIteration = iteration
+                  , successResult    = x
+                  , successSeed      = splitmixReplaySeed now
+                  , successRun       = run
                   }
             if runDeterministic run then
               case (successes acc, discardedTotal acc) of
@@ -159,13 +182,18 @@ falsify opts prop = do
           -- We ignore the failure message here, because this is the failure
           -- message before shrinking, which we are typically not interested in.
           TestFailed e -> do
-            let explanation :: ShrinkExplanation (e, TestRun) TestRun
+            let explanation :: ShrinkExplanation (Counterexample e) TestRun
                 explanation =
-                    limitShrinkSteps (maxShrinks opts) . second snd $
+                    second snd $
                       shrinkFrom
-                        resultIsValidShrink
-                        (runProperty prop)
-                        ((e, run), shrunk)
+                        static
+                        iteration
+                        ( \ctx ->
+                             resultIsValidShrink (Context.execution ctx) <$>
+                               runProperty prop ctx
+                        )
+                        st
+                        (Counterexample Context.Initial e run, shrunk)
 
                 -- We have to be careful here: if the user specifies a seed, we
                 -- will first /split/ it to run the test (call to splitSMGen,
@@ -198,14 +226,14 @@ data DriverState a = DriverState {
       -- | Accumulated successful tests
     , successes :: [Success a]
 
-      -- | Number of tests still to execute
-    , todo :: Word
-
       -- | Number of tests we discarded so far (for this test)
     , discardedForTest :: Word
 
       -- | Number of tests we discarded (in total)
     , discardedTotal :: Word
+
+      -- | Current test number
+    , thisTest :: Word
     }
   deriving (Show)
 
@@ -219,27 +247,27 @@ initDriverState opts = do
     return $ DriverState {
         prng
       , successes        = []
-      , todo             = tests opts
       , discardedForTest = 0
       , discardedTotal   = 0
+      , thisTest         = 1
       }
 
 withSuccess :: SMGen -> Success a -> DriverState a -> DriverState a
 withSuccess next success acc = DriverState {
       prng             = next
     , successes        = success : successes acc
-    , todo             = pred (todo acc)
     , discardedForTest = 0 -- reset for the next test
     , discardedTotal   = discardedTotal acc
+    , thisTest         = succ (thisTest acc)
     }
 
 withDiscard :: SMGen -> DriverState a -> DriverState a
 withDiscard next acc = DriverState {
       prng             = next
     , successes        = successes acc
-    , todo             = todo acc
     , discardedForTest = succ $ discardedForTest acc
     , discardedTotal   = succ $ discardedTotal acc
+    , thisTest         = thisTest acc
     }
 
 {-------------------------------------------------------------------------------
@@ -333,7 +361,7 @@ renderTestOutcome
                , ""
                , "Logs for each test run below."
                , ""
-               , unlines $ map renderSuccess (zip [1..] successes)
+               , unlines $ map renderSuccess successes
                ]
            }
 
@@ -352,7 +380,7 @@ renderTestOutcome
                , ""
                , "Logs for each test run below."
                , ""
-               , intercalate "\n" $ map renderSuccess (zip [1..] successes)
+               , intercalate "\n" $ map renderSuccess successes
                , showSeed initSeed
                ]
            }
@@ -374,7 +402,7 @@ renderTestOutcome
                    , countHistory history
                    , countDiscarded
                    ]
-               , fst $ NE.last history
+               , counterexampleError $ NE.last history
                ]
            }
          where
@@ -388,9 +416,9 @@ renderTestOutcome
                    , countHistory history
                    , countDiscarded
                    ]
-               , fst $ NE.last history
+               , counterexampleError $ NE.last history
                , "Logs for failed test run:"
-               , renderLog . runLog . snd $ NE.last history
+               , renderLog . runLog . counterexampleRun $ NE.last history
                ]
            }
          where
@@ -400,9 +428,9 @@ renderTestOutcome
              testPassed = False
            , testOutput = unlines [
                  "failed after " ++ countHistory history
-               , fst $ NE.last history
+               , counterexampleError $ NE.last history
                , "Logs for failed test run:"
-               , renderLog . runLog . snd $ NE.last history
+               , renderLog . runLog . counterexampleRun $ NE.last history
                , showSeed $ failureSeed e
                ]
            }
@@ -413,16 +441,16 @@ renderTestOutcome
              testPassed = False
            , testOutput = unlines [
                  "failed after " ++ countHistory history
-               , fst $ NE.last history
+               , counterexampleError $ NE.last history
                , ""
                , "Logs for complete shrink history:"
                , ""
                , intercalate "\n" $ [
                      intercalate "\n" [
-                         "Step " ++ show (step :: Word)
-                       , renderLog (runLog run)
+                         showStep (counterexampleContext example)
+                       , renderLog (runLog $ counterexampleRun example)
                        ]
-                   | (step, (_result, run)) <- zip [1..] (NE.toList history)
+                   | example <- NE.toList history
                    ]
                , showSeed $ failureSeed e
                ]
@@ -443,13 +471,27 @@ renderTestOutcome
 
     -- The history includes the original value, so the number of shrink steps
     -- is the length of the history minus 1.
-    countHistory :: NonEmpty (String, TestRun) -> [Char]
+    countHistory :: NonEmpty (Counterexample String) -> [Char]
     countHistory history = concat [
           if | length successes == 0 -> ""
              | otherwise             -> countSuccess ++ " and "
-        , if | length history   == 2 -> "1 shrink"
-             | otherwise             -> show (length history - 1) ++ " shrinks"
+        , if | numShrinks == 1 -> "1 shrink"
+             | otherwise       -> show numShrinks ++ " shrinks"
         ]
+      where
+        numShrinks :: Word
+        numShrinks =
+            case counterexampleContext $ NE.last history of
+              Context.Final i ->
+                -- Under normal circumstances this is the only expected case
+                i
+              Context.Initial ->
+                -- No shrinking steps at all
+                0
+              Context.Shrinking i ->
+                -- @i@ here is the index of the step, not the number of steps
+                i + 1
+
 
     showSeed :: ReplaySeed -> String
     showSeed seed = "Use --falsify-replay=" ++ show seed ++ " to replay."
@@ -504,10 +546,19 @@ renderTestOutcome
             . runLabels
             . successRun
 
-renderSuccess :: (Int, Success ()) -> String
-renderSuccess (ix, Success{successRun}) =
+    showStep :: Context.Execution -> [Char]
+    showStep = \case
+        Context.Initial ->
+          "Initial counter-example"
+        Context.Shrinking i ->
+          "Shrinking step " ++ show i
+        Context.Final i ->
+          "Final counter-example after " ++ show i ++ " shrink steps"
+
+renderSuccess :: Success () -> String
+renderSuccess Success{successIteration, successRun} =
     intercalate "\n" . concat $ [
-        ["Test " ++ show ix]
+        ["Test " ++ show (Context.thisTest successIteration)]
       , [renderLog $ runLog successRun]
       ]
 

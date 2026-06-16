@@ -6,7 +6,6 @@ module Test.Falsify.Internal.Shrinking (
   , ShrinkHistory(..)
   , IsValidShrink(..)
   , isValidShrink
-  , limitShrinkSteps
   , shrinkHistory
   , shrinkOutcome
   ) where
@@ -15,8 +14,11 @@ import Data.Bifunctor
 import Data.Either
 import Data.List.NonEmpty (NonEmpty((:|)))
 
+import Test.Falsify.Context (Context(Context))
 import Test.Falsify.Internal.Generator
 import Test.Falsify.SampleTree (SampleTree(..))
+
+import qualified Test.Falsify.Context as Context
 
 {-------------------------------------------------------------------------------
   Explanation
@@ -42,31 +44,22 @@ data ShrinkHistory p n =
 
     -- | We could no shrink any further
     --
-    -- We also record all rejected next steps. This is occasionally useful when
-    -- trying to figure out why a value didn't shrink any further (what did it
-    -- try to shrink to?)
-  | ShrinkingDone [n]
+    -- We record
+    --
+    -- * All rejected next steps
+    -- * The outcome of the repeated 'Context.Final' step
+    --
+    -- Recording the rejected next steps is occasionally useful when trying to
+    -- figure out why a value didn't shrink any further (what did it try to
+    -- shrink to?).
+  | ShrinkingDone [n] p
 
     -- | We stopped shrinking early
     --
     -- This is used when the number of shrink steps is limited.
-  | ShrinkingStopped
+    -- We record the outcome of the repeated 'Context.Final' step.
+  | ShrinkingStopped p
   deriving (Show)
-
-limitShrinkSteps :: Maybe Word -> ShrinkExplanation p n -> ShrinkExplanation p n
-limitShrinkSteps Nothing      = id
-limitShrinkSteps (Just limit) = \case
-    ShrinkExplanation{initial, history} ->
-      ShrinkExplanation{
-          initial
-        , history = go limit history
-        }
-  where
-    go :: Word -> ShrinkHistory p n -> ShrinkHistory p n
-    go 0 (ShrunkTo _ _)      = ShrinkingStopped
-    go n (ShrunkTo x xs)     = ShrunkTo x (go (pred n) xs)
-    go _ (ShrinkingDone rej) = ShrinkingDone rej
-    go _ ShrinkingStopped    = ShrinkingStopped
 
 -- | Simplify the shrink explanation to keep only the shrink history
 shrinkHistory :: ShrinkExplanation p n -> NonEmpty p
@@ -74,26 +67,26 @@ shrinkHistory = \(ShrinkExplanation unshrunk shrunk) ->
     unshrunk :| go shrunk
   where
     go :: ShrinkHistory p n -> [p]
-    go (ShrunkTo x xs)   = x : go xs
-    go (ShrinkingDone _) = []
-    go ShrinkingStopped  = []
+    go (ShrunkTo x xs)       = x : go xs
+    go (ShrinkingDone _ns p) = [p]
+    go (ShrinkingStopped  p) = [p]
 
 -- | The final shrunk value, as well as all rejected /next/ shrunk steps
 --
 -- The list of rejected next steps is
 --
--- * @Nothing@ if shrinking was terminated early ('limitShrinkSteps')
+-- * @Nothing@ if shrinking was terminated early (e.g. 'Context.maxShrinks')
 -- * @Just []@ if the final value truly is minimal (typically, it is only
 --   minimal wrt to a particular properly, but not the minimal value that a
 --   generator can produce).
 shrinkOutcome :: forall p n. ShrinkExplanation p n -> (p, Maybe [n])
-shrinkOutcome = \ShrinkExplanation{initial, history} ->
-    go initial history
+shrinkOutcome = \ShrinkExplanation{history} ->
+    go history
   where
-    go :: p -> ShrinkHistory p n -> (p, Maybe [n])
-    go _ (ShrunkTo p h)     = go p h
-    go p (ShrinkingDone ns) = (p, Just ns)
-    go p  ShrinkingStopped  = (p, Nothing)
+    go :: ShrinkHistory p n -> (p, Maybe [n])
+    go (ShrunkTo _p h)      = go h
+    go (ShrinkingDone ns p) = (p, Just ns)
+    go (ShrinkingStopped p) = (p, Nothing)
 
 {-------------------------------------------------------------------------------
   Mapping
@@ -113,12 +106,9 @@ instance Bifunctor ShrinkExplanation where
 
 instance Bifunctor ShrinkHistory where
   bimap f g = \case
-      ShrunkTo truncated history ->
-        ShrunkTo (f truncated) (bimap f g history)
-      ShrinkingDone rejected ->
-        ShrinkingDone (map g rejected)
-      ShrinkingStopped ->
-        ShrinkingStopped
+      ShrunkTo         p h -> ShrunkTo                 (f p) (bimap f g h)
+      ShrinkingDone ns p   -> ShrinkingDone (map g ns) (f p)
+      ShrinkingStopped p   -> ShrinkingStopped         (f p)
 
 {-------------------------------------------------------------------------------
   Shrinking
@@ -142,33 +132,74 @@ isValidShrink (InvalidShrink n) = Left n
 -- To avoid boolean blindness, we use different types for values that satisfy
 -- the property and values that do not.
 --
--- This is lazy in the shrink history; see 'limitShrinkSteps' to limit the
--- number of shrinking steps.
-shrinkFrom :: forall a p n.
-     (a -> IsValidShrink p n)
-  -> Gen a
-  -> (p, [SampleTree]) -- ^ Initial result of the generator
+-- This is lazy in the shrink history.
+shrinkFrom :: forall p n.
+     Context.Static
+     -- ^ Static context
+     --
+     -- Passed as-is to the property as part of the t'Context'.
+     -- Used to extract shrinking parameters.
+  -> Context.Iteration
+     -- ^ Iteration context
+     --
+     -- Passsed as-is to the property as part of the t'Context'.
+     -- Not used otherwise.
+  -> (Context -> Gen (IsValidShrink p n))
+     -- ^ The property we're shrinking
+  -> SampleTree
+     -- ^ The sample tree we started with
+  -> (p, [SampleTree])
+     -- ^ The initial result of the generator
   -> ShrinkExplanation p n
-shrinkFrom prop gen = \(p, shrunk) ->
-    ShrinkExplanation p $ go shrunk
+shrinkFrom static iteration prop = \st (p, shrunk) ->
+    ShrinkExplanation p $ go 0 st shrunk
   where
-    go :: [SampleTree] -> ShrinkHistory p n
-    go shrunk =
-        -- Shrinking is a greedy algorithm: we go with the first candidate that
-        -- works, and discard the others.
-        --
+    go :: Word -> SampleTree -> [SampleTree] -> ShrinkHistory p n
+    go i = \st shrunk ->
         -- NOTE: 'partitionEithers' is lazy enough:
         --
         -- > head . fst $ partitionEithers [Left True, undefined] == True
-        case partitionEithers candidates of
-          ([], rejected)      -> ShrinkingDone rejected
-          ((p, shrunk'):_, _) -> ShrunkTo p $ go shrunk'
-      where
-        candidates :: [Either (p, [SampleTree]) n]
-        candidates = map consider $ map (runGen gen) shrunk
+        let candidates :: [(SampleTree, p, [SampleTree])]
+            rejected   :: [n]
+            (candidates, rejected) = partitionEithers $ map consider shrunk
 
-    consider :: (a, [SampleTree]) -> Either (p, [SampleTree]) n
-    consider (a, shrunk) =
-        case prop a of
-          ValidShrink p   -> Left (p, shrunk)
-          InvalidShrink n -> Right n
+         in case candidates of
+              [] ->
+                ShrinkingDone rejected $ runFinal i st
+              (st', p, shrunk'):_ | canContinue ->
+                ShrunkTo p $ go (succ i) st' shrunk'
+              _otherwise ->
+                ShrinkingStopped $ runFinal i st
+      where
+        ctx :: Context
+        ctx = Context static iteration $ Context.Shrinking i
+
+        canContinue :: Bool
+        canContinue =
+             maybe
+               True
+               (\limit -> i < limit)
+               (Context.maxShrinks static)
+
+        consider :: SampleTree -> Either (SampleTree, p, [SampleTree]) n
+        consider st =
+            case isValid of
+              ValidShrink p   -> Left (st, p, shrunk')
+              InvalidShrink n -> Right n
+          where
+            isValid :: IsValidShrink p n
+            shrunk' :: [SampleTree]
+            (isValid, shrunk') = runGen (prop ctx) st
+
+    -- Run the property one final time
+    --
+    -- Precondition: must be run on a sample tree for which we know the
+    -- property fails.
+    runFinal :: Word -> SampleTree -> p
+    runFinal i st =
+        case fst $ runGen (prop ctx) st of
+          ValidShrink   p -> p
+          InvalidShrink _ -> error "runFinal: precondition violated"
+      where
+        ctx :: Context
+        ctx = Context static iteration $ Context.Final i

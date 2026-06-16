@@ -17,8 +17,12 @@ import qualified Test.Falsify.Predicate as P
 
 import TestSuite.Util.List
 
+{-------------------------------------------------------------------------------
+  List of tests
+-------------------------------------------------------------------------------}
+
 tests :: TestTree
-tests = testGroup "TestSuite.Prop.Generator.Prim" [
+tests = testGroup "TestSuit.Generator.Prim" [
     testGroup "prim" [
         testProperty "shrinking" prop_prim_shrinking
       , testGroup "minimum" [

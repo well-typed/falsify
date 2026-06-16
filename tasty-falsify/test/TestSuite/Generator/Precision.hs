@@ -13,8 +13,12 @@ import qualified Data.Falsify.WordN     as WordN
 import qualified Test.Falsify.Generator as Gen
 import qualified Test.Falsify.Predicate as P
 
+{-------------------------------------------------------------------------------
+  List of tests
+-------------------------------------------------------------------------------}
+
 tests :: TestTree
-tests = testGroup "TestSuite.Prop.Generator.Precision" [
+tests = testGroup "TestSuite.Generator.Precision" [
       testGroup "wordN" [
           testGroup (show p) [
               testProperty "shrinking" $ prop_wordN_shrinking p
