@@ -29,7 +29,7 @@ testProperty ::
   -> Tasty.TestTree
 testProperty = testPropertyWith def
 
--- | Test @falsify@ 'Falsify.Property'' as part of a @tasty@ 'Tasty.TestTree'
+-- | Test @falsify@ 'Falsify.Property' as part of a @tasty@ 'Tasty.TestTree'
 testPropertyWith ::
      TestOptions
   -> Tasty.TestName
