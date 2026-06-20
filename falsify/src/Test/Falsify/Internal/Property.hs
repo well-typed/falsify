@@ -170,7 +170,7 @@ instance Monad m => Monad (TestResultT e m) where
 -- A 'Property'' is a generator that can fail and keeps a track of some
 -- information about the test run.
 --
--- In most cases, you will probably want to use t'Test.Falsify.Property.Property'
+-- In most cases, you will probably want to use 'Property'
 -- instead, which fixes @e@ at 'String'.
 newtype Property' e a = WrapProperty {
       unwrapProperty :: TestResultT e (StateT TestRun Gen) a

@@ -2,7 +2,7 @@
 
 -- | Default generators
 --
--- 'GenDefault' (as well as 'Test.Falsify.GenDefault.Std') are exported from
+-- 'GenDefault' (as well as t'Test.Falsify.GenDefault.Std.Std') are exported from
 -- "Test.Falsify", so you will only need to import this module if you want to
 -- make use of the deriving-via support.
 --

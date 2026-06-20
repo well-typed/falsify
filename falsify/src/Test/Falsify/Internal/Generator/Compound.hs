@@ -93,7 +93,7 @@ import qualified Test.Falsify.Range                as Range
 -- In this case, @l@ and @r@ are run against /different/ sample trees, like we
 -- do here, /but/ in this case if the current value produced by the generator is
 -- produced by the right generator, then the sample tree used for the left
--- generator will always shrink to 'Test.Falsify.Generator.Minimal' (this /must/
+-- generator will always shrink to 'Test.Falsify.SampleTree.Minimal' (this /must/
 -- be possible because we're not currently using it); this means that we would
 -- then only be able to shrink to a value from the left generator if the
 -- /minimal/ value produced by that generator happens to work.

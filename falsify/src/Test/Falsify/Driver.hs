@@ -1,7 +1,7 @@
 -- | The main @falsify@ driver
 --
 -- The main entrypoint into @falsify@ is the 'falsify' function, which attempts
--- to falsify the 'Test.Falsify.Internal.Property.Property'' it is given.
+-- to falsify the t'Test.Falsify.Property'' it is given.
 -- However, most users don't need to use this module directly; it is primarily
 -- intended for integration of @falsify@ in test frameworks such as @tasty@.
 -- For the case of @tasty@ /specifically/, see the @tasty-falsify@ package.
