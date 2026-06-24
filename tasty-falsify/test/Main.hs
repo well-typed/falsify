@@ -3,6 +3,7 @@ module Main (main) where
 import Test.Tasty
 
 import qualified TestSuite.Generator.Compound
+import qualified TestSuite.Generator.Context
 import qualified TestSuite.Generator.Function
 import qualified TestSuite.Generator.Marking
 import qualified TestSuite.Generator.Precision
@@ -15,6 +16,7 @@ main :: IO ()
 main = defaultMain $ testGroup "falsify" [
       testGroup "Generator" [
           TestSuite.Generator.Prim.tests
+        , TestSuite.Generator.Context.tests
         , TestSuite.Generator.Selective.tests
         , TestSuite.Generator.Marking.tests
         , TestSuite.Generator.Precision.tests

@@ -12,6 +12,10 @@ import Test.Falsify.Interactive (sample, shrink')
 
 import qualified Test.Falsify.Generator as Gen
 
+{-------------------------------------------------------------------------------
+  List of tests
+-------------------------------------------------------------------------------}
+
 tests :: TestTree
 tests = testGroup "TestSuite.Sanity.Selective" [
       testGroup "tree" [

@@ -90,6 +90,7 @@ library
       lang
   exposed-modules:
       Test.Falsify
+      Test.Falsify.Context
       Test.Falsify.Driver
       Test.Falsify.GenDefault
       Test.Falsify.GenDefault.Std

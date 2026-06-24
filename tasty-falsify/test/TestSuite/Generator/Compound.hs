@@ -23,8 +23,12 @@ import qualified Test.Falsify.ShrinkTree  as ShrinkTree
 
 import TestSuite.Util.List
 
+{-------------------------------------------------------------------------------
+  List of tests
+-------------------------------------------------------------------------------}
+
 tests :: TestTree
-tests = testGroup "TestSuite.Prop.Generator.Compound" [
+tests = testGroup "TestSuite.Generator.Compound" [
       testGroup "list" [
           testGroup "towardsShorter" [
               testProperty "shrinking" prop_list_towardsShorter_shrinking
@@ -275,7 +279,6 @@ prop_toShrinkTree =
 
     genToTest :: Gen Word64
     genToTest = (`mod` 100) <$> Gen.prim
-
 
 {-------------------------------------------------------------------------------
   Tweak test data distribution

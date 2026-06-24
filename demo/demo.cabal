@@ -57,6 +57,7 @@ executable demo
       Main.hs
   other-modules:
       Demo.Blogpost
+      Demo.Context
       Demo.Distribution
       Demo.Functions
       Demo.HowToSpecifyIt

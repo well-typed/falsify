@@ -20,8 +20,12 @@ import qualified Test.Falsify.Range as Range
 
 import TestSuite.Util.List
 
+{-------------------------------------------------------------------------------
+  List of tests
+-------------------------------------------------------------------------------}
+
 tests :: TestTree
-tests = testGroup "TestSuite.Prop.Generator.Shrinking" [
+tests = testGroup "TestSuite.Generator.Shrinking" [
       testGroup "prim" [
           testPropertyWith expectFailure  "prim" prop_prim_minimum
         ]
