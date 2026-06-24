@@ -2,16 +2,25 @@
 
 module TestSuite.Sanity.Predicate (tests) where
 
+import Data.Char
 import Test.Tasty
 import Test.Tasty.HUnit
-import Test.Falsify.Predicate (Predicate, (.$))
+
+import Test.Falsify
 import qualified Test.Falsify.Predicate as P
-import Data.Char
+
+{-------------------------------------------------------------------------------
+  List of tests
+-------------------------------------------------------------------------------}
 
 tests :: TestTree
 tests = testGroup "TestSuite.Sanity.Predicate" [
       testCase "on" test_on
     ]
+
+{-------------------------------------------------------------------------------
+  Test: 'P.on'
+-------------------------------------------------------------------------------}
 
 test_on :: Assertion
 test_on = do

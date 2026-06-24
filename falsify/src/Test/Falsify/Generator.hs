@@ -48,6 +48,7 @@ module Test.Falsify.Generator (
     -- * Shrink trees
   , fromShrinkTree
   , toShrinkTree
+  , toShrinkTreeWithContext
     -- * Generator independence
   , bindIntegral
   , perturb

@@ -32,6 +32,7 @@ import qualified Data.List.NonEmpty as NE
 
 import Test.Falsify.Internal.Driver
 import Test.Falsify.Internal.Driver.ReplaySeed
+import Test.Falsify.Internal.Property
 import Test.Falsify.Internal.Shrinking
 
 {-------------------------------------------------------------------------------
@@ -72,6 +73,6 @@ failure' TestOutcome{testFailure} = aux <$> testFailure
     aux Failure{failureSeed, failureRun} = (
           failureSeed
         ,   shrinkHistory
-          $ first fst      -- Drop the 'TestRun's
+          $ first counterexampleError
           $ failureRun
         )

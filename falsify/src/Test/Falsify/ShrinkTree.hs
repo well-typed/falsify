@@ -20,6 +20,10 @@ import qualified Data.Tree as Rose
 newtype ShrinkTree a = WrapShrinkTree{
       unwrapShrinkTree :: Rose.Tree a
     }
+  deriving stock (Eq, Functor)
+
+instance Show a => Show (ShrinkTree a) where
+  show = Rose.drawTree . fmap show . unwrapShrinkTree
 
 {-------------------------------------------------------------------------------
   Construction

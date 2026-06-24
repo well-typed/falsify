@@ -109,7 +109,6 @@ library
       Data.Falsify.Tree
       Data.Falsify.WordN
   other-modules:
-      Test.Falsify.Internal.Context
       Test.Falsify.Internal.Driver
       Test.Falsify.Internal.Driver.ReplaySeed
       Test.Falsify.Internal.Fun

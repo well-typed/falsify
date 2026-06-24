@@ -6,7 +6,6 @@ module Test.Falsify.Internal.Shrinking (
   , ShrinkHistory(..)
   , IsValidShrink(..)
   , isValidShrink
-  , finalShrink
   , shrinkHistory
   , shrinkOutcome
   ) where
@@ -15,11 +14,11 @@ import Data.Bifunctor
 import Data.Either
 import Data.List.NonEmpty (NonEmpty((:|)))
 
-import Test.Falsify.Internal.Context (Context)
+import Test.Falsify.Context (Context(Context))
 import Test.Falsify.Internal.Generator
 import Test.Falsify.SampleTree (SampleTree(..))
 
-import qualified Test.Falsify.Internal.Context as Context
+import qualified Test.Falsify.Context as Context
 
 {-------------------------------------------------------------------------------
   Explanation
@@ -45,15 +44,21 @@ data ShrinkHistory p n =
 
     -- | We could no shrink any further
     --
-    -- We also record all rejected next steps. This is occasionally useful when
-    -- trying to figure out why a value didn't shrink any further (what did it
-    -- try to shrink to?)
-  | ShrinkingDone [n]
+    -- We record
+    --
+    -- * All rejected next steps
+    -- * The outcome of the repeated 'finalShrink' step
+    --
+    -- Recording the rejected next steps is occasionally useful when trying to
+    -- figure out why a value didn't shrink any further (what did it try to
+    -- shrink to?).
+  | ShrinkingDone [n] p
 
     -- | We stopped shrinking early
     --
     -- This is used when the number of shrink steps is limited.
-  | ShrinkingStopped
+    -- We record the outcome of the repeated 'finalShrink' step.
+  | ShrinkingStopped p
   deriving (Show)
 
 -- | Simplify the shrink explanation to keep only the shrink history
@@ -62,9 +67,9 @@ shrinkHistory = \(ShrinkExplanation unshrunk shrunk) ->
     unshrunk :| go shrunk
   where
     go :: ShrinkHistory p n -> [p]
-    go (ShrunkTo x xs)   = x : go xs
-    go (ShrinkingDone _) = []
-    go ShrinkingStopped  = []
+    go (ShrunkTo x xs)       = x : go xs
+    go (ShrinkingDone _ns p) = [p]
+    go (ShrinkingStopped  p) = [p]
 
 -- | The final shrunk value, as well as all rejected /next/ shrunk steps
 --
@@ -75,13 +80,13 @@ shrinkHistory = \(ShrinkExplanation unshrunk shrunk) ->
 --   minimal wrt to a particular properly, but not the minimal value that a
 --   generator can produce).
 shrinkOutcome :: forall p n. ShrinkExplanation p n -> (p, Maybe [n])
-shrinkOutcome = \ShrinkExplanation{initial, history} ->
-    go initial history
+shrinkOutcome = \ShrinkExplanation{history} ->
+    go history
   where
-    go :: p -> ShrinkHistory p n -> (p, Maybe [n])
-    go _ (ShrunkTo p h)     = go p h
-    go p (ShrinkingDone ns) = (p, Just ns)
-    go p  ShrinkingStopped  = (p, Nothing)
+    go :: ShrinkHistory p n -> (p, Maybe [n])
+    go (ShrunkTo _p h)      = go h
+    go (ShrinkingDone ns p) = (p, Just ns)
+    go (ShrinkingStopped p) = (p, Nothing)
 
 {-------------------------------------------------------------------------------
   Mapping
@@ -101,12 +106,9 @@ instance Bifunctor ShrinkExplanation where
 
 instance Bifunctor ShrinkHistory where
   bimap f g = \case
-      ShrunkTo truncated history ->
-        ShrunkTo (f truncated) (bimap f g history)
-      ShrinkingDone rejected ->
-        ShrinkingDone (map g rejected)
-      ShrinkingStopped ->
-        ShrinkingStopped
+      ShrunkTo         p h -> ShrunkTo                 (f p) (bimap f g h)
+      ShrinkingDone ns p   -> ShrinkingDone (map g ns) (f p)
+      ShrinkingStopped p   -> ShrinkingStopped         (f p)
 
 {-------------------------------------------------------------------------------
   Shrinking
@@ -122,28 +124,6 @@ isValidShrink :: IsValidShrink p n -> Either n p
 isValidShrink (ValidShrink p)   = Right p
 isValidShrink (InvalidShrink n) = Left n
 
--- | Rerun the final shrink with the context flag 'Test.Falsify.Context.finalShrink'
--- asserted
-finalShrink :: forall a p n.
-     (a -> IsValidShrink p n)
-  -> (Context -> Gen a)
-  -> Context
-  -> SampleTree
-  -> p
-finalShrink prop gen ctx st =
-    case prop a of
-      ValidShrink p -> p
-      _             -> error finalErrorMsg
-  where
-    a =
-      fst $
-        runGen
-          (gen ctx{Context.finalShrink = True})
-          st
-
-    finalErrorMsg :: String
-    finalErrorMsg = "Inconsistent test: failing test did not fail with finalShrink True"
-
 -- | Find smallest value that the generator can produce and still satisfies
 -- the predicate.
 --
@@ -153,44 +133,73 @@ finalShrink prop gen ctx st =
 -- the property and values that do not.
 --
 -- This is lazy in the shrink history.
-shrinkFrom :: forall a p n.
-     Maybe Word -- ^ Limit amount of shrinking steps
-  -> (a -> IsValidShrink p n)
-  -> (Context -> Gen a)
-  -> Context
-  -> (p, [SampleTree]) -- ^ Initial result of the generator
+shrinkFrom :: forall p n.
+     Context.Static
+     -- ^ Static context
+     --
+     -- Passed as-is to the property as part of the 'Context'.
+     -- Used to extract shrinking parameters.
+  -> Context.Iteration
+     -- ^ Iteration context
+     --
+     -- Passsed as-is to the property as part of the 'Context'.
+     -- Not used otherwise.
+  -> (Context -> Gen (IsValidShrink p n))
+     -- ^ The property we're shrinking
+  -> SampleTree
+     -- ^ The sample tree we started with
+  -> (p, [SampleTree])
+     -- ^ The initial result of the generator
   -> ShrinkExplanation p n
-shrinkFrom limit prop gen ctx = \(p, shrunk) ->
-    ShrinkExplanation p $ go 1 shrunk
+shrinkFrom static iteration prop = \st (p, shrunk) ->
+    ShrinkExplanation p $ go 0 st shrunk
   where
-    go i shrunk =
-        -- Shrinking is a greedy algorithm: we go with the first candidate that
-        -- works, and discard the others.
-        if | ([], rejected) <- candidates
-           -> ShrinkingDone rejected
-           | Just li <- limit
-           , i > li
-           -> ShrinkingStopped
-           | ((st, p, shrunk'):_, _) <- candidates
-           -> let next :: ShrinkHistory p n
-                  next = go (succ i) shrunk'
-              in case next of
-                   ShrunkTo _ _ -> ShrunkTo p next
-                   _            -> ShrunkTo (finalShrink prop gen ctx' st) next
-      where
+    go :: Word -> SampleTree -> [SampleTree] -> ShrinkHistory p n
+    go i = \st shrunk ->
         -- NOTE: 'partitionEithers' is lazy enough:
         --
         -- > head . fst $ partitionEithers [Left True, undefined] == True
-        candidates :: ([(SampleTree, p, [SampleTree])], [n])
-        candidates = partitionEithers $ map consider shrunk
+        let candidates :: [(SampleTree, p, [SampleTree])]
+            rejected   :: [n]
+            (candidates, rejected) = partitionEithers $ map consider shrunk
+
+         in case candidates of
+              [] ->
+                ShrinkingDone rejected $ runFinal i st
+              (st', p, shrunk'):_ | canContinue ->
+                ShrunkTo p $ go (succ i) st' shrunk'
+              _otherwise ->
+                ShrinkingStopped $ runFinal i st
+      where
+        ctx :: Context
+        ctx = Context static iteration $ Context.Shrinking i
+
+        canContinue :: Bool
+        canContinue =
+             maybe
+               True
+               (\limit -> i < limit)
+               (Context.maxShrinks static)
 
         consider :: SampleTree -> Either (SampleTree, p, [SampleTree]) n
         consider st =
-            case prop a of
+            case isValid of
               ValidShrink p   -> Left (st, p, shrunk')
               InvalidShrink n -> Right n
           where
-            (a, shrunk') = runGen (gen ctx') st
+            isValid :: IsValidShrink p n
+            shrunk' :: [SampleTree]
+            (isValid, shrunk') = runGen (prop ctx) st
 
-        ctx' :: Context
-        ctx' = ctx{Context.thisShrink = Just i}
+    -- Run the property one final time
+    --
+    -- Precondition: must be run on a sample tree for which we know the
+    -- property fails.
+    runFinal :: Word -> SampleTree -> p
+    runFinal i st =
+        case fst $ runGen (prop ctx) st of
+          ValidShrink   p -> p
+          InvalidShrink _ -> error "runFinal: precondition violated"
+      where
+        ctx :: Context
+        ctx = Context static iteration $ Context.Final i

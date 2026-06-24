@@ -10,6 +10,7 @@ module Test.Falsify.Internal.Property (
   , runProperty
     -- * Test results
   , TestResult(..)
+  , Counterexample(..)
   , resultIsValidShrink
     -- * State
   , TestRun(..)
@@ -28,11 +29,14 @@ module Test.Falsify.Internal.Property (
   , getContext
     -- * Testing shrinking
   , testShrinking
+  , testShrinkingForIteration
   , testMinimum
+  , testMinimumForIteration
     -- * Testing generators
   , testGen
   , testGen'
   , testShrinkingOfGen
+  , testShrinkingOfGenForIteration
   ) where
 
 import Prelude hiding (log)
@@ -50,12 +54,12 @@ import GHC.Stack
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
-import Test.Falsify.Internal.Context (Context(Context))
+import Test.Falsify.Context (Context(Context))
 import Test.Falsify.Internal.Generator
 import Test.Falsify.Internal.Shrinking
 import Test.Falsify.Predicate (Predicate, (.$))
 
-import qualified Test.Falsify.Internal.Context as Context
+import qualified Test.Falsify.Context   as Context
 import qualified Test.Falsify.Generator as Gen
 import qualified Test.Falsify.Predicate as P
 
@@ -64,6 +68,7 @@ import qualified Test.Falsify.Predicate as P
 -------------------------------------------------------------------------------}
 
 data TestRun = TestRun {
+      -- | Any 'info' messages generated during the run
       runLog :: Log
 
       -- | Did we generate any values in this test run?
@@ -131,15 +136,22 @@ data TestResult e a =
   | TestDiscarded
   deriving stock (Show, Functor)
 
--- | A test result is a valid shrink step if the test still fails
+data Counterexample e = Counterexample{
+      counterexampleContext :: Context.Execution
+    , counterexampleError   :: e
+    , counterexampleRun     :: TestRun
+    }
+  deriving (Show)
+
 resultIsValidShrink ::
-     (TestResult e a, TestRun)
-  -> IsValidShrink (e, TestRun) (Maybe a, TestRun)
-resultIsValidShrink (result, run) =
+     Context.Execution
+  -> (TestResult e a, TestRun)
+  -> IsValidShrink (Counterexample e) (Maybe a, TestRun)
+resultIsValidShrink ctxt (result, run) =
     case result of
-      TestFailed e  -> ValidShrink   (e       , run)
-      TestDiscarded -> InvalidShrink (Nothing , run)
-      TestPassed a  -> InvalidShrink (Just a  , run)
+      TestFailed e  -> ValidShrink $ Counterexample ctxt e run
+      TestDiscarded -> InvalidShrink (Nothing, run)
+      TestPassed a  -> InvalidShrink (Just a , run)
 
 {-------------------------------------------------------------------------------
   Monad-transformer version of 'TestResult'
@@ -346,25 +358,31 @@ genWith = genWithCallStack callStack
 -------------------------------------------------------------------------------}
 
 -- | Construct random path through the property's shrink tree
-genShrinkPath :: Property' e () -> Property' e' [(e, TestRun)]
-genShrinkPath prop = do
-    let ctx = Context {
-              tests = 1
-            , thisTest = 1
-            , maxShrinks = Nothing
-            , thisShrink = Nothing
-            , finalShrink = False
-            , maxRatio = 100
-            }
+--
+-- The repeated 'finalShrink' step is /not/ included.
+genShrinkPath ::
+     Context.Iteration -- ^ See 'testShrinking' for detailed discussion
+  -> Property' e ()
+  -> Property' e' [Counterexample e]
+genShrinkPath iteration prop = do
+    static <- Context.static <$> getContext
+
+    let ctx :: Context.Execution -> Context
+        ctx = Context static iteration
+
     st    <- genWith (const Nothing) $
-               Gen.toShrinkTree (runProperty prop ctx)
+               Gen.toShrinkTreeWithContext False (runProperty prop . ctx)
     mPath <- genWith (const Nothing) $
-               Gen.path (isValidShrink . resultIsValidShrink) st
+               Gen.path
+                 ( \(exe, (result, run)) ->
+                      isValidShrink $ resultIsValidShrink exe (result, run)
+                 )
+                 st
     aux mPath
   where
     aux ::
-         Either (Maybe (), TestRun) (NonEmpty (e, TestRun))
-      -> Property' e' [(e, TestRun)]
+         Either (Maybe (), TestRun) (NonEmpty (Counterexample e))
+      -> Property' e' [Counterexample e]
     aux (Left (Just (), _)) = return []
     aux (Left (Nothing, _)) = discard
     aux (Right es)          = return $ toList es
@@ -381,11 +399,39 @@ genShrinkPath prop = do
 -- If the given property itself discards immediately, then this generator will
 -- discard also; otherwise, only shrink steps are considered that do not lead
 -- to a discard.
+--
+-- See also 'testShrinkingForIteration'.
 testShrinking :: forall e.
      Show e
-  => Predicate [e, e] -> Property' e () -> Property' String ()
-testShrinking p prop = do
-    path <- genShrinkPath prop
+  => Predicate [e, e]
+  -> Property' e () -> Property' String ()
+testShrinking = testShrinkingForIteration $ Context.Iteration{
+      thisTest = error $ concat [
+          "thisTest is undefined. "
+        , "Use testShrinkingForIteration "
+        , "instead of testShrinking."
+        ]
+    }
+
+-- | Generalization of 'testShrinking' for an arbitrary 'Iteration'
+--
+-- Some properties may behave quite differently given a different iteration
+-- context, in which case it is important to be explicit about this.
+--
+-- The /shrinking/ context is constructed so that it accurately reflects
+-- the path: 'Nothing' for the root of the tree, and then 'Just' the shrink
+-- step as we follow edges downwards. There is /no/ repeated 'finalShrink'
+-- step: 'genShrinkPath' is typically used to verify that successive shrink
+-- steps result in values that are closer to the generator's origin, which
+-- is trivially violated by that repeated final step.
+--
+-- The /static/ context is inherited from the parent property.
+testShrinkingForIteration :: forall e.
+     Show e
+  => Context.Iteration
+  -> Predicate [e, e] -> Property' e () -> Property' String ()
+testShrinkingForIteration iteration p prop = do
+    path <- genShrinkPath iteration prop
     case findCounterExample (toList path) of
       Nothing ->
         return ()
@@ -396,14 +442,20 @@ testShrinking p prop = do
         appendLog logAfter
         testFailed err
   where
-    findCounterExample :: [(e, TestRun)] -> Maybe (String, Log, Log)
+    findCounterExample :: [Counterexample e] -> Maybe (String, Log, Log)
     findCounterExample = \case
         []  -> Nothing
         [_] -> Nothing
-        ((x, runX) : rest@((y, runY) : _)) ->
-          case P.eval $ p .$ ("original", x) .$ ("shrunk", y) of
-            Left err -> Just (err, runLog runX, runLog runY)
+        (x : rest@(y : _)) ->
+          case P.eval $
+                 p .$ ("original" , counterexampleError x)
+                   .$ ("shrunk"   , counterexampleError y) of
             Right () -> findCounterExample rest
+            Left err -> Just (
+                err
+              , runLog (counterexampleRun x)
+              , runLog (counterexampleRun y)
+              )
 
 -- | Test the minimum error thrown by the property
 --
@@ -415,22 +467,32 @@ testShrinking p prop = do
 -- some particular property in mind. Otherwise, the minimum value will always
 -- simply be the value that the generator produces when given the @Minimal@
 -- sample tree.
-testMinimum :: forall e.
+--
+-- See also 'testMinimumForIteration'.
+testMinimum :: Show e => Predicate '[e] -> Property' e () -> Property' String ()
+testMinimum = testMinimumForIteration $ Context.Iteration{
+          thisTest = error $ concat [
+              "thisTest is undefined. "
+            , "Use testMinimumForIteration "
+            , "instead of testMinimum."
+            ]
+        }
+
+-- | Generalization of 'testMinimum'
+--
+-- See 'testShrinkingForGeneration' for detailed discussion of the context.
+testMinimumForIteration :: forall e.
      Show e
-  => Predicate '[e]
-  -> Property' e ()
-  -> Property' String ()
-testMinimum p prop = do
-    let ctx = Context {
-              tests       = 1
-            , thisTest    = 1
-            , maxShrinks  = Nothing
-            , thisShrink  = Nothing
-            , finalShrink = False
-            , maxRatio    = 100
-            }
+  => Context.Iteration
+  -> Predicate '[e] -> Property' e () -> Property' String ()
+testMinimumForIteration iteration p prop = do
+    static <- Context.static <$> getContext
+
+    let initContext :: Context
+        initContext = Context static iteration Context.Initial
+
     st <- genWith (const Nothing) $ Gen.captureLocalTree
-    case runGen (runProperty prop ctx) st of
+    case runGen (runProperty prop initContext) st of
       ((TestPassed (), _run), _shrunk) ->
         -- The property passed; nothing to test
         discard
@@ -438,41 +500,33 @@ testMinimum p prop = do
         -- The property needs to be discarded; discard this one, too
         discard
       ((TestFailed initErr, initRun), shrunk) -> do
-        let explanation, explanation' ::
-              ShrinkExplanation (e, TestRun) (Maybe (), TestRun)
-            explanation = shrinkFrom
-                            Nothing
-                            resultIsValidShrink
-                            (runProperty prop)
-                            ctx
-                            ((initErr, initRun), shrunk)
+        let explanation :: ShrinkExplanation (Counterexample e) (Maybe (), TestRun)
+            explanation =
+                shrinkFrom
+                  static
+                  iteration
+                  (\ctx -> resultIsValidShrink (Context.execution ctx) <$>
+                             runProperty prop ctx)
+                  st
+                  (Counterexample Context.Initial initErr initRun, shrunk)
 
-            explanation' = case history explanation of
-                ShrunkTo _ _ -> explanation
-                _            -> explanation{initial = finalInitial}
-
-            finalInitial :: (e, TestRun)
-            finalInitial =
-              finalShrink resultIsValidShrink (runProperty prop) ctx st
-
-            minErr    :: e
-            minRun    :: TestRun
-            mRejected :: Maybe [(Maybe (), TestRun)]
-            ((minErr, minRun), mRejected) = shrinkOutcome explanation'
+            minExample :: Counterexample e
+            mRejected  :: Maybe [(Maybe (), TestRun)]
+            (minExample, mRejected) = shrinkOutcome explanation
 
             rejected :: [TestRun]
             rejected  = maybe [] (map snd) mRejected
 
-        case P.eval $ p .$ ("minimum", minErr) of
+        case P.eval $ p .$ ("minimum", counterexampleError minExample) of
           Right () -> do
             -- For a successful test, we add the full shrink history as info
             -- This means that users can use verbose mode to see precisely
             -- how the minimum value is reached, if they wish.
             info "Shrink history:"
-            forM_ (shrinkHistory explanation) $ \(e, _run) ->
-              info $ show e
+            forM_ (shrinkHistory explanation) $ \example ->
+              info $ show (counterexampleError example)
           Left err -> do
-            appendLog (runLog minRun)
+            appendLog (runLog $ counterexampleRun minExample)
             unless (null rejected) $ do
               info "\nLogs for rejected potential next shrinks:"
               forM_ (zip [0 :: Word ..] rejected) $ \(i, rej) -> do
@@ -506,5 +560,24 @@ testGen' p g = WrapProperty $ TestResultT $ ReaderT $ \_ctx -> StateT $ \run ->
 --
 -- We check /any/ shrink step that the generator can make (independent of any
 -- property).
+--
+-- See also 'testShrinkingOfGenForIteration'.
 testShrinkingOfGen :: Show a => Predicate [a, a] -> Gen a -> Property' String ()
-testShrinkingOfGen p = testShrinking p . testGen' Left
+testShrinkingOfGen =
+    testShrinkingOfGenForIteration $ Context.Iteration{
+          thisTest = error $ concat [
+              "thisTest is undefined. "
+            , "Use testShrinkingOfGenForIteration "
+            , "instead of testShrinkingOfGen."
+            ]
+        }
+
+-- | Generalization of 'testShrinkingOfGen'
+--
+-- See 'testShrinkingForGeneration' for detailed discussion of the context.
+testShrinkingOfGenForIteration ::
+     Show a
+  => Context.Iteration
+  -> Predicate [a, a] -> Gen a -> Property' String ()
+testShrinkingOfGenForIteration iteration p =
+    testShrinkingForIteration iteration p . testGen' Left
