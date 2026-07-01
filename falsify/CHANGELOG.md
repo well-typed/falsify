@@ -1,9 +1,19 @@
 # Revision history for falsify
 
-## 0.4.0 -- ??
+## 0.4.0 -- 2026-07-01
 
 This release is a major cleanup release, and backwards incompatible with 0.3 in
 various ways. Below we provide a list of changes as well as a migration guide.
+
+### New features
+
+* `Test.Falsify.Interactive` now offers a pure function `sampleUsing` (#65),
+  using `ReplaySeed` to initialize the PRNG. `ReplaySeed` is no longer opaque.
+* `Property` now offers `getContext`, which allows properties to vary their
+  behaviour across different test iterations; for example, tests might want to
+  start with generating values from small ranges and then slowly increase that
+  range. There is also a derived function `sized` for that specific application.
+  (#102, together with Peter Lebbing and Martijn Bastiaan from QBayLogic)
 
 ### Package split: `falsify` vs `tasty-falsify`
 
@@ -81,8 +91,6 @@ A number of type aliases have been replaced by newtypes.
   are a more natural fit when used together with `lam` to construct predicates
   of arbitrary arity. To consider the old `alwaysFail`, use `Fail "Fail"`.
 * Predicate documentation has been significantly improved.
-* `Test.Falsify.Interactive` now offers a pure function `sampleUsing` (#65),
-  using `ReplaySeed` to initialize the PRNG. `ReplaySeed` is no longer opaque.
 * Dropped support for GHC < 8.10.7
 
 ## 0.3.0 -- 2026-03-05

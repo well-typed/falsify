@@ -17,6 +17,10 @@ import Test.Falsify
 import qualified Data.Falsify.WordN as WordN
 import qualified Test.Falsify.Range as Range
 
+{-------------------------------------------------------------------------------
+  List of tests
+-------------------------------------------------------------------------------}
+
 tests :: TestTree
 tests = testGroup "TestSuite.Sanity.Range" [
       testGroup "between" [
@@ -24,6 +28,10 @@ tests = testGroup "TestSuite.Sanity.Range" [
         | size <- [2, 3, 4, 10, 100, 1000, 10_000]
         ]
     ]
+
+{-------------------------------------------------------------------------------
+  Test: 'between'
+-------------------------------------------------------------------------------}
 
 test_between :: Word -> Assertion
 test_between size = do

@@ -13,8 +13,12 @@ import Test.Falsify
 import qualified Test.Falsify.Generator as Gen
 import qualified Test.Falsify.Predicate as P
 
+{-------------------------------------------------------------------------------
+  List of tests
+-------------------------------------------------------------------------------}
+
 tests :: TestTree
-tests = testGroup "TestSuite.Prop.Generator.Selective" [
+tests = testGroup "TestSuite.Generator.Selective" [
       testGroup "pair" [
           testProperty                   "ifM"        $ prop_pair ifM
         , testPropertyWith expectFailure "ifS"        $ prop_pair ifS

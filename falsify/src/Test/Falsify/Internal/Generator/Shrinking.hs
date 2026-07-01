@@ -6,6 +6,7 @@ module Test.Falsify.Internal.Generator.Shrinking (
     -- * Support for shrink trees
   , fromShrinkTree
   , toShrinkTree
+  , toShrinkTreeWithContext
   ) where
 
 import Prelude hiding (properFraction)
@@ -18,6 +19,7 @@ import Test.Falsify.Internal.Generator
 import Test.Falsify.SampleTree (SampleTree(..), Sample(..))
 import Test.Falsify.ShrinkTree (ShrinkTree(..))
 
+import qualified Test.Falsify.Context    as Context
 import qualified Test.Falsify.ShrinkTree as ShrinkTree
 
 {-------------------------------------------------------------------------------
@@ -122,10 +124,44 @@ fromShrinkTree = go . unwrapShrinkTree
 
 -- | Expose the full shrink tree of a generator
 --
+-- The generator is passed 'Context.Initial' for the initial step, and then
+-- 'Context.Shrinking' with the number of the shrink step after that. The
+-- 'Test.Falsify.Context.Final' step is /not/ included.
+--
 -- This generator does not shrink.
 toShrinkTree :: forall a. Gen a -> Gen (ShrinkTree a)
-toShrinkTree gen =
-    WrapShrinkTree . Rose.unfoldTree aux . runGen gen <$> captureLocalTree
+toShrinkTree gen = fmap snd <$> toShrinkTreeWithContext False (const gen)
+
+-- | Generalization of 'toShrinkTree'
+toShrinkTreeWithContext :: forall a.
+     Bool -- ^ Include 'Context.Final' step?
+  -> (Context.Execution -> Gen a)
+  -> Gen (ShrinkTree (Context.Execution, a))
+toShrinkTreeWithContext includeFinal gen = do
+    initSeed <- Seed Context.Initial <$> captureLocalTree
+    return $ WrapShrinkTree $ Rose.unfoldTree aux initSeed
   where
-    aux :: (a, [SampleTree]) -> (a, [(a, [SampleTree])])
-    aux (x, shrunk) = (x, map (runGen gen) shrunk)
+    aux :: Seed -> ((Context.Execution, a), [Seed])
+    aux seed@Seed{seedContext, seedSampleTree} =
+        case runGen (gen seedContext) seedSampleTree of
+          (a, shrunk) -> ((seedContext, a), nextSeed seed shrunk)
+
+    nextSeed :: Seed -> [SampleTree] -> [Seed]
+    nextSeed Seed{seedContext, seedSampleTree} shrunk =
+       case seedContext of
+         Context.Initial ->
+           case shrunk of
+             [] | includeFinal -> [Seed (Context.Final 0) seedSampleTree]
+             _  -> map (Seed $ Context.Shrinking 0) shrunk
+         Context.Shrinking i ->
+           case shrunk of
+             [] | includeFinal -> [Seed (Context.Final $ succ i) seedSampleTree]
+             _  -> map (Seed $ Context.Shrinking $ succ i) shrunk
+         Context.Final _ ->
+           []
+
+-- | Internal: 'Rose.unfoldTree' seed, for constructing the shrink tree
+data Seed = Seed{
+      seedContext    :: Context.Execution
+    , seedSampleTree :: SampleTree
+    }

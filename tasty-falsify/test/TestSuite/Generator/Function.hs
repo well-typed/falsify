@@ -15,8 +15,12 @@ import qualified Test.Falsify.Generator as Gen
 import qualified Test.Falsify.Predicate as P
 import qualified Test.Falsify.Range     as Range
 
+{-------------------------------------------------------------------------------
+  List of tests
+-------------------------------------------------------------------------------}
+
 tests :: TestTree
-tests = testGroup "TestSuite.Prop.Generator.Function" [
+tests = testGroup "TestSuite.Generator.Function" [
       testGroup "BoolToBool" [
           testProperty "notConstant" prop_BoolToBool_notConstant
         , testProperty "constant"    prop_BoolToBool_constant
